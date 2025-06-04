@@ -592,6 +592,87 @@ export function runTestCommand(commandString, responseData) {
             return { passed: true };
         }
 
+        case 'jsonValueEquals': {
+            // parts[1]: JSON パス風の文字列 (例: "users.length" や "meta.page")
+            // parts[2]: 比較したい「期待値」を文字列で受け取る
+            const path = args[0];
+            const expectedRaw = args.slice(1).join(' ');
+            // もし数値なら数値に変換
+            const expected = isNaN(expectedRaw) ? expectedRaw : Number(expectedRaw);
+
+            // responseData.body が文字列の場合はまず JSON としてパース
+            let jsonBody;
+            if (typeof responseData.bodyText === 'string') {
+                try {
+                    jsonBody = JSON.parse(responseData.bodyText);
+                } catch {
+                    throw new Error('レスポンスボディが有効な JSON ではありません');
+                }
+            } else {
+                // すでにオブジェクトならそのまま使用
+                jsonBody = responseData.body;
+            }
+
+            // パスに従って JSON オブジェクトを辿る
+            const actual = path.split('.').reduce((obj, key) => {
+                console.log("obj=".obj)
+                console.log("key=".key)
+                if (obj && key in obj) {
+                    return obj[key];
+                }
+                // "length" を持つ配列なら length を返す
+                if (key === 'length' && Array.isArray(obj)) {
+                    return obj.length;
+                }
+                return undefined;
+            }, jsonBody);
+
+            if (actual === undefined) {
+                throw new Error(`パス "${path}" が見つかりません`);
+            }
+
+            // 値を比較
+            if (actual !== expected) {
+                throw new Error(`期待値: ${expected} ですが、実際の値: ${actual} です`);
+            }
+            return { passed: true };
+        }
+
+        case 'headerExists': {
+            // parts[1]: チェックしたいヘッダー名 (大文字小文字区別なし)
+            const headerName = args[0].toLowerCase();
+            // ヘッダーキーをすべて小文字化して検索
+            const found = Object.keys(responseData.headers).some(
+                k => k.toLowerCase() === headerName
+            );
+            if (!found) {
+                throw new Error(`ヘッダー "${args[0]}" が存在しません`);
+            }
+            return { passed: true };
+        }
+
+        case 'headerValueEquals': {
+            // parts[1]: チェックしたいヘッダー名
+            // parts[2]: 期待するヘッダー値
+            const headerName = args[0].toLowerCase();
+            const expectedValue = args.slice(1).join(' ');
+            // 実際のヘッダー値を取得
+            let actualValue = undefined;
+            for (const [k, v] of Object.entries(responseData.headers)) {
+                if (k.toLowerCase() === headerName) {
+                    actualValue = v;
+                    break;
+                }
+            }
+            if (actualValue === undefined) {
+                throw new Error(`ヘッダー "${args[0]}" が存在しません`);
+            }
+            if (actualValue !== expectedValue) {
+                throw new Error(`"${args[1]}" の値が期待値と異なります (期待: ${expectedValue}, 実際: ${actualValue})`);
+            }
+            return { passed: true };
+        }
+
         default:
             return { passed: false, error: `Unknown test command: ${cmd}` };
     }

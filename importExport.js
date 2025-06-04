@@ -98,6 +98,110 @@ export async function handleImport() {
     }
 }
 
+
+function convertPostmanAuth(postmanAuth) {
+    const auth = { type: postmanAuth.type || 'none' };
+
+    switch (postmanAuth.type) {
+        case 'basic':
+            const basicAuth = postmanAuth.basic?.reduce((acc, item) => {
+                acc[item.key] = item.value;
+                return acc;
+            }, {});
+            auth.username = basicAuth?.username || '';
+            auth.password = basicAuth?.password || '';
+            break;
+
+        case 'bearer':
+            const bearerAuth = postmanAuth.bearer?.reduce((acc, item) => {
+                acc[item.key] = item.value;
+                return acc;
+            }, {});
+            auth.token = bearerAuth?.token || '';
+            break;
+
+        case 'apikey':
+            const apikeyAuth = postmanAuth.apikey?.reduce((acc, item) => {
+                acc[item.key] = item.value;
+                return acc;
+            }, {});
+            auth.key = apikeyAuth?.key || '';
+            auth.value = apikeyAuth?.value || '';
+            auth.addTo = apikeyAuth?.in === 'query' ? 'query' : 'header';
+            break;
+    }
+
+    return auth;
+}
+
+function extractPostmanRequests(items, folder = '') {
+    const requests = [];
+
+    items.forEach(item => {
+        if (item.request) {
+            const request = {
+                id: Date.now() + Math.random(),
+                name: item.name || 'Untitled Request',
+                method: item.request.method || 'GET',
+                url: typeof item.request.url === 'string' ? item.request.url : item.request.url?.raw || '',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' },
+                folder: folder
+            };
+
+            // Extract headers
+            if (item.request.header) {
+                item.request.header.forEach(header => {
+                    if (!header.disabled) {
+                        request.headers[header.key] = header.value;
+                    }
+                });
+            }
+
+            // Extract query parameters
+            if (item.request.url?.query) {
+                item.request.url.query.forEach(param => {
+                    if (!param.disabled) {
+                        request.params[param.key] = param.value;
+                    }
+                });
+            }
+
+            // Extract body
+            if (item.request.body) {
+                switch (item.request.body.mode) {
+                    case 'raw':
+                        request.body = item.request.body.raw;
+                        break;
+                    case 'formdata':
+                        request.body = item.request.body.formdata?.reduce((acc, field) => {
+                            if (!field.disabled) {
+                                acc[field.key] = field.value;
+                            }
+                            return acc;
+                        }, {});
+                        break;
+                }
+            }
+
+            // Extract auth
+            if (item.request.auth) {
+                request.auth = convertPostmanAuth(item.request.auth);
+            }
+
+            requests.push(request);
+        } else if (item.item) {
+            // Folder with sub-items
+            const folderName = folder ? `${folder}/${item.name}` : item.name;
+            requests.push(...extractPostmanRequests(item.item, folderName));
+        }
+    });
+
+    return requests;
+}
+
 /** importPostmanCollection */
 async function importPostmanCollection(data) {
     const collection = {
@@ -115,13 +219,13 @@ async function importPostmanCollection(data) {
     if (data.variable) {
         data.variable.forEach(v => {
             if (v.key && !v.disabled) {
-                variables.global[v.key] = { value: v.value || '', description: v.description || '' };
+                state.variables.global[v.key] = { value: v.value || '', description: v.description || '' };
             }
         });
         await saveVariablesToStorage();
     }
 
-    collections.push(collection);
+    state.collections.push(collection);
     await saveCollectionsToStorage();
 
     renderCollections();
@@ -131,14 +235,14 @@ async function importPostmanCollection(data) {
 /** importApiTesterData */
 async function importApiTesterData(data) {
     if (data.collections) {
-        collections.push(...data.collections);
+        state.collections.push(...data.collections);
     }
     if (data.variables) {
-        Object.assign(variables.global, data.variables.global || {});
-        Object.assign(variables.collection, data.variables.collection || {});
+        Object.assign(state.variables.global, data.variables.global || {});
+        Object.assign(state.variables.collection, data.variables.collection || {});
     }
     if (data.environments) {
-        environments.push(...data.environments);
+        state.environments.push(...data.environments);
     }
 
     await saveCollectionsToStorage();
