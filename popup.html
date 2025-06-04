@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced API Tester</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <h1>🚀 API Tester</h1>
+            </div>
+            <div class="header-actions">
+                <button id="importBtn" class="btn btn-outline" title="インポート">
+                    📥 Import
+                </button>
+                <button id="exportBtn" class="btn btn-outline" title="エクスポート">
+                    📤 Export
+                </button>
+                <button id="settingsBtn" class="btn btn-outline" title="設定">
+                    ⚙️
+                </button>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="request">Request</button>
+            <button class="tab-btn" data-tab="collections">Collections</button>
+            <button class="tab-btn" data-tab="history">History</button>
+            <button class="tab-btn" data-tab="interceptor">Interceptor</button>
+        </nav>
+
+        <!-- Request Tab -->
+        <div id="request-tab" class="tab-content active">
+            <div class="request-section">
+                <div class="request-line">
+                    <select id="methodSelect" class="method-select">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="HEAD">HEAD</option>
+                        <option value="OPTIONS">OPTIONS</option>
+                    </select>
+                    <input type="url" id="urlInput" placeholder="https://api.example.com/endpoint" class="url-input">
+                    <button id="sendBtn" class="btn btn-primary">Send</button>
+                </div>
+
+                <div class="request-details">
+                    <!-- Request Tabs -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" data-subtab="params">Params</button>
+                        <button class="sub-tab-btn" data-subtab="headers">Headers</button>
+                        <button class="sub-tab-btn" data-subtab="body">Body</button>
+                        <button class="sub-tab-btn" data-subtab="auth">Auth</button>
+                        <button class="sub-tab-btn" data-subtab="tests">Tests</button>
+                    </div>
+
+                    <!-- Params Tab -->
+                    <div id="params-subtab" class="sub-tab-content active">
+                        <div class="key-value-editor">
+                            <div class="key-value-header">
+                                <span>Key</span>
+                                <span>Value</span>
+                                <span>Description</span>
+                                <span></span>
+                            </div>
+                            <div id="paramsContainer" class="key-value-container"></div>
+                            <button class="btn btn-sm add-param">+ Add Parameter</button>
+                        </div>
+                    </div>
+
+                    <!-- Headers Tab -->
+                    <div id="headers-subtab" class="sub-tab-content">
+                        <div class="key-value-editor">
+                            <div class="key-value-header">
+                                <span>Key</span>
+                                <span>Value</span>
+                                <span>Description</span>
+                                <span></span>
+                            </div>
+                            <div id="headersContainer" class="key-value-container"></div>
+                            <button class="btn btn-sm add-header">+ Add Header</button>
+                        </div>
+                    </div>
+
+                    <!-- Body Tab -->
+                    <div id="body-subtab" class="sub-tab-content">
+                        <div class="body-type-selector">
+                            <label><input type="radio" name="bodyType" value="none" checked> None</label>
+                            <label><input type="radio" name="bodyType" value="form-data"> Form Data</label>
+                            <label><input type="radio" name="bodyType" value="urlencoded"> URL Encoded</label>
+                            <label><input type="radio" name="bodyType" value="raw"> Raw</label>
+                            <label><input type="radio" name="bodyType" value="binary"> Binary</label>
+                        </div>
+                        <div id="bodyEditor" class="body-editor">
+                            <textarea id="rawBody" placeholder="Enter raw body content" class="raw-body"></textarea>
+                            <div id="formDataContainer" class="key-value-container" style="display: none;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Auth Tab -->
+                    <div id="auth-subtab" class="sub-tab-content">
+                        <div class="auth-type-selector">
+                            <select id="authType">
+                                <option value="none">No Auth</option>
+                                <option value="basic">Basic Auth</option>
+                                <option value="bearer">Bearer Token</option>
+                                <option value="oauth2">OAuth 2.0</option>
+                                <option value="apikey">API Key</option>
+                            </select>
+                        </div>
+                        <div id="authDetails" class="auth-details"></div>
+                    </div>
+
+                    <!-- Tests Tab -->
+                    <div id="tests-subtab" class="sub-tab-content">
+                        <textarea id="testScript" placeholder="// Write test assertions here
+pm.test('Status code is 200', function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test('Response has required fields', function () {
+    var jsonData = pm.response.json();
+    pm.expect(jsonData).to.have.property('id');
+});" class="test-script"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Section -->
+            <div class="response-section">
+                <div class="response-header">
+                    <h3>Response</h3>
+                    <div class="response-stats" id="responseStats"></div>
+                </div>
+                
+                <div class="response-tabs">
+                    <button class="response-tab-btn active" data-restab="body">Body</button>
+                    <button class="response-tab-btn" data-restab="headers">Headers</button>
+                    <button class="response-tab-btn" data-restab="cookies">Cookies</button>
+                    <button class="response-tab-btn" data-restab="tests">Test Results</button>
+                </div>
+
+                <div class="response-content">
+                    <div id="response-body" class="response-tab-content active">
+                        <div class="response-format-selector">
+                            <button class="format-btn active" data-format="pretty">Pretty</button>
+                            <button class="format-btn" data-format="raw">Raw</button>
+                            <button class="format-btn" data-format="preview">Preview</button>
+                        </div>
+                        <div id="responseBody" class="response-body-content"></div>
+                    </div>
+                    <div id="response-headers" class="response-tab-content"></div>
+                    <div id="response-cookies" class="response-tab-content"></div>
+                    <div id="response-tests" class="response-tab-content"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collections Tab -->
+        <div id="collections-tab" class="tab-content">
+            <div class="collections-header">
+                <h3>Collections</h3>
+                <button id="newCollectionBtn" class="btn btn-primary">+ New Collection</button>
+            </div>
+            <div id="collectionsContainer" class="collections-container"></div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history-tab" class="tab-content">
+            <div class="history-header">
+                <h3>Request History</h3>
+                <div class="history-actions">
+                    <input type="search" id="historySearch" placeholder="Search history..." class="search-input">
+                    <button id="clearHistoryBtn" class="btn btn-outline">Clear All</button>
+                </div>
+            </div>
+            <div id="historyContainer" class="history-container"></div>
+        </div>
+
+        <!-- Interceptor Tab -->
+        <div id="interceptor-tab" class="tab-content">
+            <div class="interceptor-header">
+                <h3>Network Interceptor</h3>
+                <div class="interceptor-controls">
+                    <button id="startInterceptorBtn" class="btn btn-primary">Start Capture</button>
+                    <button id="stopInterceptorBtn" class="btn btn-outline" disabled>Stop Capture</button>
+                </div>
+            </div>
+            <div class="interceptor-filters">
+                <div class="filter-group">
+                    <label>Methods:</label>
+                    <div class="method-filters">
+                        <label><input type="checkbox" value="GET" checked> GET</label>
+                        <label><input type="checkbox" value="POST" checked> POST</label>
+                        <label><input type="checkbox" value="PUT" checked> PUT</label>
+                        <label><input type="checkbox" value="DELETE" checked> DELETE</label>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Domain Filter:</label>
+                    <input type="text" id="domainFilter" placeholder="example.com" class="filter-input">
+                </div>
+            </div>
+            <div id="interceptorContainer" class="interceptor-container"></div>
+        </div>
+
+        <!-- Import/Export Modal -->
+        <div id="importExportModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Import Data</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="import-options">
+                        <label>Import From:</label>
+                        <select id="importType">
+                            <option value="postman">Postman Collection</option>
+                            <option value="apitester">ApiTester Settings</option>
+                            <option value="openapi">OpenAPI/Swagger</option>
+                            <option value="har">HAR File</option>
+                            <option value="curl">cURL Commands</option>
+                        </select>
+                    </div>
+                    <div class="file-input-area">
+                        <input type="file" id="importFile" accept=".json,.har,.yaml,.yml">
+                        <div class="file-drop-zone" id="fileDropZone">
+                            <p>Drop files here or click to browse</p>
+                        </div>
+                    </div>
+                    <textarea id="importText" placeholder="Or paste JSON/cURL content here..." class="import-textarea"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button id="importSubmitBtn" class="btn btn-primary">Import</button>
+                    <button class="btn btn-outline modal-close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  // デフォルトのフォーマッタをPrettierに設定します。
+
+  "editor.formatOnType": true,
+  // 入力時にコードを自動整形するオプションを有効にします。
+
+  "editor.formatOnPaste": true,
+  // 貼り付け時にコードを自動整形するオプションを有効にします。
+
+  "git.openRepositoryInParentFolders": "always",
+  // Gitリポジトリが親フォルダに存在する場合にも開くように設定します。
+
+  "vim.useSystemClipboard": true,
+  // Vimモードでクリップボードをシステムクリップボードと連携するように設定します。
+
+  "git.suggestSmartCommit": false,
+  // Gitコミットメッセージの提案時にスマートコミットを無効にします。
+
+  "git.confirmSync": false,
+  // Gitの同期操作時に確認ダイアログを無効にします。
+
+  "javascript.updateImportsOnFileMove.enabled": "never",
+  // ファイル移動時にJavaScriptのインポート文を更新しないように設定します。
+
+  "editor.formatOnSave": true,
+  // 保存時にコードを自動整形するオプションを有効にします。
+
+  "css.validate": false,
+  // CSSファイルの構文チェックを無効にします。
+
+  "less.validate": false,
+  // LESSファイルの構文チェックを無効にします。
+
+  "scss.validate": false,
+  // SCSSファイルの構文チェックを無効にします。
+
+  "stylelint.configFile": "./.stylelint.config.js",
+  // Stylelintの設定ファイルのパスを指定します。
+
+  "stylelint.validate": ["css", "scss"],
+  // Stylelintで検証するファイルの拡張子を指定します。
+
+  "stylelint.ignorePatterns": ["**/*.vue"],
+  // Stylelintの検証を無視するファイルパターンを指定します。
+
+  "eslint.validate": ["javascript", "typescript"],
+  // ESLintで検証するファイルの拡張子を指定します。
+
+  "eslint.options": {
+    "overrideConfigFile": ".eslintrc.js"
+  },
+  // ESLintの設定をカスタマイズするためのオプションを指定します。
+
+  "prettier.requireConfig": true,
+  // .prettierrc ファイルの使用を必須にします。
+
+  "prettier.configPath": ".prettierrc",
+  "search.exclude": {
+    "**/_nuxt": true,
+    "**/.output": true,
+    "**/nginx/html": true,
+    "**/yarn.lock": true,
+    "**/docs": true,
+    "**/package-lock.json": true
+  },
+  "search.useIgnoreFiles": false,
+  "window.zoomLevel": 1,
+  "remote.SSH.remotePlatform": {
+    "ubuntu1": "linux"
+  }
+  // .prettierrc ファイルのパスを指定します。
+}
