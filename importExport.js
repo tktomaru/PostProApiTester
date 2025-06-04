@@ -3,9 +3,6 @@
 // Import / Export 処理をまとめる
 
 import {
-    collections,
-    variables,
-    environments,
     saveCollectionsToStorage,
     saveVariablesToStorage,
     saveEnvironmentsToStorage,
@@ -366,7 +363,7 @@ export async function exportData() {
     const dataToExport = {
         version: '1.0',
         exportDate: new Date().toISOString(),
-        collections: collections,
+        collections: state.collections,
         variables: {
             global: variables.global,
             collection: variables.collection

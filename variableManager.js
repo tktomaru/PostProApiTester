@@ -12,16 +12,12 @@ import {
 } from './defaultData.js';
 
 import {
-    variables,
-    environments,
-    currentEnvironment,
-    currentCollection,
     saveVariablesToStorage,
     saveEnvironmentsToStorage,
     saveEnvDataToStorage,
-    saveCurrentEnvironmentToStorage
+    saveCurrentEnvironmentToStorage,
+    state
 } from './state.js';
-import { collections } from './state.js';
 
 import { showError, showSuccess, escapeHtml } from './utils.js';
 
@@ -34,64 +30,95 @@ export async function initializeVariablesManagement() {
 
         // --- サンプルデータを自動投入するロジック START ---
 
-        // 1) グローバル変数が未定義であればサンプルを投入
-        const storedVars = await chrome.storage.local.get(['variables']);
-        if (!storedVars.variables || !storedVars.variables.global ||
-            Object.keys(storedVars.variables.global).length === 0) {
-            // グローバル変数が空だったら、サンプルをセット
-            variables.global = { ...sampleGlobalVariables };
-            // 「collection」はまだ何もない前提
-            variables.collection = storedVars.variables?.collection || {};
-            await chrome.storage.local.set({
-                variables: {
-                    global: variables.global,
-                    collection: variables.collection
-                }
-            });
-        } else {
-            // ストレージにあれば、そちらを優先
-            variables.global = storedVars.variables.global || {};
-            variables.collection = storedVars.variables.collection || {};
-        }
 
-        // 2) 環境一覧が未定義であればサンプルを投入
-        const storedEnvList = await chrome.storage.local.get(['environments']);
-        if (!storedEnvList.environments || storedEnvList.environments.length === 0) {
-            // 環境リストにサンプルをセット
-            environments = [...sampleEnvironments];
-            // 各環境に対応する変数もセット
-            variables.environment = {};
-            for (const env of sampleEnvironments) {
-                const envVars = sampleEnvironmentVariables[env.id] || {};
-                variables.environment = { ...envVars };
-                await chrome.storage.local.set({ [`env_${env.id}`]: variables.environment });
-            }
-            // 最後に環境リストだけ格納
-            await chrome.storage.local.set({ environments });
-        } else {
-            environments.splice(0, environments.length, ...storedEnvList.environments);
-            // 現在選択中の環境（あれば）に合わせて変数をロード
-            if (currentEnvironment) {
-                const envData = await chrome.storage.local.get([`env_${currentEnvironment}`]);
-                variables.environment = envData[`env_${currentEnvironment}`] || {};
+        // ── 1) グローバル変数の初期化 ──
+        {
+            const stored = await chrome.storage.local.get(['variables']);
+            const storedVars = stored.variables || {};
+
+            // ストレージに global がなく、あるいは空オブジェクトならサンプルを投入
+            if (!storedVars.global || Object.keys(storedVars.global).length === 0) {
+                // sampleGlobalVariables はどこかで定義しておくこと
+                state.variables.global = { ...sampleGlobalVariables };
+
+                // collection はストレージの existing value があればそれを使い、なければ空オブジェクト
+                state.variables.collection = storedVars.collection || {};
+
+                // Chrome ストレージに保存
+                await chrome.storage.local.set({
+                    variables: {
+                        global: state.variables.global,
+                        collection: state.variables.collection
+                    }
+                });
             } else {
-                variables.environment = {};
+                // ストレージに global があればそちらを優先して state に読み込む
+                state.variables.global = storedVars.global;
+                state.variables.collection = storedVars.collection || {};
             }
         }
 
-        // 3) コレクション変数が未定義ならサンプルを投入
-        const storedVars2 = await chrome.storage.local.get(['variables']);
-        const colVars = storedVars2.variables?.collection || {};
-        if (!colVars || Object.keys(colVars).length === 0) {
-            variables.collection = { ...sampleCollectionVariables };
-            await chrome.storage.local.set({
-                variables: {
-                    global: variables.global,
-                    collection: variables.collection
+        // ── 2) 環境一覧および環境変数の初期化 ──
+        {
+            const storedEnvList = await chrome.storage.local.get(['environments']);
+            const envsFromStorage = storedEnvList.environments || [];
+
+            // ストレージに環境一覧がなければサンプルを投入
+            if (envsFromStorage.length === 0) {
+                // sampleEnvironments はどこかで定義しておくこと
+                state.environments = [...sampleEnvironments];
+
+                // 各サンプル環境に対応する環境変数を state に設定し、保存
+                // sampleEnvironmentVariables は { [envId]: { key: { value, description }, … }, … } の形で用意しておく
+                for (const env of sampleEnvironments) {
+                    const envVarsForThis = sampleEnvironmentVariables[env.id] || {};
+                    // state.variables.environment を一旦空にしてから、サンプルをセット
+                    // ※ここでは、複数のサンプル環境がある場合に `state.variables.environment` を上書きしてしまわないよう、
+                    //   “現在の環境を最後のサンプルに合わせる” 形だと都合が悪いならば、初期状態として全サンプルを別管理しておく方法もあります。
+                    //   ここでは「最後に処理した env.id のものが state.currentEnvironment が null の状態でも反映される」というサンプルとして示しています。
+                    state.variables.environment = { ...envVarsForThis };
+                    await chrome.storage.local.set({ [`env_${env.id}`]: state.variables.environment });
                 }
-            });
-        } else {
-            variables.collection = colVars;
+
+                // ストレージにも環境一覧を保存
+                await chrome.storage.local.set({ environments: state.environments });
+            } else {
+                // ストレージに environment list があれば、それを優先して state に読み込む
+                state.environments.splice(0, state.environments.length, ...envsFromStorage);
+
+                // 現在選択中の環境（state.currentEnvironment）に合わせて変数を読み込む
+                if (state.currentEnvironment) {
+                    const envData = await chrome.storage.local.get([`env_${state.currentEnvironment}`]);
+                    state.variables.environment = envData[`env_${state.currentEnvironment}`] || {};
+                } else {
+                    // 選択中環境がないなら空オブジェクト
+                    state.variables.environment = {};
+                }
+            }
+        }
+
+        // ── 3) コレクション変数の初期化 ──
+        {
+            // 再度 'variables' キーを取得して、collection 部分だけ取り出す
+            const storedVars2 = await chrome.storage.local.get(['variables']);
+            const colVarsFromStorage = storedVars2.variables?.collection || {};
+
+            // ストレージに collection 変数がなければサンプルを投入
+            if (!colVarsFromStorage || Object.keys(colVarsFromStorage).length === 0) {
+                // sampleCollectionVariables は { [collectionId]: { key: {value, description}, … }, … } の形で用意しておく
+                state.variables.collection = { ...sampleCollectionVariables };
+
+                // 保存
+                await chrome.storage.local.set({
+                    variables: {
+                        global: state.variables.global,
+                        collection: state.variables.collection
+                    }
+                });
+            } else {
+                // すでにあれば保管されているものを state に読み込む
+                state.variables.collection = colVarsFromStorage;
+            }
         }
 
         // --- サンプルデータを自動投入するロジック END ---
@@ -125,23 +152,39 @@ export function setupVariableEventListeners() {
     });
 }
 
+
 /**
  * renderEnvironmentSelector
- *  環境のプルダウンを再描画
+ *   - state.environments: [{ id, name, created }, …]
+ *   - state.currentEnvironment: 選択中の環境ID
+ * 
+ * 環境選択用の <select id="environmentSelect"> を作り直します。
  */
 export function renderEnvironmentSelector() {
     const select = document.getElementById('environmentSelect');
-    select.innerHTML = '<option value="">No Environment</option>';
-    environments.forEach(env => {
+    if (!select) return;
+
+    // 既存の option をクリア
+    select.innerHTML = '';
+
+    // 「No Environment」 を先頭に追加
+    const noEnvOption = document.createElement('option');
+    noEnvOption.value = '';
+    noEnvOption.textContent = 'No Environment';
+    select.appendChild(noEnvOption);
+
+    // state.environments からオプションを生成
+    state.environments.forEach(env => {
         const option = document.createElement('option');
         option.value = env.id;
         option.textContent = env.name;
-        if (env.id === currentEnvironment) {
+        if (env.id === state.currentEnvironment) {
             option.selected = true;
         }
         select.appendChild(option);
     });
 }
+
 
 /**
  * createNewEnvironment
@@ -194,11 +237,11 @@ export async function switchEnvironment() {
     const select = document.getElementById('environmentSelect');
     const envId = select.value;
 
-    if (currentEnvironment) {
-        await saveEnvDataToStorage(currentEnvironment);
+    if (state.currentEnvironment) {
+        await saveEnvDataToStorage(state.currentEnvironment);
     }
 
-    currentEnvironment = envId;
+    state.currentEnvironment = envId;
     await saveCurrentEnvironmentToStorage();
 
     if (envId) {
@@ -213,92 +256,126 @@ export async function switchEnvironment() {
     showSuccess('Switched to: ' + envName);
 }
 
+
 /**
  * updateCollectionVarSelector
- *  コレクション変数用のプルダウンを再描画
+ *   - state.collections: [{ id, name, … }, …]
+ *   - state.currentCollection: 選択中のコレクションID
+ * 
+ * コレクション変数管理タブの <select id="collectionVarSelect"> を更新します。
  */
 export function updateCollectionVarSelector() {
     const select = document.getElementById('collectionVarSelect');
-    select.innerHTML = '<option value="">Select Collection</option>';
-    collections.forEach(collection => {
+    if (!select) return;
+
+    // 既存の option をクリア
+    select.innerHTML = '';
+
+    // 「Select Collection」を先頭に追加
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select Collection';
+    select.appendChild(defaultOption);
+
+    // state.collections からオプションを生成
+    state.collections.forEach(col => {
         const option = document.createElement('option');
-        option.value = collection.id;
-        option.textContent = collection.name;
-        if (collection.id == currentCollection) {
+        option.value = col.id;
+        option.textContent = col.name;
+        if (col.id === state.currentCollection) {
             option.selected = true;
         }
         select.appendChild(option);
     });
 }
 
+
 /**
  * renderAllVariables
- *  グローバル・環境・コレクションの変数一覧を描画
+ *   - state.variables.global: { [key]: { value, description } }
+ *   - state.variables.environment: { [key]: { value, description } }
+ *   - state.variables.collection: { [collectionId]: { [key]: { value, description } } }
+ * 
+ * 「グローバル変数」「環境変数」「コレクション変数」をそれぞれ描画します。
+ * 内部で renderVariables(scope) を呼び出す想定とします。
  */
 export function renderAllVariables() {
+    // グローバル変数
     renderVariables('global');
+
+    // 環境変数
     renderVariables('environment');
+
+    // コレクション変数
     renderVariables('collection');
 }
 
+
 /**
  * renderVariables
- *  scope ('global'|'environment'|'collection') に応じた変数一覧を描画
+ *   ・scope が 'global' のときは state.variables.global を使う
+ *   ・scope が 'environment' のときは state.currentEnvironment に紐づく state.variables.environment を使う
+ *   ・scope が 'collection' のときは state.currentCollection に紐づく state.variables.collection[state.currentCollection] を使う
+ *
+ * 変数一覧を描画するサンプル実装。各 scope ごとに、
+ * 適切な DOM ノード（#globalVariablesContainer、#envVariablesContainer、#collectionVariablesContainer）を参照し、
+ * 行を組み立てて append するものとします。
  */
 export function renderVariables(scope) {
-    let container, data;
+    let container;
+    let data;
 
-    switch (scope) {
-        case 'global':
-            container = document.getElementById('globalVariablesContainer');
-            data = variables.global || {};
-            break;
-        case 'environment':
-            container = document.getElementById('envVariablesContainer');
-            if (!currentEnvironment) {
-                container.innerHTML = '<p class="empty-message">Select an environment to manage variables</p>';
-                return;
-            }
-            data = variables.environment || {};
-            break;
-        case 'collection':
-            container = document.getElementById('collectionVariablesContainer');
-            const selectedCollection = document.getElementById('collectionVarSelect').value;
-            if (!selectedCollection) {
-                container.innerHTML = '<p class="empty-message">Select a collection to manage variables</p>';
-                return;
-            }
-            data = variables.collection[selectedCollection] || {};
-            break;
+    if (scope === 'global') {
+        container = document.getElementById('globalVariablesContainer');
+        data = state.variables.global;
+    } else if (scope === 'environment') {
+        container = document.getElementById('envVariablesContainer');
+        // 環境が未選択の場合は空メッセージを表示
+        if (!state.currentEnvironment) {
+            container.innerHTML = '<p class="empty-message">Select an environment to manage variables</p>';
+            return;
+        }
+        data = state.variables.environment;
+    } else if (scope === 'collection') {
+        container = document.getElementById('collectionVariablesContainer');
+        // コレクションが未選択の場合は空メッセージを表示
+        if (!state.currentCollection) {
+            container.innerHTML = '<p class="empty-message">Select a collection to manage variables</p>';
+            return;
+        }
+        data = state.variables.collection[state.currentCollection] || {};
+    } else {
+        return;
     }
 
+    // 既存コンテンツをクリア
     container.innerHTML = '';
 
+    // ヘッダ行
     const headerRow = document.createElement('div');
     headerRow.className = 'variable-header-row';
     headerRow.innerHTML = `
-        <span>Variable</span>
-        <span>Value</span>
-        <span>Description</span>
-        <span></span>
+      <span>Variable</span>
+      <span>Value</span>
+      <span>Description</span>
+      <span></span>
     `;
     container.appendChild(headerRow);
 
-    const entries = Object.entries(data);
+    const entries = Object.entries(data || {});
     if (entries.length === 0) {
         const emptyRow = document.createElement('div');
         emptyRow.className = 'empty-variables';
         emptyRow.innerHTML = '<p>No variables defined. Click "Add" to create one.</p>';
         container.appendChild(emptyRow);
     } else {
-        entries.forEach(([key, value]) => {
-            const varData = typeof value === 'object' ? value : { value: value, description: '' };
-            const row = createVariableRow(scope, key, varData.value, varData.description);
+        entries.forEach(([key, val]) => {
+            const { value, description } = val;
+            const row = createVariableRow(scope, key, value, description);
             container.appendChild(row);
         });
     }
 }
-
 /**
  * createVariableRow
  *  新規・既存変数の行を作成し、blur／削除ボタンにイベントを登録して返す
@@ -467,16 +544,16 @@ export function addVariableRow(scope) {
 
 export function getVariable(key) {
     // Priority: Environment > Collection > Global
-    if (variables.environment[key]) {
-        const val = variables.environment[key];
+    if (state.variables.environment[key]) {
+        const val = state.variables.environment[key];
         return typeof val === 'object' ? val.value : val;
     }
-    if (currentCollection && variables.collection[currentCollection]?.[key]) {
-        const val = variables.collection[currentCollection][key];
+    if (state.currentCollection && state.variables.collection[state.currentCollection]?.[key]) {
+        const val = variables.collection[state.currentCollection][key];
         return typeof val === 'object' ? val.value : val;
     }
-    if (variables.global[key]) {
-        const val = variables.global[key];
+    if (state.variables.global[key]) {
+        const val = state.variables.global[key];
         return typeof val === 'object' ? val.value : val;
     }
     return undefined;

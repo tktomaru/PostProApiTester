@@ -3,8 +3,6 @@
 // コレクション一覧の表示・選択・編集・削除などをまとめる
 
 import {
-    collections,
-    currentCollection,
     saveCollectionsToStorage,
     saveCurrentCollectionToStorage,
     state
@@ -23,11 +21,11 @@ export async function initializeCollections() {
         const stored = await chrome.storage.local.get(['collections']);
         if (!stored.collections || stored.collections.length === 0) {
             // まだコレクションがなければサンプルを投入
-            collections.splice(0, collections.length, ...sampleCollections);
-            await chrome.storage.local.set({ collections });
+            state.collections.splice(0, state.collections.length, ...sampleCollections);
+            await chrome.storage.local.set({ collections: state.collections });
         } else {
             // すでにあればそちらを優先
-            collections.splice(0, collections.length, ...stored.collections);
+            state.collections.splice(0, state.collections.length, ...stored.collections);
         }
 
         // 画面にレンダリング
@@ -47,17 +45,17 @@ export async function initializeCollections() {
 export function renderCollections() {
     const container = document.getElementById('collectionsContainer');
 
-    if (collections.length === 0) {
+    if (state.collections.length === 0) {
         container.innerHTML = '<p class="empty-message">No collections created</p>';
         return;
     }
 
     container.innerHTML = '';
-    collections.forEach(collection => {
+    state.collections.forEach(collection => {
         const item = document.createElement('div');
         item.className = 'collection-item';
         item.dataset.id = collection.id;
-        if (currentCollection == collection.id) {
+        if (state.currentCollection == collection.id) {
             item.classList.add('active');
         }
 
@@ -100,7 +98,7 @@ export async function selectCollection(collectionId) {
  *  選択中のコレクションに属するリクエスト一覧を描画する
  */
 export function renderCollectionRequests(collectionId) {
-    const collection = collections.find(c => c.id == collectionId);
+    const collection = state.collections.find(c => c.id == collectionId);
     if (!collection) return;
 
     const header = document.getElementById('collectionRequestsHeader');
@@ -161,7 +159,7 @@ export async function addRequestToCollection(collectionId) {
     const name = prompt('Enter request name:');
     if (!name) return;
 
-    const collection = collections.find(c => c.id == collectionId);
+    const collection = state.collections.find(c => c.id == collectionId);
     if (!collection) return;
 
     if (!collection.requests) {
@@ -191,7 +189,7 @@ export async function addRequestToCollection(collectionId) {
  *  コレクション内のリクエスト名を変更して再保存 → 再レンダリング
  */
 export async function editCollectionRequest(collectionId, requestIndex) {
-    const collection = collections.find(c => c.id == collectionId);
+    const collection = state.collections.find(c => c.id == collectionId);
     if (!collection || !collection.requests || !collection.requests[requestIndex]) return;
 
     const request = collection.requests[requestIndex];
@@ -212,7 +210,7 @@ export async function editCollectionRequest(collectionId, requestIndex) {
 export async function deleteCollectionRequest(collectionId, requestIndex) {
     if (!confirm('Delete this request?')) return;
 
-    const collection = collections.find(c => c.id == collectionId);
+    const collection = state.collections.find(c => c.id == collectionId);
     if (!collection || !collection.requests) return;
 
     collection.requests.splice(requestIndex, 1);

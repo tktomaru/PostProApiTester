@@ -3,20 +3,6 @@
 // グローバル変数と、chrome.storage への読み書きロジックをまとめる
 
 // コレクション・履歴・変数群
-export let collections = [];
-export let history = [];
-export let variables = {
-    global: {},
-    environment: {},
-    collection: {}
-};
-
-// 環境・コレクション・インターセプタのステート
-export let environments = [];
-export let currentEnvironment = null;
-export let currentCollection = null;
-export let isInterceptorActive = false;
-
 export const state = {
     // 現在編集中のリクエスト全体を保持
     // 初期値として最低限必要なフィールドをそろえておく
@@ -72,11 +58,16 @@ export const state = {
 };
 
 
-
 /**
  * loadAllStoredData
- *  ストレージから「collections, history, variables, environments, currentEnvironment, currentCollection」の各キーを
- *  読み出し、必要に応じてグローバル変数を初期化する
+ *  chrome.storage から以下のキーを読み込み、state を初期化する
+ *   - collections
+ *   - history
+ *   - variables
+ *   - environments
+ *   - currentEnvironment
+ *   - currentCollection
+ *   - settings
  */
 export async function loadAllStoredData() {
     try {
@@ -91,37 +82,48 @@ export async function loadAllStoredData() {
         ]);
 
         if (result.collections) {
-            collections = result.collections;
+            state.collections = result.collections;
         }
+
         if (result.history) {
-            history = result.history;
+            state.history = result.history;
         }
+
         if (result.variables?.global) {
-            variables.global = result.variables.global;
+            state.variables.global = result.variables.global;
         }
+
         if (result.variables?.collection) {
-            variables.collection = result.variables.collection;
+            state.variables.collection = result.variables.collection;
         }
+
         if (result.environments) {
-            environments = result.environments;
+            state.environments = result.environments;
         }
+
         if (result.currentEnvironment) {
-            currentEnvironment = result.currentEnvironment;
-            const envData = await chrome.storage.local.get([`env_${currentEnvironment}`]);
-            if (envData[`env_${currentEnvironment}`]) {
-                variables.environment = envData[`env_${currentEnvironment}`];
+            state.currentEnvironment = result.currentEnvironment;
+            // 環境ごとの詳細データを読み込む
+            const envData = await chrome.storage.local.get([`env_${state.currentEnvironment}`]);
+            if (envData[`env_${state.currentEnvironment}`]) {
+                state.variables.environment = envData[`env_${state.currentEnvironment}`];
             }
         }
+
         if (result.currentCollection) {
-            currentCollection = result.currentCollection;
+            state.currentCollection = result.currentCollection;
+        }
+
+        if (result.settings) {
+            state.settings = result.settings;
         }
 
         console.log('Stored data loaded:', {
-            collectionsCount: collections.length,
-            historyCount: history.length,
-            environmentsCount: environments.length,
-            currentEnvironment,
-            currentCollection
+            collectionsCount: state.collections.length,
+            historyCount: state.history.length,
+            environmentsCount: state.environments.length,
+            currentEnvironment: state.currentEnvironment,
+            currentCollection: state.currentCollection
         });
     } catch (error) {
         console.error('Error loading stored data:', error);
@@ -131,61 +133,78 @@ export async function loadAllStoredData() {
 
 /**
  * saveCollectionsToStorage
- *  collections 配列を chrome.storage.local に保存
+ *  state.collections を chrome.storage.local に保存
  */
 export async function saveCollectionsToStorage() {
-    await chrome.storage.local.set({ collections });
+    await chrome.storage.local.set({ collections: state.collections });
 }
 
 /**
  * saveHistoryToStorage
- *  history 配列を chrome.storage.local に保存
+ *  state.history を chrome.storage.local に保存
  */
 export async function saveHistoryToStorage() {
-    await chrome.storage.local.set({ history });
+    await chrome.storage.local.set({ history: state.history });
 }
 
 /**
  * saveVariablesToStorage
- *  グローバル・コレクションの変数を chrome.storage.local に保存
+ *  state.variables.global と state.variables.collection を chrome.storage.local に保存
  */
 export async function saveVariablesToStorage() {
     await chrome.storage.local.set({
         variables: {
-            global: variables.global,
-            collection: variables.collection
+            global: state.variables.global,
+            collection: state.variables.collection
         }
     });
 }
 
 /**
  * saveEnvironmentsToStorage
- *  environments 配列を chrome.storage.local に保存
+ *  state.environments を chrome.storage.local に保存
  */
 export async function saveEnvironmentsToStorage() {
-    await chrome.storage.local.set({ environments });
+    await chrome.storage.local.set({ environments: state.environments });
 }
 
 /**
  * saveCurrentEnvironmentToStorage
- *  currentEnvironment を chrome.storage.local に保存
+ *  state.currentEnvironment を chrome.storage.local に保存
  */
 export async function saveCurrentEnvironmentToStorage() {
-    await chrome.storage.local.set({ currentEnvironment });
+    await chrome.storage.local.set({ currentEnvironment: state.currentEnvironment });
 }
 
 /**
  * saveEnvDataToStorage
- *  指定された環境ID の variables.environment を保存
+ *  指定された環境ID の state.variables.environment を保存
  */
 export async function saveEnvDataToStorage(envId) {
-    await chrome.storage.local.set({ [`env_${envId}`]: variables.environment });
+    await chrome.storage.local.set({ [`env_${envId}`]: state.variables.environment });
 }
 
 /**
  * saveCurrentCollectionToStorage
- *  currentCollection を chrome.storage.local に保存
+ *  state.currentCollection を chrome.storage.local に保存
  */
 export async function saveCurrentCollectionToStorage() {
-    await chrome.storage.local.set({ currentCollection });
+    await chrome.storage.local.set({ currentCollection: state.currentCollection });
+}
+
+/**
+ * saveSettingsToStorage
+ *  state.settings を chrome.storage.local に保存
+ */
+export async function saveSettingsToStorage() {
+    await chrome.storage.local.set({ settings: state.settings });
+}
+
+/**
+ * toggleInterceptorState
+ *  state.isInterceptorActive を切り替えて、chrome.storage にも保存
+ */
+export async function toggleInterceptorState(active) {
+    state.isInterceptorActive = active;
+    await chrome.storage.local.set({ isInterceptorActive: active });
 }

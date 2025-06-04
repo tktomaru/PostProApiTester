@@ -3,8 +3,6 @@
 // リクエスト送受信・プリリクエストスクリプト・テストスクリプト・レスポンス表示をまとめる
 
 import {
-    history,
-    saveHistoryToStorage,
     state
 } from './state.js';
 

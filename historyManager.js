@@ -2,7 +2,7 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // 履歴の記録、表示、クリック時にリクエストを復元するロジック
 
-import { history, saveHistoryToStorage } from './state.js';
+import { saveHistoryToStorage, state } from './state.js';
 import { escapeHtml } from './utils.js';
 import { showSuccess } from './utils.js';
 
@@ -13,13 +13,13 @@ import { showSuccess } from './utils.js';
 export function renderHistory() {
     const container = document.getElementById('historyContainer');
 
-    if (history.length === 0) {
+    if (state.history.length === 0) {
         container.innerHTML = '<p class="empty-message">No request history</p>';
         return;
     }
 
     container.innerHTML = '';
-    history.forEach(item => {
+    state.history.forEach(item => {
         const historyDiv = document.createElement('div');
         historyDiv.className = 'history-item';
         historyDiv.dataset.id = item.id;
@@ -63,9 +63,9 @@ export async function saveToHistory(request, response) {
         }
     };
 
-    history.unshift(historyItem);
-    if (history.length > 100) {
-        history.splice(100); // 最新 100 件だけ保持
+    state.history.unshift(historyItem);
+    if (state.history.length > 100) {
+        state.history.splice(100); // 最新 100 件だけ保持
     }
 
     await saveHistoryToStorage();
@@ -77,7 +77,7 @@ export async function saveToHistory(request, response) {
  *  クリックされた履歴アイテムのリクエストを復元し、エディタにロードする
  */
 export async function loadHistoryItem(historyId) {
-    const item = history.find(h => h.id == historyId);
+    const item = state.history.find(h => h.id == historyId);
     if (!item || !item.request) return;
 
     const { loadRequestIntoEditor } = await import('./requestManager.js');
@@ -91,7 +91,7 @@ export async function loadHistoryItem(historyId) {
  */
 export async function clearHistory() {
     if (!confirm('Are you sure you want to clear all request history?')) return;
-    history.length = 0;
+    state.history.length = 0;
     await saveHistoryToStorage();
     renderHistory();
     showSuccess('History cleared');

@@ -2,7 +2,6 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // インターセプタ（ネットワークキャプチャ）の開始・停止・受信表示をまとめる
 
-import { isInterceptorActive } from './state.js';
 import { showSuccess, showError, escapeHtml } from './utils.js';
 
 let _isActive = false;
