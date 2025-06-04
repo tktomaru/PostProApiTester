@@ -6,11 +6,39 @@ import {
     collections,
     currentCollection,
     saveCollectionsToStorage,
-    saveCurrentCollectionToStorage
+    saveCurrentCollectionToStorage,
+    state
 } from './state.js';
+import { sampleCollections } from './defaultData.js';
 
 import { escapeHtml } from './utils.js';
 import { showSuccess } from './utils.js';
+import { updateCollectionVarSelector } from './variableManager.js';
+
+/**
+ * initializeCollections：起動時にコレクション一覧をロードし、必要ならサンプルを投入する
+ */
+export async function initializeCollections() {
+    try {
+        const stored = await chrome.storage.local.get(['collections']);
+        if (!stored.collections || stored.collections.length === 0) {
+            // まだコレクションがなければサンプルを投入
+            collections.splice(0, collections.length, ...sampleCollections);
+            await chrome.storage.local.set({ collections });
+        } else {
+            // すでにあればそちらを優先
+            collections.splice(0, collections.length, ...stored.collections);
+        }
+
+        // 画面にレンダリング
+        renderCollections();
+
+        // コレクション変数セレクタも更新
+        updateCollectionVarSelector();
+    } catch (error) {
+        console.error('Error initializing collections:', error);
+    }
+}
 
 /**
  * renderCollections
@@ -48,8 +76,9 @@ export function renderCollections() {
  *  コレクションを選択し、画面上の強調・リクエスト一覧を更新する
  */
 export async function selectCollection(collectionId) {
-    currentCollection = collectionId;
-    await saveCurrentCollectionToStorage();
+    // オブジェクト state のプロパティを書き換える（読み取り専用バインディングではないためエラーにならない）
+    state.currentCollection = collectionId;
+    await saveCurrentCollectionToStorage(collectionId);
 
     document.querySelectorAll('.collection-item').forEach(item => {
         item.classList.toggle('active', item.dataset.id == collectionId);

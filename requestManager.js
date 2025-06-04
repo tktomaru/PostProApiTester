@@ -3,9 +3,9 @@
 // リクエスト送受信・プリリクエストスクリプト・テストスクリプト・レスポンス表示をまとめる
 
 import {
-    currentRequest,
     history,
-    saveHistoryToStorage
+    saveHistoryToStorage,
+    state
 } from './state.js';
 
 import {
@@ -16,23 +16,21 @@ import {
     formatBytes
 } from './utils.js';
 
-const { switchMainTab } = import('./utils.js');
-const { addKeyValueRow } = import('./utils.js');
-const { handleBodyTypeChange } = import('./utils.js');
-const { renderAuthDetails, updateAuthData } = await import('./utils.js');
+import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails } from './utils.js';
+import { getVariable, replaceVariables, deepReplaceVariables } from './variableManager.js';
 /**
  * loadRequestIntoEditor
  *  コレクションや履歴から呼ばれ、右側エディタ（メソッド、URL、ヘッダ、ボディ、認証）に
- *  currentRequest を反映する
+ *  state.currentRequest を反映する
  */
 export function loadRequestIntoEditor(request) {
-    // currentRequest の値をまるごと置き換え
-    currentRequest.method = request.method;
-    currentRequest.url = request.url;
-    currentRequest.headers = { ...request.headers };
-    currentRequest.params = { ...request.params };
-    currentRequest.body = request.body;
-    currentRequest.auth = { ...request.auth };
+    // state.currentRequest の値をまるごと置き換え
+    state.currentRequest.method = request.method;
+    state.currentRequest.url = request.url;
+    state.currentRequest.headers = { ...request.headers };
+    state.currentRequest.params = { ...request.params };
+    state.currentRequest.body = request.body;
+    state.currentRequest.auth = { ...request.auth };
 
     // メソッド + URL を設定
     document.getElementById('methodSelect').value = request.method;
@@ -122,6 +120,42 @@ export function loadRequestIntoEditor(request) {
     switchMainTab('request');
 }
 
+
+/**
+ * executeTestScript
+ *  Tests タブに書かれたスクリプトを実行し、結果を表示
+ */
+export async function executeTestScript(responseData) {
+    // テキストエリアから文字列を取得
+    const raw = document.getElementById('testScript')?.value;
+    if (!raw?.trim()) return;
+
+    // 改行で分割し、空行や先頭が // のコメント行を除外
+    const lines = raw
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line !== '' && !line.startsWith('//'));
+
+    const results = [];
+    try {
+        for (const line of lines) {
+            // runTestCommand は、単一行のテストコマンドを評価し { passed, error } を返す想定
+            const result = runTestCommand(line, responseData);
+            results.push({ name: line, passed: result.passed, error: result.error });
+        }
+        displayTestResults(results);
+    } catch (error) {
+        console.error('Test script 実行エラー:', error);
+        results.push({
+            name: 'Script Execution Error',
+            passed: false,
+            error: error.message
+        });
+        displayTestResults(results);
+    }
+}
+
+
 /**
  * sendRequest
  *  プリリクエストスクリプトを実行 → リクエストを送信 → レスポンスを表示 → テストスクリプトを実行 → 履歴に保存
@@ -130,7 +164,7 @@ export async function sendRequest() {
     try {
         showLoading(true);
 
-        if (!currentRequest.url.trim()) {
+        if (!state.currentRequest.url.trim()) {
             showError('URL is required');
             return;
         }
@@ -139,7 +173,7 @@ export async function sendRequest() {
         await executePreRequestScript();
 
         // 2. 変数置換後のリクエストを生成
-        const processedRequest = processVariables(currentRequest);
+        const processedRequest = processVariables(state.currentRequest);
 
         // 3. fetch オプションを作成
         const fetchOptions = buildFetchOptions(processedRequest);
@@ -235,7 +269,7 @@ export function buildFetchOptions(request) {
 
 /**
  * addAuthenticationHeaders
- *  currentRequest.auth に応じて Authorization ヘッダなどを追加する
+ *  state.currentRequest.auth に応じて Authorization ヘッダなどを追加する
  */
 export function addAuthenticationHeaders(headers, auth) {
     switch (auth.type) {
@@ -409,83 +443,209 @@ export function displayResponseCookies(headers) {
     }
 }
 
-/**
- * executePreRequestScript
- *  Pre-request タブに書かれたスクリプトを実行（pm オブジェクト経由で currentRequest を操作可能）
- */
-export async function executePreRequestScript() {
-    const script = document.getElementById('preRequestScript')?.value;
-    if (!script?.trim()) return;
 
-    try {
-        const pm = {
-            request: {
-                url: currentRequest.url,
-                method: currentRequest.method,
-                headers: currentRequest.headers,
-                body: currentRequest.body,
-                setUrl: function (newUrl) {
-                    currentRequest.url = newUrl;
-                },
-                addHeader: function (key, value) {
-                    currentRequest.headers[key] = value;
-                },
-                removeHeader: function (key) {
-                    delete currentRequest.headers[key];
-                },
-                setBody: function (newBody) {
-                    currentRequest.body = newBody;
-                }
-            },
-            variables: {
-                get: key => getVariable(key),
-                set: async (key, value) => {
-                    const { setVariable } = await import('./variableManager.js');
-                    await setVariable('environment', key, value);
-                }
-            },
-            globals: {
-                get: key => variables.global[key]?.value || variables.global[key],
-                set: async (key, value) => {
-                    const { setVariable } = await import('./variableManager.js');
-                    await setVariable('global', key, value);
+export function runTestCommand(commandString, responseData) {
+    const [cmd, ...args] = commandString.trim().split(/\s+/);
+    switch (cmd) {
+        case 'status': {
+            const expected = parseInt(args[0], 10);
+            if (responseData.status !== expected) {
+                return { passed: false, error: `Expected status ${expected}, got ${responseData.status}` };
+            }
+            return { passed: true };
+        }
+
+        case 'jsonHasProperty': {
+            const prop = args[0];
+            const json = responseData.body; // processResponse で JSON.parse 済み or テキスト
+
+            // JSON オブジェクトかどうかをチェック
+            if (typeof json !== 'object' || json === null) {
+                return {
+                    passed: false,
+                    error: 'レスポンスボディが JSON オブジェクトではありません'
+                };
+            }
+            // キー存在チェック
+            if (!(prop in json)) {
+                return {
+                    passed: false,
+                    error: `JSON にプロパティ "${prop}" が見つかりません`
+                };
+            }
+            return { passed: true };
+        }
+
+        case 'jsonArrayLengthEquals': {
+            const [path, expectedStr] = args;
+            const expectedLen = parseInt(expectedStr, 10);
+            const json = responseData.body;
+
+            if (typeof json !== 'object' || json === null) {
+                return {
+                    passed: false,
+                    error: 'レスポンスボディが JSON オブジェクトではありません'
+                };
+            }
+            // ドット区切りでネストされた配列を取得
+            const arr = path.split('.').reduce((o, key) => (o && o[key] !== undefined ? o[key] : undefined), json);
+            if (!Array.isArray(arr)) {
+                return {
+                    passed: false,
+                    error: `パス "${path}" に対応する値が配列ではありません`
+                };
+            }
+            if (arr.length !== expectedLen) {
+                return {
+                    passed: false,
+                    error: `Expected ${path}.length === ${expectedLen}, got ${arr.length}`
+                };
+            }
+            return { passed: true };
+        }
+
+        case 'bodyContains': {
+            const substr = args.join(' ');
+            const text = responseData.bodyText ?? '';
+            if (!text.includes(substr)) {
+                return {
+                    passed: false,
+                    error: `レスポンスボディに "${substr}" が含まれていません`
+                };
+            }
+            return { passed: true };
+        }
+
+        // --- カスタムコマンド例: レスポンスヘッダーの値を変数にセット ---
+        case 'setVarFromHeader': {
+            const varName = args[0];
+            const headerName = args.slice(1).join(' ');
+            const headers = responseData.headers || {};
+
+            // ヘッダー名の大文字小文字を区別しない検索
+            const headerKeyLower = headerName.toLowerCase();
+            let headerValue;
+            for (const key in headers) {
+                if (key.toLowerCase() === headerKeyLower) {
+                    headerValue = headers[key];
+                    break;
                 }
             }
-        };
+            if (headerValue === undefined) {
+                return {
+                    passed: false,
+                    error: `レスポンスヘッダー "${headerName}" が見つかりません`
+                };
+            }
+            // 例: 非同期で環境変数に保存する関数を呼び出す（await は不要。非同期処理なのでエラーは catch）
+            import('./variableManager.js').then(({ setVariable }) => {
+                setVariable('environment', varName, headerValue).catch(console.error);
+            });
+            return { passed: true };
+        }
 
-        const scriptFunction = new Function('pm', script);
-        await scriptFunction(pm);
-    } catch (error) {
-        console.error('Pre-request script error:', error);
-        showError('Pre-request script error: ' + error.message);
+        default:
+            return { passed: false, error: `Unknown test command: ${cmd}` };
     }
 }
 
 /**
- * executeTestScript
- *  Tests タブに書かれたスクリプトを実行し、結果を表示
+ * executePreRequestScript
+ *  Pre-request タブに書かれたスクリプトを実行（pm オブジェクト経由で state.currentRequest を操作可能）
  */
-export async function executeTestScript(responseData) {
-    const script = document.getElementById('testScript')?.value;
-    if (!script?.trim()) return;
 
-    const results = [];
+export async function executePreRequestScript() {
+    const raw = document.getElementById('preRequestScript')?.value;
+    if (!raw?.trim()) return;
+
+    // 行ごとに分割してコマンドを解析
+    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('//'));
+
     try {
-        const pm = createTestPmObject(responseData, results);
-        const scriptFunction = new Function('pm', script);
-        await scriptFunction(pm);
-        displayTestResults(results);
+        for (const line of lines) {
+            // 空白で先頭コマンドと引数を分割
+            const [cmd, ...args] = line.split(/\s+/);
+
+            switch (cmd) {
+                case 'setUrl': {
+                    // args[0] に URL 文字列が入る
+                    const newUrl = args.join(' ');
+                    state.currentRequest.url = newUrl;
+                    break;
+                }
+
+                case 'addHeader': {
+                    // args[0] = Header 名, args[1..] = 値 (空白を含む可能性を考慮)
+                    const headerName = args[0];
+                    const headerValue = args.slice(1).join(' ');
+                    state.currentRequest.headers[headerName] = headerValue;
+                    break;
+                }
+
+                case 'removeHeader': {
+                    // args[0] = Header 名
+                    const headerName = args[0];
+                    delete state.currentRequest.headers[headerName];
+                    break;
+                }
+
+                case 'setBody': {
+                    // args.join(' ') = JSON 文字列 (または自由テキスト)
+                    const text = args.join(' ');
+                    // JSON 解析を試み、失敗すればそのまま文字列をセット
+                    try {
+                        state.currentRequest.body = JSON.parse(text);
+                    } catch {
+                        state.currentRequest.body = text;
+                    }
+                    break;
+                }
+
+                case 'setUrlWithVar': {
+                    // 「setUrlWithVar VAR_NAME」で、環境変数から取り出した文字列を URL に設定
+                    // 例: setUrlWithVar apiBaseUrl
+                    const varName = args[0];
+                    const val = getVariable(varName);
+                    if (typeof val === 'string') {
+                        state.currentRequest.url = val;
+                    } else {
+                        throw new Error(`変数「${varName}」が文字列ではありません`);
+                    }
+                    break;
+                }
+
+                case 'addHeaderWithVar': {
+                    // 「addHeaderWithVar HEADER_NAME VAR_NAME」で、VAR_NAME 変数の値をヘッダー値に設定
+                    // 例: addHeaderWithVar Authorization authToken
+                    const headerName = args[0];
+                    const varName = args[1];
+                    const val = getVariable(varName);
+                    if (typeof val === 'string') {
+                        state.currentRequest.headers[headerName] = val;
+                    } else {
+                        throw new Error(`変数「${varName}」が文字列ではありません`);
+                    }
+                    break;
+                }
+
+                case 'setBodyWithVar': {
+                    // 「setBodyWithVar VAR_NAME」で、変数の中身を body に JSON としてセット
+                    // 例: setBodyWithVar requestPayload
+                    const varName = args[0];
+                    const val = getVariable(varName);
+                    state.currentRequest.body = val;
+                    break;
+                }
+
+                default:
+                    throw new Error(`不明なコマンド: ${cmd}`);
+            }
+        }
     } catch (error) {
-        console.error('Test script error:', error);
-        results.push({
-            name: 'Script Execution Error',
-            passed: false,
-            error: error.message
-        });
-        displayTestResults(results);
+        console.error('Pre-request script 実行エラー:', error);
+        showError('Pre-request script エラー: ' + error.message);
     }
 }
-
 /**
  * createTestPmObject
  *  テスト用 pm オブジェクトを構築
@@ -625,7 +785,7 @@ export function displayTestResults(results) {
 
 /**
  * processVariables
- *  currentRequest の各プロパティ（URL, headers, params, body）について
+ *  state.currentRequest の各プロパティ（URL, headers, params, body）について
  *  変数置換を行った結果を返す
  */
 export function processVariables(request) {

@@ -1,9 +1,9 @@
 // utils.js
 // ───────────────────────────────────────────────────────────────────────────────
 // 汎用ユーティリティ関数群、タブ切り替え、イベント登録、一部の小さなヘルパーをまとめる
-// state.js を動的にインポートして currentRequest を取得
-const { currentRequest } = import('./state.js');
-
+// state.js を動的にインポートしてstate.currentRequest を取得
+import { state } from './state.js';
+import { displayResponse } from './requestManager.js';
 /**
  * escapeHtml
  *  XSS 対策用にテキストをエスケープして安全に innerHTML に渡す
@@ -86,16 +86,6 @@ export function addKeyValueRow(container, type) {
     container.appendChild(row);
 }
 
-/** updateRequestData を async 関数に変更 */
-export async function updateRequestData(type) {
-
-    if (type === 'param') {
-        currentRequest.params = collectKeyValues('paramsContainer');
-    } else if (type === 'header') {
-        currentRequest.headers = collectKeyValues('headersContainer');
-    }
-}
-
 /** collectKeyValues */
 export function collectKeyValues(containerId) {
     const container = document.getElementById(containerId);
@@ -111,6 +101,21 @@ export function collectKeyValues(containerId) {
     return result;
 }
 
+
+/** updateRequestData を async 関数に変更 */
+export async function updateRequestData(type) {
+    // state.currentRequest が undefined の場合は何もしない
+    if (!state.currentRequest) {
+        console.warn('updateRequestData: state.currentRequest が未定義です');
+        return;
+    }
+
+    if (type === 'param') {
+        state.currentRequest.params = collectKeyValues('paramsContainer');
+    } else if (type === 'header') {
+        state.currentRequest.headers = collectKeyValues('headersContainer');
+    }
+}
 /**
  * setupEventListeners
  *  ページ全体で使う「クリック・入力」などのイベントを一度にまとめる
@@ -123,10 +128,14 @@ export function setupEventListeners() {
     });
     // メソッド・URL 更新時
     document.getElementById('methodSelect').addEventListener('change', e => {
-        currentRequest.method = e.target.value;
+        state.currentRequest.method = e.target.value;
     });
     document.getElementById('urlInput').addEventListener('input', e => {
-        currentRequest.url = e.target.value;
+        state.currentRequest.url = e.target.value;
+        // ここで必ず最新の URL を state.currentRequest.url に代入する
+        if (state.currentRequest) {
+            state.currentRequest.url = e.target.value;
+        }
     });
     // インポート・エクスポート・設定
     document.getElementById('importBtn').addEventListener('click', () => {
@@ -168,7 +177,7 @@ export function setupEventListeners() {
     });
     // Raw Body 入力
     document.getElementById('rawBody').addEventListener('input', e => {
-        currentRequest.body = e.target.value;
+        state.currentRequest.body = e.target.value;
     });
 }
 
@@ -317,32 +326,42 @@ export function renderAuthDetails(authType) {
 }
 
 export function updateAuthData() {
-    const authType = currentRequest.auth.type;
-    currentRequest.auth = { type: authType };
+    // state.currentRequest が undefined であればエラーになってしまうため確認
+    if (!state.currentRequest) {
+        console.error('updateAuthData: state.currentRequest が undefined です');
+        return;
+    }
+
+    const authType = state.currentRequest.auth?.type || 'none';
+    // auth オブジェクトをいったん置き換える
+    state.currentRequest.auth = { type: authType };
 
     switch (authType) {
         case 'basic':
-            currentRequest.auth.username = document.getElementById('authUsername')?.value || '';
-            currentRequest.auth.password = document.getElementById('authPassword')?.value || '';
+            state.currentRequest.auth.username = document.getElementById('authUsername')?.value || '';
+            state.currentRequest.auth.password = document.getElementById('authPassword')?.value || '';
             break;
 
         case 'bearer':
-            currentRequest.auth.token = document.getElementById('authToken')?.value || '';
+            state.currentRequest.auth.token = document.getElementById('authToken')?.value || '';
             break;
 
         case 'apikey':
-            currentRequest.auth.key = document.getElementById('authKey')?.value || '';
-            currentRequest.auth.value = document.getElementById('authValue')?.value || '';
-            currentRequest.auth.addTo = document.getElementById('authAddTo')?.value || 'header';
+            state.currentRequest.auth.key = document.getElementById('authKey')?.value || '';
+            state.currentRequest.auth.value = document.getElementById('authValue')?.value || '';
+            state.currentRequest.auth.addTo = document.getElementById('authAddTo')?.value || 'header';
             break;
 
         case 'oauth2':
-            currentRequest.auth.accessToken = document.getElementById('authAccessToken')?.value || '';
-            currentRequest.auth.tokenType = document.getElementById('authTokenType')?.value || 'Bearer';
+            state.currentRequest.auth.accessToken = document.getElementById('authAccessToken')?.value || '';
+            state.currentRequest.auth.tokenType = document.getElementById('authTokenType')?.value || 'Bearer';
+            break;
+
+        default:
+            // 何もしない（type が none の場合など）
             break;
     }
 }
-
 export function showLoading(show) {
     const sendBtn = document.getElementById('sendBtn');
     if (show) {
@@ -353,3 +372,30 @@ export function showLoading(show) {
         sendBtn.textContent = 'Send';
     }
 }
+
+// Body type handling
+export function handleBodyTypeChange(event) {
+    const bodyType = event.target.value;
+    const rawBody = document.getElementById('rawBody');
+    const formDataContainer = document.getElementById('formDataContainer');
+
+    // Hide all body editors
+    rawBody.style.display = 'none';
+    formDataContainer.style.display = 'none';
+
+    // Show appropriate editor
+    switch (bodyType) {
+        case 'raw':
+            rawBody.style.display = 'block';
+            break;
+        case 'form-data':
+        case 'urlencoded':
+            formDataContainer.style.display = 'block';
+            if (!formDataContainer.children.length) {
+                addKeyValueRow(formDataContainer, 'body');
+            }
+            break;
+    }
+}
+
+

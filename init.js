@@ -3,11 +3,7 @@
 // ページ読み込み時に実行される、全体の初期化処理とイベント登録をまとめる
 
 import {
-    loadAllStoredData,
-    collections,
-    currentCollection,
-    variables,
-    environments
+    state
 } from './state.js';
 
 import {
@@ -20,6 +16,7 @@ import {
     handleImport
 } from './importExport.js';
 
+import { initializeTestScript } from './importExport.js';
 
 import {
     initializeVariablesManagement,
@@ -28,18 +25,18 @@ import {
     renderAllVariables
 } from './variableManager.js';
 
-import { renderCollections } from './collectionManager.js';
+import { initializeCollections } from './collectionManager.js';
 import { renderHistory } from './historyManager.js';
 
 import { addKeyValueRow } from './utils.js';
-
+import { showError, showSuccess } from './utils.js';
 
 // Authentication handlers
 function setupAuthHandlers() {
     const authTypeSelect = document.getElementById('authType');
     authTypeSelect.addEventListener('change', function () {
         const authType = this.value;
-        currentRequest.auth.type = authType;
+        state.currentRequest.auth.type = authType;
         renderAuthDetails(authType);
     });
 }
@@ -129,36 +126,45 @@ function setupAddButtons() {
     });
 }
 
-
-document.addEventListener('DOMContentLoaded', async () => {
+async function initializeApp() {
     try {
-        // 1. イベントリスナー／タブ切り替え登録など
+        // ─────────────────────────────
+        // 1. 最初に UI 周りのイベントだけ設定
+        // （タブ切り替え・モーダル開閉・ボタンイベントなど）
         setupEventListeners();
         setupTabSwitching();
         setupModalHandlers();
 
-        // 2. ストレージからデータを読み込む
-        await loadAllStoredData();
+        // ─────────────────────────────
+        // 2. ストレージからデータをロードし、必要ならサンプル投入
 
-        // 3. UI初期化：Key-Value エディタ、Auth ハンドラ
+        // 2-2. コレクションの初期化（サンプルコレクション投入）
+        await initializeCollections();
+
+        // 2-1. 変数管理関連の初期化（グローバル／環境／コレクション変数投入）
+        await initializeVariablesManagement();
+
+        // 2-3. 履歴の表示（もし保存済みあれば表示、なければ空状態を表示）
+        renderHistory();
+
+        // ─────────────────────────────
+        // 3. Key-Value エディタや認証フォームの初期化
         initializeKeyValueEditors();
         setupAuthHandlers();
 
-        // 4. 変数管理の初期化（環境読み込み後）
-        await initializeVariablesManagement();
+        // ─────────────────────────────
+        // 4. テストスクリプト欄にサンプルをセット
+        initializeTestScript();
 
-        // 5. 初期レンダリング：コレクション一覧、履歴一覧、環境セレクタ
-        renderCollections();
-        renderHistory();
-        renderEnvironmentSelector();
-        updateCollectionVarSelector();
-        renderAllVariables();
-
+        // ─────────────────────────────
         console.log('API Tester initialized successfully');
     } catch (error) {
         console.error('Initialization error:', error);
-        // showError は utils.js 経由で呼べる想定
-        const { showError } = await import('./utils.js');
+        // showError は utils.js か別モジュールに定義してある想定
         showError('Failed to initialize: ' + error.message);
     }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await initializeApp();
 });

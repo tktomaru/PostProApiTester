@@ -2,6 +2,15 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // 環境変数・コレクション変数・グローバル変数を管理する
 
+
+// 1. サンプルデータを読み込む
+import {
+    sampleGlobalVariables,
+    sampleEnvironments,
+    sampleEnvironmentVariables,
+    sampleCollectionVariables
+} from './defaultData.js';
+
 import {
     variables,
     environments,
@@ -22,6 +31,71 @@ import { showError, showSuccess, escapeHtml } from './utils.js';
  */
 export async function initializeVariablesManagement() {
     try {
+
+        // --- サンプルデータを自動投入するロジック START ---
+
+        // 1) グローバル変数が未定義であればサンプルを投入
+        const storedVars = await chrome.storage.local.get(['variables']);
+        if (!storedVars.variables || !storedVars.variables.global ||
+            Object.keys(storedVars.variables.global).length === 0) {
+            // グローバル変数が空だったら、サンプルをセット
+            variables.global = { ...sampleGlobalVariables };
+            // 「collection」はまだ何もない前提
+            variables.collection = storedVars.variables?.collection || {};
+            await chrome.storage.local.set({
+                variables: {
+                    global: variables.global,
+                    collection: variables.collection
+                }
+            });
+        } else {
+            // ストレージにあれば、そちらを優先
+            variables.global = storedVars.variables.global || {};
+            variables.collection = storedVars.variables.collection || {};
+        }
+
+        // 2) 環境一覧が未定義であればサンプルを投入
+        const storedEnvList = await chrome.storage.local.get(['environments']);
+        if (!storedEnvList.environments || storedEnvList.environments.length === 0) {
+            // 環境リストにサンプルをセット
+            environments = [...sampleEnvironments];
+            // 各環境に対応する変数もセット
+            variables.environment = {};
+            for (const env of sampleEnvironments) {
+                const envVars = sampleEnvironmentVariables[env.id] || {};
+                variables.environment = { ...envVars };
+                await chrome.storage.local.set({ [`env_${env.id}`]: variables.environment });
+            }
+            // 最後に環境リストだけ格納
+            await chrome.storage.local.set({ environments });
+        } else {
+            environments.splice(0, environments.length, ...storedEnvList.environments);
+            // 現在選択中の環境（あれば）に合わせて変数をロード
+            if (currentEnvironment) {
+                const envData = await chrome.storage.local.get([`env_${currentEnvironment}`]);
+                variables.environment = envData[`env_${currentEnvironment}`] || {};
+            } else {
+                variables.environment = {};
+            }
+        }
+
+        // 3) コレクション変数が未定義ならサンプルを投入
+        const storedVars2 = await chrome.storage.local.get(['variables']);
+        const colVars = storedVars2.variables?.collection || {};
+        if (!colVars || Object.keys(colVars).length === 0) {
+            variables.collection = { ...sampleCollectionVariables };
+            await chrome.storage.local.set({
+                variables: {
+                    global: variables.global,
+                    collection: variables.collection
+                }
+            });
+        } else {
+            variables.collection = colVars;
+        }
+
+        // --- サンプルデータを自動投入するロジック END ---
+
         renderEnvironmentSelector();
         setupVariableEventListeners();
         updateCollectionVarSelector();
@@ -390,3 +464,75 @@ export function addVariableRow(scope) {
     container.appendChild(row);
     row.querySelector('.var-key').focus();
 }
+
+export function getVariable(key) {
+    // Priority: Environment > Collection > Global
+    if (variables.environment[key]) {
+        const val = variables.environment[key];
+        return typeof val === 'object' ? val.value : val;
+    }
+    if (currentCollection && variables.collection[currentCollection]?.[key]) {
+        const val = variables.collection[currentCollection][key];
+        return typeof val === 'object' ? val.value : val;
+    }
+    if (variables.global[key]) {
+        const val = variables.global[key];
+        return typeof val === 'object' ? val.value : val;
+    }
+    return undefined;
+}
+
+// Include the variable replacement functions
+export function replaceVariables(text) {
+    if (typeof text !== 'string') return text;
+
+    return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+        const trimmedName = varName.trim();
+        const value = getVariable(trimmedName);
+        return value !== undefined ? value : match;
+    });
+}
+
+
+export function deepReplaceVariables(obj) {
+    if (typeof obj === 'string') {
+        return replaceVariables(obj);
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(deepReplaceVariables);
+    }
+    if (obj && typeof obj === 'object') {
+        const result = {};
+        for (const [key, value] of Object.entries(obj)) {
+            const newKey = replaceVariables(key);
+            result[newKey] = deepReplaceVariables(value);
+        }
+        return result;
+    }
+    return obj;
+}
+
+export async function setVariable(scope, key, value) {
+    const varData = { value, description: '' };
+
+    switch (scope) {
+        case 'global':
+            variables.global[key] = varData;
+            await chrome.storage.local.set({
+                variables: {
+                    global: variables.global,
+                    collection: variables.collection
+                }
+            });
+            break;
+        case 'environment':
+            if (currentEnvironment) {
+                variables.environment[key] = varData;
+                await chrome.storage.local.set({
+                    [`env_${currentEnvironment}`]: variables.environment
+                });
+            }
+            break;
+    }
+}
+

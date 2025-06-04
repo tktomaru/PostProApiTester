@@ -8,7 +8,8 @@ import {
     environments,
     saveCollectionsToStorage,
     saveVariablesToStorage,
-    saveEnvironmentsToStorage
+    saveEnvironmentsToStorage,
+    state
 } from './state.js';
 
 import {
@@ -19,11 +20,21 @@ import {
     updateCollectionVarSelector
 } from './variableManager.js';
 
-import { currentRequest } from './state.js';
-
 import { renderEnvironmentSelector, renderAllVariables } from './variableManager.js';
 
 import { showSuccess, showError } from './utils.js';
+
+import { sampleTestScript } from './defaultData.js';
+import { addKeyValueRow, handleBodyTypeChange } from './utils.js';
+
+
+/** initializeTestScript：ページ上にある TestScript 欄にサンプルを反映 */
+export function initializeTestScript() {
+    const testTextarea = document.getElementById('testScript');
+    if (testTextarea && !testTextarea.value.trim()) {
+        testTextarea.value = sampleTestScript;
+    }
+}
 
 /** openImportModal */
 export function openImportModal() {
@@ -309,19 +320,18 @@ export function importCurlCommand(request) {
     document.getElementById('methodSelect').value = request.method;
     document.getElementById('urlInput').value = request.url;
 
-    // currentRequest を更新
-    currentRequest.method = request.method;
-    currentRequest.url = request.url;
-    currentRequest.headers = { ...request.headers };
-    currentRequest.params = {};
-    currentRequest.body = request.body || null;
-    currentRequest.auth = request.auth || { type: 'none' };
+    //state.currentRequest を更新
+    state.currentRequest.method = request.method;
+    state.currentRequest.url = request.url;
+    state.currentRequest.headers = { ...request.headers };
+    state.currentRequest.params = {};
+    state.currentRequest.body = request.body || null;
+    state.currentRequest.auth = request.auth || { type: 'none' };
 
     // ヘッダをセット
     const headersContainer = document.getElementById('headersContainer');
     headersContainer.innerHTML = '';
     Object.entries(request.headers).forEach(([key, value]) => {
-        const { addKeyValueRow } = import('./utils.js');
         addKeyValueRow(headersContainer, 'header');
         const rows = headersContainer.querySelectorAll('.key-value-row');
         const lastRow = rows[rows.length - 1];
@@ -329,14 +339,13 @@ export function importCurlCommand(request) {
         lastRow.querySelector('.value-input').value = value;
     });
     if (Object.keys(request.headers).length === 0) {
-        const { addKeyValueRow } = import('./utils.js');
+
         addKeyValueRow(headersContainer, 'header');
     }
 
     // ボディをセット
     if (request.body) {
         document.querySelector('input[name="bodyType"][value="raw"]').checked = true;
-        const { handleBodyTypeChange } = import('./utils.js');
         handleBodyTypeChange({ target: { value: 'raw' } });
         document.getElementById('rawBody').value = request.body;
     }

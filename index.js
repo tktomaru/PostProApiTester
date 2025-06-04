@@ -1,11 +1,10 @@
 // index.js
 // 各機能モジュールを読み込むエントリーポイント
 
+import './defaultData.js';
+
 // 1. 状態管理
 import './state.js';
-
-// 2. 初期化・イベント登録
-import './init.js';
 
 // 3. インポート／エクスポート処理
 import './importExport.js';
@@ -27,3 +26,5 @@ import './variableManager.js';
 
 // 9. ユーティリティ関数群
 import './utils.js';
+
+import './init.js';  // 最後に initializeApp() を実行する
