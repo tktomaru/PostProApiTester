@@ -15,83 +15,83 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             startNetworkInterceptor(message.filters);
             sendResponse({ success: true });
             break;
-            
+
         case 'stopInterceptor':
             stopNetworkInterceptor();
             sendResponse({ success: true });
             break;
-            
+
         case 'getInterceptorStatus':
             sendResponse({ active: isInterceptorActive });
             break;
-            
+
         default:
             sendResponse({ error: 'Unknown action' });
     }
-    
+
     return true; // Keep message channel open for async response
 });
 
 function startNetworkInterceptor(filters) {
     if (isInterceptorActive) return;
-    
+
     isInterceptorActive = true;
     interceptorFilters = filters || interceptorFilters;
-    
+
     // Register webRequest listeners
     chrome.webRequest.onBeforeRequest.addListener(
         handleBeforeRequest,
         { urls: ["<all_urls>"] },
         ["requestBody"]
     );
-    
+
     chrome.webRequest.onSendHeaders.addListener(
         handleSendHeaders,
         { urls: ["<all_urls>"] },
         ["requestHeaders"]
     );
-    
+
     chrome.webRequest.onHeadersReceived.addListener(
         handleHeadersReceived,
         { urls: ["<all_urls>"] },
         ["responseHeaders"]
     );
-    
+
     chrome.webRequest.onCompleted.addListener(
         handleRequestCompleted,
         { urls: ["<all_urls>"] },
         ["responseHeaders"]
     );
-    
+
     chrome.webRequest.onErrorOccurred.addListener(
         handleRequestError,
         { urls: ["<all_urls>"] }
     );
-    
+
     console.log('Network interceptor started');
 }
 
 function stopNetworkInterceptor() {
     if (!isInterceptorActive) return;
-    
+
     isInterceptorActive = false;
-    
+
     // Remove all webRequest listeners
     chrome.webRequest.onBeforeRequest.removeListener(handleBeforeRequest);
     chrome.webRequest.onSendHeaders.removeListener(handleSendHeaders);
     chrome.webRequest.onHeadersReceived.removeListener(handleHeadersReceived);
     chrome.webRequest.onCompleted.removeListener(handleRequestCompleted);
     chrome.webRequest.onErrorOccurred.removeListener(handleRequestError);
-    
+
     // Clear stored requests
     interceptedRequests.clear();
-    
+
     console.log('Network interceptor stopped');
 }
 
 function handleBeforeRequest(details) {
     if (!shouldInterceptRequest(details)) return;
-    
+
     const requestData = {
         id: details.requestId,
         url: details.url,
@@ -103,13 +103,13 @@ function handleBeforeRequest(details) {
         responseHeaders: {},
         duration: null
     };
-    
+
     // Extract request body if present
     if (details.requestBody) {
         if (details.requestBody.raw) {
             // Binary data
             const decoder = new TextDecoder();
-            requestData.body = details.requestBody.raw.map(data => 
+            requestData.body = details.requestBody.raw.map(data =>
                 decoder.decode(data.bytes)
             ).join('');
         } else if (details.requestBody.formData) {
@@ -117,54 +117,54 @@ function handleBeforeRequest(details) {
             requestData.body = details.requestBody.formData;
         }
     }
-    
+
     interceptedRequests.set(details.requestId, requestData);
 }
 
 function handleSendHeaders(details) {
     const requestData = interceptedRequests.get(details.requestId);
     if (!requestData) return;
-    
+
     // Store request headers
     if (details.requestHeaders) {
         details.requestHeaders.forEach(header => {
             requestData.headers[header.name] = header.value;
         });
     }
-    
+
     interceptedRequests.set(details.requestId, requestData);
 }
 
 function handleHeadersReceived(details) {
     const requestData = interceptedRequests.get(details.requestId);
     if (!requestData) return;
-    
+
     // Store response headers and status
     requestData.status = details.statusCode;
-    
+
     if (details.responseHeaders) {
         details.responseHeaders.forEach(header => {
             requestData.responseHeaders[header.name] = header.value;
         });
     }
-    
+
     interceptedRequests.set(details.requestId, requestData);
 }
 
 function handleRequestCompleted(details) {
     const requestData = interceptedRequests.get(details.requestId);
     if (!requestData) return;
-    
+
     // Calculate duration
     requestData.duration = Date.now() - requestData.timestamp;
     requestData.status = details.statusCode;
-    
+
     // Send to popup if it's open
     sendToPopup({
         action: 'requestIntercepted',
         request: requestData
     });
-    
+
     // Clean up old requests (keep only last 100)
     if (interceptedRequests.size > 100) {
         const oldestKey = interceptedRequests.keys().next().value;
@@ -175,27 +175,27 @@ function handleRequestCompleted(details) {
 function handleRequestError(details) {
     const requestData = interceptedRequests.get(details.requestId);
     if (!requestData) return;
-    
+
     requestData.duration = Date.now() - requestData.timestamp;
     requestData.status = 0;
     requestData.error = details.error;
-    
+
     // Send to popup if it's open
     sendToPopup({
         action: 'requestIntercepted',
         request: requestData
     });
-    
+
     interceptedRequests.delete(details.requestId);
 }
 
 function shouldInterceptRequest(details) {
     // Skip chrome-extension URLs
     if (details.url.startsWith('chrome-extension://')) return false;
-    
+
     // Skip if not in allowed methods
     if (!interceptorFilters.methods.includes(details.method)) return false;
-    
+
     // Apply domain filter if set
     if (interceptorFilters.domain) {
         try {
@@ -205,7 +205,7 @@ function shouldInterceptRequest(details) {
             return false;
         }
     }
-    
+
     return true;
 }
 
@@ -219,7 +219,7 @@ function sendToPopup(message) {
 // Extension lifecycle events
 chrome.runtime.onInstalled.addListener((details) => {
     console.log('API Tester extension installed:', details.reason);
-    
+
     // Initialize default settings
     chrome.storage.local.set({
         settings: {
@@ -248,7 +248,7 @@ chrome.action.onClicked.addListener((tab) => {
     console.log('Extension icon clicked on tab:', tab.id);
     // 新しいタブで index.html を開く
     chrome.tabs.create({
-      url: chrome.runtime.getURL("index.html")
+        url: chrome.runtime.getURL("index.html")
     });
     // if (info.menuItemId === 'interceptRequest') {
     //     // Send the URL to popup for testing
@@ -264,6 +264,9 @@ chrome.action.onClicked.addListener((tab) => {
 
 // Context menu setup (optional feature)
 chrome.runtime.onInstalled.addListener(() => {
+    chrome.storage.local.clear(() => {
+        console.log('debug用の暫定処理：ストレージをクリアしました（onInstalled）');
+    });
     chrome.contextMenus.create({
         id: 'interceptRequest',
         title: 'Test this API with API Tester',
@@ -281,9 +284,9 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Set up periodic cleanup
 chrome.runtime.onStartup.addListener(() => {
-    chrome.alarms.create('cleanup', { 
-        delayInMinutes: 60, 
-        periodInMinutes: 60 
+    chrome.alarms.create('cleanup', {
+        delayInMinutes: 60,
+        periodInMinutes: 60
     });
 });
 
@@ -292,13 +295,13 @@ async function performCleanup() {
         const result = await chrome.storage.local.get(['history', 'settings']);
         const settings = result.settings || {};
         const maxHistoryItems = settings.maxHistoryItems || 100;
-        
+
         if (result.history && result.history.length > maxHistoryItems) {
             const trimmedHistory = result.history.slice(0, maxHistoryItems);
             await chrome.storage.local.set({ history: trimmedHistory });
             console.log(`Cleaned up history: ${result.history.length} -> ${trimmedHistory.length} items`);
         }
-        
+
         // Clear old intercepted requests
         if (interceptedRequests.size > 50) {
             const requestsToKeep = Array.from(interceptedRequests.entries())
@@ -358,7 +361,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // OAuth2 helper functions
 async function handleOAuth2Flow(config) {
     const authUrl = buildAuthUrl(config);
-    
+
     return new Promise((resolve, reject) => {
         chrome.identity.launchWebAuthFlow({
             url: authUrl,
@@ -368,12 +371,12 @@ async function handleOAuth2Flow(config) {
                 reject(chrome.runtime.lastError);
                 return;
             }
-            
+
             try {
                 const urlParams = new URL(redirectUrl).searchParams;
                 const code = urlParams.get('code');
                 const error = urlParams.get('error');
-                
+
                 if (error) {
                     reject(new Error(error));
                 } else if (code) {
@@ -396,13 +399,13 @@ function buildAuthUrl(config) {
         scope: config.scope || '',
         state: generateRandomState()
     });
-    
+
     return `${config.authUrl}?${params.toString()}`;
 }
 
 function generateRandomState() {
-    return Math.random().toString(36).substring(2, 15) + 
-           Math.random().toString(36).substring(2, 15);
+    return Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15);
 }
 
 // Token exchange for OAuth2
@@ -414,7 +417,7 @@ async function exchangeCodeForToken(config, authCode) {
         code: authCode,
         redirect_uri: config.redirectUri
     };
-    
+
     const response = await fetch(config.tokenUrl, {
         method: 'POST',
         headers: {
@@ -422,11 +425,11 @@ async function exchangeCodeForToken(config, authCode) {
         },
         body: new URLSearchParams(tokenData)
     });
-    
+
     if (!response.ok) {
         throw new Error(`Token exchange failed: ${response.statusText}`);
     }
-    
+
     return await response.json();
 }
 
@@ -438,7 +441,7 @@ async function refreshAccessToken(config, refreshToken) {
         client_secret: config.clientSecret,
         refresh_token: refreshToken
     };
-    
+
     const response = await fetch(config.tokenUrl, {
         method: 'POST',
         headers: {
@@ -446,11 +449,11 @@ async function refreshAccessToken(config, refreshToken) {
         },
         body: new URLSearchParams(tokenData)
     });
-    
+
     if (!response.ok) {
         throw new Error(`Token refresh failed: ${response.statusText}`);
     }
-    
+
     return await response.json();
 }
 
@@ -466,7 +469,7 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
         }
         return true;
     }
-    
+
     if (message.action === 'oauth2Refresh') {
         try {
             const tokens = await refreshAccessToken(message.config, message.refreshToken);
@@ -487,12 +490,12 @@ let performanceMetrics = {
 
 function updatePerformanceMetrics(requestData) {
     performanceMetrics.requestCount++;
-    
+
     if (requestData.duration) {
         const totalTime = performanceMetrics.averageResponseTime * (performanceMetrics.requestCount - 1);
         performanceMetrics.averageResponseTime = (totalTime + requestData.duration) / performanceMetrics.requestCount;
     }
-    
+
     if (requestData.status >= 400 || requestData.error) {
         performanceMetrics.errorCount++;
     }
@@ -504,7 +507,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(performanceMetrics);
         return true;
     }
-    
+
     if (message.action === 'resetPerformanceMetrics') {
         performanceMetrics = {
             requestCount: 0,

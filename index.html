@@ -1,9 +1,11 @@
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>API Tester</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -17,7 +19,7 @@
                 <button class="btn btn-outline btn-sm" id="settingsBtn">Settings</button>
             </div>
         </div>
-        
+
         <!-- Main Navigation -->
         <div class="nav-tabs">
             <button class="tab-btn active" data-tab="request">Request</button>
@@ -26,7 +28,7 @@
             <button class="tab-btn" data-tab="interceptor">Interceptor</button>
             <button class="tab-btn" data-tab="variables">Variables</button>
         </div>
-        
+
         <!-- Tab Contents -->
         <div class="tab-contents">
             <!-- Request Tab -->
@@ -45,7 +47,7 @@
                         <input type="text" id="urlInput" class="url-input" placeholder="Enter request URL">
                         <button id="sendBtn" class="btn btn-primary">Send</button>
                     </div>
-                    
+
                     <!-- Request Sub-tabs -->
                     <div class="sub-tabs">
                         <button class="sub-tab-btn active" data-subtab="params">Params</button>
@@ -55,7 +57,7 @@
                         <button class="sub-tab-btn" data-subtab="pre-script">Pre-request</button>
                         <button class="sub-tab-btn" data-subtab="tests">Tests</button>
                     </div>
-                    
+
                     <!-- Sub Tab Contents -->
                     <div class="sub-tab-contents">
                         <!-- Params -->
@@ -71,7 +73,7 @@
                                 <button class="btn btn-sm add-param">Add Param</button>
                             </div>
                         </div>
-                        
+
                         <!-- Headers -->
                         <div id="headers-subtab" class="sub-tab-content">
                             <div class="key-value-editor">
@@ -85,21 +87,33 @@
                                 <button class="btn btn-sm add-header">Add Header</button>
                             </div>
                         </div>
-                        
+
                         <!-- Body -->
                         <div id="body-subtab" class="sub-tab-content">
                             <div class="body-type-selector">
                                 <label><input type="radio" name="bodyType" value="none" checked> None</label>
                                 <label><input type="radio" name="bodyType" value="raw"> Raw</label>
+                                <label><input type="radio" name="bodyType" value="json"> Json</label>
                                 <label><input type="radio" name="bodyType" value="form-data"> Form Data</label>
                                 <label><input type="radio" name="bodyType" value="urlencoded"> URL Encoded</label>
                             </div>
                             <div id="bodyEditor">
                                 <textarea id="rawBody" class="raw-body" placeholder="Enter request body"></textarea>
+
+                                <!-- JSON 用エリア（最初は非表示）-->
+                                <div id="jsonEditor" style="display: none;">
+                                    <textarea id="jsonBody" class="json-body" placeholder="{ key : value }"></textarea>
+                                </div>
+
+                                <!-- Form Data 用エリア（最初は非表示）-->
+                                <div id="formDataContainer" class="key-value-container" style="display: none;">
+                                </div>
                                 <div id="formDataContainer" class="key-value-container" style="display:none;"></div>
                             </div>
+
+
                         </div>
-                        
+
                         <!-- Auth -->
                         <div id="auth-subtab" class="sub-tab-content">
                             <div class="auth-type-selector">
@@ -114,41 +128,43 @@
                             </div>
                             <div id="authDetails" class="auth-details"></div>
                         </div>
-                        
+
                         <!-- Pre-request Script -->
                         <div id="pre-script-subtab" class="sub-tab-content">
                             <div class="script-section">
                                 <h4>Pre-request Script</h4>
                                 <p class="script-description">This script runs before the request is sent</p>
-                                <textarea id="preRequestScript" class="script-editor" placeholder="// Example: pm.variables.set('timestamp', Date.now());"></textarea>
+                                <textarea id="preRequestScript" class="script-editor"
+                                    placeholder="// Example: pm.variables.set('timestamp', Date.now());"></textarea>
                             </div>
                         </div>
-                        
+
                         <!-- Test Script -->
                         <div id="tests-subtab" class="sub-tab-content">
                             <div class="script-section">
                                 <h4>Test Script</h4>
                                 <p class="script-description">This script runs after the response is received</p>
-                                <textarea id="testScript" class="script-editor" placeholder="// Example: pm.test('Status is 200', () => pm.response.to.have.status(200));"></textarea>
+                                <textarea id="testScript" class="script-editor"
+                                    placeholder="// Example: pm.test('Status is 200', () => pm.response.to.have.status(200));"></textarea>
                             </div>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Response Section -->
                 <div class="response-section">
                     <div class="response-header">
                         <h3>Response</h3>
                         <div id="responseStats" class="response-stats"></div>
                     </div>
-                    
+
                     <div class="response-tabs">
                         <button class="response-tab-btn active" data-restab="body">Body</button>
                         <button class="response-tab-btn" data-restab="headers">Headers</button>
                         <button class="response-tab-btn" data-restab="cookies">Cookies</button>
                         <button class="response-tab-btn" data-restab="tests">Test Results</button>
                     </div>
-                    
+
                     <div class="response-content">
                         <div id="response-body" class="response-tab-content active">
                             <div class="response-format-selector">
@@ -164,7 +180,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Collections Tab -->
             <div id="collections-tab" class="tab-content">
                 <div class="collections-header">
@@ -183,7 +199,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- History Tab -->
             <div id="history-tab" class="tab-content">
                 <div class="history-header">
@@ -195,7 +211,7 @@
                 </div>
                 <div id="historyContainer" class="history-container"></div>
             </div>
-            
+
             <!-- Interceptor Tab -->
             <div id="interceptor-tab" class="tab-content">
                 <div class="interceptor-header">
@@ -222,21 +238,13 @@
                 </div>
                 <div id="interceptorContainer" class="interceptor-container"></div>
             </div>
-            
+
             <!-- Variables Tab -->
             <div id="variables-tab" class="tab-content">
                 <div class="variables-header">
                     <h3>Variables Management</h3>
-                    <div class="environment-selector">
-                        <label>Environment:</label>
-                        <select id="environmentSelect">
-                            <option value="">No Environment</option>
-                        </select>
-                        <button class="btn btn-sm" id="newEnvironmentBtn">New</button>
-                        <button class="btn btn-sm" id="editEnvironmentBtn">Edit</button>
-                    </div>
                 </div>
-                
+
                 <div class="variables-content">
                     <!-- Global Variables -->
                     <div class="variable-section">
@@ -246,16 +254,21 @@
                         </div>
                         <div id="globalVariablesContainer" class="variables-container"></div>
                     </div>
-                    
+
                     <!-- Environment Variables -->
                     <div class="variable-section">
                         <div class="variable-section-header">
                             <h4>Environment Variables</h4>
+                            <select id="environmentSelect">
+                                <option value="">No Environment</option>
+                            </select>
+                            <button class="btn btn-sm" id="newEnvironmentBtn">New</button>
+                            <button class="btn btn-sm" id="editEnvironmentBtn">Edit</button>
                             <button class="btn btn-sm" id="addEnvVarBtn">Add</button>
                         </div>
                         <div id="envVariablesContainer" class="variables-container"></div>
                     </div>
-                    
+
                     <!-- Collection Variables -->
                     <div class="variable-section">
                         <div class="variable-section-header">
@@ -271,7 +284,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Import/Export Modal -->
     <div id="importExportModal" class="modal">
         <div class="modal-content">
@@ -304,11 +317,12 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Notification Area -->
     <div id="notificationArea" class="notification-area"></div>
-    
-  <!-- モジュールとして読み込む -->
-  <script type="module" src="index.js"></script>
+
+    <!-- モジュールとして読み込む -->
+    <script type="module" src="index.js"></script>
 </body>
+
 </html>

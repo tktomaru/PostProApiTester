@@ -140,14 +140,16 @@ export async function initializeVariablesManagement() {
 export function setupVariableEventListeners() {
     document.getElementById('newEnvironmentBtn').addEventListener('click', createNewEnvironment);
     document.getElementById('editEnvironmentBtn').addEventListener('click', editCurrentEnvironment);
-    document.getElementById('environmentSelect').addEventListener('change', switchEnvironment);
+    document.getElementById('environmentSelect').addEventListener('change', () => {
+        switchEnvironment();
+    });
 
     document.getElementById('addGlobalVarBtn').addEventListener('click', () => addVariableRow('global'));
     document.getElementById('addEnvVarBtn').addEventListener('click', () => addVariableRow('environment'));
     document.getElementById('addCollectionVarBtn').addEventListener('click', () => addVariableRow('collection'));
 
     document.getElementById('collectionVarSelect').addEventListener('change', () => {
-        currentCollection = document.getElementById('collectionVarSelect').value;
+        state.currentCollection = document.getElementById('collectionVarSelect').value;
         renderVariables('collection');
     });
 }
@@ -200,7 +202,7 @@ export async function createNewEnvironment() {
         created: new Date().toISOString()
     };
 
-    environments.push(env);
+    state.environments.push(env);
     await saveEnvironmentsToStorage();
     await chrome.storage.local.set({ [`env_${env.id}`]: {} });
 
@@ -215,11 +217,11 @@ export async function createNewEnvironment() {
  *  選択中の環境の名称を変更して保存 → セレクタ再描画
  */
 export async function editCurrentEnvironment() {
-    if (!currentEnvironment) {
+    if (!state.currentEnvironment) {
         showError('No environment selected');
         return;
     }
-    const env = environments.find(e => e.id === currentEnvironment);
+    const env = state.environments.find(e => e.id === state.currentEnvironment);
     if (!env) return;
     const newName = prompt('Edit environment name:', env.name);
     if (!newName || newName === env.name) return;
@@ -246,14 +248,13 @@ export async function switchEnvironment() {
 
     if (envId) {
         const envData = await chrome.storage.local.get([`env_${envId}`]);
-        variables.environment = envData[`env_${envId}`] || {};
+        state.variables.environment = envData[`env_${envId}`] || {};
     } else {
-        variables.environment = {};
+        state.variables.environment = {};
     }
-
-    renderVariables('environment');
-    const envName = envId ? environments.find(e => e.id === envId)?.name : 'No Environment';
+    const envName = envId ? state.environments.find(e => e.id === envId)?.name : 'No Environment';
     showSuccess('Switched to: ' + envName);
+    renderVariables('environment');
 }
 
 
@@ -333,6 +334,7 @@ export function renderVariables(scope) {
         // 環境が未選択の場合は空メッセージを表示
         if (!state.currentEnvironment) {
             container.innerHTML = '<p class="empty-message">Select an environment to manage variables</p>';
+            console.log("renderVariables is return currentEnvironment");
             return;
         }
         data = state.variables.environment;
@@ -341,10 +343,12 @@ export function renderVariables(scope) {
         // コレクションが未選択の場合は空メッセージを表示
         if (!state.currentCollection) {
             container.innerHTML = '<p class="empty-message">Select a collection to manage variables</p>';
+            console.log("renderVariables is return currentCollection");
             return;
         }
         data = state.variables.collection[state.currentCollection] || {};
     } else {
+        console.log("renderVariables is return");
         return;
     }
 
@@ -449,11 +453,11 @@ export function createVariableRow(scope, key = '', value = '', description = '')
 export function variableExists(scope, key) {
     switch (scope) {
         case 'global':
-            return key in variables.global;
+            return key in state.variables.global;
         case 'environment':
-            return key in variables.environment;
+            return key in state.variables.environment;
         case 'collection':
-            return currentCollection && variables.collection[currentCollection] && key in variables.collection[currentCollection];
+            return state.currentCollection && state.variables.collection[state.currentCollection] && key in state.variables.collection[state.currentCollection];
     }
     return false;
 }
@@ -466,20 +470,20 @@ export async function saveVariable(scope, key, value, description) {
     const varData = { value, description };
     switch (scope) {
         case 'global':
-            variables.global[key] = varData;
+            state.variables.global[key] = varData;
             await saveVariablesToStorage();
             break;
         case 'environment':
-            if (!currentEnvironment) return;
-            variables.environment[key] = varData;
-            await saveEnvDataToStorage(currentEnvironment);
+            if (!state.currentEnvironment) return;
+            state.variables.environment[state.currentEnvironment] = varData;
+            await saveEnvDataToStorage(state.currentEnvironment);
             break;
         case 'collection':
-            if (!currentCollection) return;
-            if (!variables.collection[currentCollection]) {
-                variables.collection[currentCollection] = {};
+            if (!state.currentCollection) return;
+            if (!state.variables.collection[state.currentCollection]) {
+                state.variables.collection[state.currentCollection] = {};
             }
-            variables.collection[currentCollection][key] = varData;
+            state.variables.collection[state.currentCollection][key] = varData;
             await saveVariablesToStorage();
             break;
     }
@@ -492,18 +496,29 @@ export async function saveVariable(scope, key, value, description) {
 export async function deleteVariable(scope, key) {
     switch (scope) {
         case 'global':
-            delete variables.global[key];
+            delete state.variables.global[key];
             await saveVariablesToStorage();
             break;
         case 'environment':
-            if (!currentEnvironment) return;
-            delete variables.environment[key];
-            await saveEnvDataToStorage(currentEnvironment);
+            if (!state.currentEnvironment) return;
+            delete state.variables.environment[key];
+            await saveEnvDataToStorage(state.currentEnvironment);
             break;
         case 'collection':
-            if (!currentCollection) return;
-            delete variables.collection[currentCollection][key];
+            if (!state.currentCollection) return;
+            delete state.variables.collection[state.currentCollection][key];
             await saveVariablesToStorage();
+            break;
+    }
+    switch (scope) {
+        case 'global':
+            renderVariables('global');
+            break;
+        case 'environment':
+            renderVariables('environment');
+            break;
+        case 'collection':
+            renderVariables('collection');
             break;
     }
 }
@@ -513,7 +528,7 @@ export async function deleteVariable(scope, key) {
  *  空行を追加してフォーカスを当てる
  */
 export function addVariableRow(scope) {
-    if (scope === 'environment' && !currentEnvironment) {
+    if (scope === 'environment' && !state.currentEnvironment) {
         showError('Please select an environment first');
         return;
     }
@@ -540,6 +555,17 @@ export function addVariableRow(scope) {
     const row = createVariableRow(scope);
     container.appendChild(row);
     row.querySelector('.var-key').focus();
+    switch (scope) {
+        case 'global':
+            renderVariables('global');
+            break;
+        case 'environment':
+            renderVariables('environment');
+            break;
+        case 'collection':
+            renderVariables('collection');
+            break;
+    }
 }
 
 export function getVariable(key) {
@@ -549,7 +575,7 @@ export function getVariable(key) {
         return typeof val === 'object' ? val.value : val;
     }
     if (state.currentCollection && state.variables.collection[state.currentCollection]?.[key]) {
-        const val = variables.collection[state.currentCollection][key];
+        const val = state.variables.collection[state.currentCollection][key];
         return typeof val === 'object' ? val.value : val;
     }
     if (state.variables.global[key]) {
@@ -594,19 +620,19 @@ export async function setVariable(scope, key, value) {
 
     switch (scope) {
         case 'global':
-            variables.global[key] = varData;
+            state.variables.global[key] = varData;
             await chrome.storage.local.set({
                 variables: {
-                    global: variables.global,
-                    collection: variables.collection
+                    global: state.variables.global,
+                    collection: state.variables.collection
                 }
             });
             break;
         case 'environment':
-            if (currentEnvironment) {
-                variables.environment[key] = varData;
+            if (state.currentEnvironment) {
+                state.variables.environment[key] = varData;
                 await chrome.storage.local.set({
-                    [`env_${currentEnvironment}`]: variables.environment
+                    [`env_${state.currentEnvironment}`]: state.variables.environment
                 });
             }
             break;

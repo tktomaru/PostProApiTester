@@ -12,6 +12,7 @@ import { sampleCollections } from './defaultData.js';
 import { escapeHtml } from './utils.js';
 import { showSuccess } from './utils.js';
 import { updateCollectionVarSelector } from './variableManager.js';
+import { renderVariables } from './variableManager.js';
 
 /**
  * initializeCollections：起動時にコレクション一覧をロードし、必要ならサンプルを投入する
@@ -87,8 +88,6 @@ export async function selectCollection(collectionId) {
     const collectionVarSelect = document.getElementById('collectionVarSelect');
     if (collectionVarSelect) {
         collectionVarSelect.value = collectionId;
-        // variableManager.js の renderVariables('collection') を呼び出す想定
-        const { renderVariables } = await import('./variableManager.js');
         renderVariables('collection');
     }
 }

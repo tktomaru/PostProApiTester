@@ -374,28 +374,39 @@ export function showLoading(show) {
 }
 
 // Body type handling
+
 export function handleBodyTypeChange(event) {
     const bodyType = event.target.value;
     const rawBody = document.getElementById('rawBody');
+    const jsonEditor = document.getElementById('jsonEditor');
     const formDataContainer = document.getElementById('formDataContainer');
 
-    // Hide all body editors
+    // まずすべて非表示にする
     rawBody.style.display = 'none';
+    jsonEditor.style.display = 'none';
     formDataContainer.style.display = 'none';
 
-    // Show appropriate editor
+    // 選択された bodyType に応じて表示切り替え
     switch (bodyType) {
         case 'raw':
             rawBody.style.display = 'block';
             break;
+
+        case 'json':
+            jsonEditor.style.display = 'block';
+            break;
+
         case 'form-data':
         case 'urlencoded':
             formDataContainer.style.display = 'block';
             if (!formDataContainer.children.length) {
+                // 最初にキー・バリュー行がなければ追加
                 addKeyValueRow(formDataContainer, 'body');
             }
             break;
+
+        default: // 'none'
+            // 何もしない（全て非表示のまま）
+            break;
     }
 }
-
-

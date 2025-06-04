@@ -14,8 +14,9 @@ import {
     formatBytes
 } from './utils.js';
 
-import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails } from './utils.js';
-import { getVariable, replaceVariables, deepReplaceVariables } from './variableManager.js';
+import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues } from './utils.js';
+import { getVariable, replaceVariables, deepReplaceVariables, renderVariables } from './variableManager.js';
+
 /**
  * loadRequestIntoEditor
  *  コレクションや履歴から呼ばれ、右側エディタ（メソッド、URL、ヘッダ、ボディ、認証）に
@@ -162,9 +163,35 @@ export async function sendRequest() {
     try {
         showLoading(true);
 
+        // 必須チェック: URL が空でないか
         if (!state.currentRequest.url.trim()) {
             showError('URL is required');
             return;
+        }
+
+        // ① bodyType の選択状況を反映
+        const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
+        state.currentRequest.body = null; // まずクリア
+
+        switch (bodyType) {
+            case 'raw':
+                state.currentRequest.body = document.getElementById('rawBody').value;
+                break;
+
+            case 'json':
+                state.currentRequest.body = document.getElementById('jsonBody').value;
+                break;
+
+            case 'form-data':
+            case 'urlencoded':
+                // collectKeyValues('formDataContainer') でオブジェクトを作り、
+                // それを buildFetchOptions 内で処理する想定
+                // （そのまま state.currentRequest.body には代入しません）
+                break;
+
+            default:
+                // none の場合は body を null にしておく
+                break;
         }
 
         // 1. プリリクエストスクリプト実行
@@ -235,11 +262,29 @@ export function buildFetchOptions(request) {
     if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
         const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
         switch (bodyType) {
+
+            case 'json':
+                // ==== JSON 検証ロジックを追加 ====
+                const rawText = request.body?.trim();
+                if (rawText) {
+                    try {
+                        // JSON.parse して検証
+                        JSON.parse(rawText);
+                        // 正常にパースできれば、そのまま送信
+                        options.body = rawText;
+                        if (!options.headers['Content-Type']) {
+                            options.headers['Content-Type'] = 'application/json';
+                        }
+                    } catch (e) {
+                        // パースに失敗したらエラーを表示し、そのリクエストは中断する
+                        showError('不正な JSON です');
+                        // 中断のため、fetch に渡すオプションを null にする（sendRequest で検出できるように）
+                        return null;
+                    }
+                }
+                break;
             case 'raw':
                 options.body = request.body;
-                if (!options.headers['Content-Type']) {
-                    options.headers['Content-Type'] = 'application/json';
-                }
                 break;
             case 'form-data':
                 const formData = new FormData();
@@ -535,10 +580,15 @@ export function runTestCommand(commandString, responseData) {
                     error: `レスポンスヘッダー "${headerName}" が見つかりません`
                 };
             }
+            console.log("取得したAuthorizationヘッダ：varName=", varName);
+            console.log("取得したAuthorizationヘッダ：headerValue=", headerValue);
             // 例: 非同期で環境変数に保存する関数を呼び出す（await は不要。非同期処理なのでエラーは catch）
             import('./variableManager.js').then(({ setVariable }) => {
                 setVariable('environment', varName, headerValue).catch(console.error);
             });
+
+            // UI上の環境変数タブを再レンダリング
+            renderVariables('environment');
             return { passed: true };
         }
 

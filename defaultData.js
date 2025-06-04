@@ -2,7 +2,7 @@
 
 /** グローバル変数のサンプル */
 export const sampleGlobalVariables = {
-    apiUrl: { value: 'https://reply.tukutano.jp', description: '基本となる API の URL' },
+    apiUrl: { value: 'http://localhost:31013', description: '基本となる API の URL' },
     timeout: { value: '30000', description: 'タイムアウト（ミリ秒）' }
 };
 
@@ -32,15 +32,28 @@ export const sampleCollections = [
         requests: [
             {
                 id: 'req1',
-                name: 'Get Users',
-                method: 'GET',
-                url: '{{apiUrl}}/users',
+                name: 'POST Users',
+                method: 'POST',
+                url: '{{apiUrl}}/api/auth/login',
                 headers: { 'Accept': 'application/json' },
                 params: { page: '1' },
-                body: null,
+                body: JSON.stringify({
+                    "username": "tomaru",
+                    "password": ""
+                }),
                 auth: { type: 'bearer', token: '{{devToken}}' },
                 folder: '',
                 description: 'ユーザー一覧を取得する'
+            },
+            {
+                id: 'req_sample_get',
+                name: 'サンプル GET',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/items?page=1',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' }
             }
         ]
     }
