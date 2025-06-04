@@ -5,11 +5,12 @@
   "description": "Comprehensive API testing tool with ApiTester and Postman compatibility",
   "permissions": [
     "activeTab",
+    "contextMenus",
     "storage",
     "unlimitedStorage",
     "background",
     "webRequest",
-    "webRequestBlocking",
+    "declarativeNetRequest",
     "cookies",
     "tabs"
   ],
@@ -27,7 +28,6 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html",
     "default_title": "Advanced API Tester",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -39,11 +39,18 @@
     {
       "resources": ["injected.js"],
       "matches": ["<all_urls>"]
-    }
+    },
+        {
+          "resources": ["index.js"],
+          "matches": ["<all_urls>"]
+        }
   ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
   }
 }

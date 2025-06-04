@@ -246,6 +246,20 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.action.onClicked.addListener((tab) => {
     // This will open the popup automatically due to manifest configuration
     console.log('Extension icon clicked on tab:', tab.id);
+    // 新しいタブで index.html を開く
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("index.html")
+    });
+    // if (info.menuItemId === 'interceptRequest') {
+    //     // Send the URL to popup for testing
+    //     chrome.storage.local.set({
+    //         pendingRequest: {
+    //             url: info.linkUrl,
+    //             method: 'GET',
+    //             timestamp: Date.now()
+    //         }
+    //     });
+    // }
 });
 
 // Context menu setup (optional feature)
@@ -258,25 +272,12 @@ chrome.runtime.onInstalled.addListener(() => {
     });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (info.menuItemId === 'interceptRequest') {
-        // Send the URL to popup for testing
-        chrome.storage.local.set({
-            pendingRequest: {
-                url: info.linkUrl,
-                method: 'GET',
-                timestamp: Date.now()
-            }
-        });
-    }
-});
-
 // Alarm for cleanup tasks
-chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'cleanup') {
-        performCleanup();
-    }
-});
+// chrome.alarms.onAlarm.addListener((alarm) => {
+//     if (alarm.name === 'cleanup') {
+//         performCleanup();
+//     }
+// });
 
 // Set up periodic cleanup
 chrome.runtime.onStartup.addListener(() => {

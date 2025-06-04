@@ -68,6 +68,12 @@
   "window.zoomLevel": 1,
   "remote.SSH.remotePlatform": {
     "ubuntu1": "linux"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "vscode.css-language-features"
   }
   // .prettierrc ファイルのパスを指定します。
 }
