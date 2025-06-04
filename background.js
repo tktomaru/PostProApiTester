@@ -1,3 +1,5 @@
+// background.js
+// ───────────────────────────────────────────────────────────────────────────────
 // Background script for Chrome extension
 // Handles network interception and long-running tasks
 
