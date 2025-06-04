@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Advanced API Tester",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Comprehensive API testing tool with ApiTester and Postman compatibility",
   "permissions": [
     "activeTab",

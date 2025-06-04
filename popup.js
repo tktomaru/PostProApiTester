@@ -1,4 +1,4 @@
-// Global state management
+// Global state management - 修正版
 let currentRequest = {
     method: 'GET',
     url: '',
@@ -15,6 +15,11 @@ let variables = {
     environment: {},
     collection: {}
 };
+
+// 追加のグローバル変数
+let environments = [];
+let currentEnvironment = null;
+let currentCollection = null;
 let isInterceptorActive = false;
 
 // Initialize the app when DOM is loaded
@@ -22,828 +27,322 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
 });
 
-// Main initialization function
-function initializeApp() {
-    setupEventListeners();
-    loadStoredData();
-    setupTabSwitching();
-    initializeKeyValueEditors();
-    setupAuthHandlers();
-    setupModalHandlers();
-}
-
-// Setup all event listeners
-function setupEventListeners() {
-    // Send button
-    document.getElementById('sendBtn').addEventListener('click', sendRequest);
-    
-    // Method and URL changes
-    document.getElementById('methodSelect').addEventListener('change', function(e) {
-        currentRequest.method = e.target.value;
-    });
-    
-    document.getElementById('urlInput').addEventListener('input', function(e) {
-        currentRequest.url = e.target.value;
-    });
-    
-    // Import/Export buttons
-    document.getElementById('importBtn').addEventListener('click', openImportModal);
-    document.getElementById('exportBtn').addEventListener('click', exportData);
-    document.getElementById('settingsBtn').addEventListener('click', openSettings);
-    
-    // Collection management
-    document.getElementById('newCollectionBtn').addEventListener('click', createNewCollection);
-    
-    // History management
-    document.getElementById('historySearch').addEventListener('input', filterHistory);
-    document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
-    
-    // Interceptor controls
-    document.getElementById('startInterceptorBtn').addEventListener('click', startInterceptor);
-    document.getElementById('stopInterceptorBtn').addEventListener('click', stopInterceptor);
-    
-    // Body type selection
-    document.querySelectorAll('input[name="bodyType"]').forEach(radio => {
-        radio.addEventListener('change', handleBodyTypeChange);
-    });
-    
-    // Raw body input
-    document.getElementById('rawBody').addEventListener('input', function(e) {
-        currentRequest.body = e.target.value;
-    });
-}
-
-// Tab switching functionality
-function setupTabSwitching() {
-    // Main tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const tabName = this.dataset.tab;
-            switchMainTab(tabName);
-        });
-    });
-    
-    // Sub tabs (request details)
-    document.querySelectorAll('.sub-tab-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const subtabName = this.dataset.subtab;
-            switchSubTab(subtabName);
-        });
-    });
-    
-    // Response tabs
-    document.querySelectorAll('.response-tab-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const restabName = this.dataset.restab;
-            switchResponseTab(restabName);
-        });
-    });
-    
-    // Response format buttons
-    document.querySelectorAll('.format-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const format = this.dataset.format;
-            switchResponseFormat(format);
-        });
-    });
-}
-
-function switchMainTab(tabName) {
-    // Remove active class from all tabs and contents
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
-    // Add active class to selected tab and content
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-    document.getElementById(`${tabName}-tab`).classList.add('active');
-}
-
-function switchSubTab(subtabName) {
-    document.querySelectorAll('.sub-tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.sub-tab-content').forEach(content => content.classList.remove('active'));
-    
-    document.querySelector(`[data-subtab="${subtabName}"]`).classList.add('active');
-    document.getElementById(`${subtabName}-subtab`).classList.add('active');
-}
-
-function switchResponseTab(restabName) {
-    document.querySelectorAll('.response-tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.response-tab-content').forEach(content => content.classList.remove('active'));
-    
-    document.querySelector(`[data-restab="${restabName}"]`).classList.add('active');
-    document.getElementById(`response-${restabName}`).classList.add('active');
-}
-
-function switchResponseFormat(format) {
-    document.querySelectorAll('.format-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`[data-format="${format}"]`).classList.add('active');
-    
-    // Re-render response with new format
-    if (window.lastResponse) {
-        displayResponse(window.lastResponse, format);
-    }
-}
-
-// Key-Value editors initialization
-function initializeKeyValueEditors() {
-    initializeParamsEditor();
-    initializeHeadersEditor();
-    setupAddButtons();
-}
-
-function initializeParamsEditor() {
-    const container = document.getElementById('paramsContainer');
-    addKeyValueRow(container, 'param');
-}
-
-function initializeHeadersEditor() {
-    const container = document.getElementById('headersContainer');
-    addKeyValueRow(container, 'header');
-}
-
-function setupAddButtons() {
-    document.querySelector('.add-param').addEventListener('click', function() {
-        const container = document.getElementById('paramsContainer');
-        addKeyValueRow(container, 'param');
-    });
-    
-    document.querySelector('.add-header').addEventListener('click', function() {
-        const container = document.getElementById('headersContainer');
-        addKeyValueRow(container, 'header');
-    });
-}
-
-function addKeyValueRow(container, type) {
-    const row = document.createElement('div');
-    row.className = 'key-value-row';
-    row.innerHTML = `
-        <input type="text" placeholder="Key" class="key-input">
-        <input type="text" placeholder="Value" class="value-input">
-        <input type="text" placeholder="Description" class="description-input">
-        <button type="button" class="delete-btn">×</button>
-    `;
-    
-    // Add event listeners
-    const keyInput = row.querySelector('.key-input');
-    const valueInput = row.querySelector('.value-input');
-    const deleteBtn = row.querySelector('.delete-btn');
-    
-    keyInput.addEventListener('input', function() {
-        updateRequestData(type);
-    });
-    
-    valueInput.addEventListener('input', function() {
-        updateRequestData(type);
-    });
-    
-    deleteBtn.addEventListener('click', function() {
-        row.remove();
-        updateRequestData(type);
-    });
-    
-    container.appendChild(row);
-}
-
-function updateRequestData(type) {
-    if (type === 'param') {
-        currentRequest.params = collectKeyValues('paramsContainer');
-    } else if (type === 'header') {
-        currentRequest.headers = collectKeyValues('headersContainer');
-    }
-}
-
-function collectKeyValues(containerId) {
-    const container = document.getElementById(containerId);
-    const rows = container.querySelectorAll('.key-value-row');
-    const result = {};
-    
-    rows.forEach(row => {
-        const key = row.querySelector('.key-input').value.trim();
-        const value = row.querySelector('.value-input').value.trim();
-        if (key && value) {
-            result[key] = value;
-        }
-    });
-    
-    return result;
-}
-
-// Authentication handlers
-function setupAuthHandlers() {
-    const authTypeSelect = document.getElementById('authType');
-    authTypeSelect.addEventListener('change', function() {
-        const authType = this.value;
-        currentRequest.auth.type = authType;
-        renderAuthDetails(authType);
-    });
-}
-
-function renderAuthDetails(authType) {
-    const container = document.getElementById('authDetails');
-    container.innerHTML = '';
-    
-    switch (authType) {
-        case 'basic':
-            container.innerHTML = `
-                <div class="auth-field">
-                    <label>Username</label>
-                    <input type="text" id="authUsername" placeholder="Enter username">
-                </div>
-                <div class="auth-field">
-                    <label>Password</label>
-                    <input type="password" id="authPassword" placeholder="Enter password">
-                </div>
-            `;
-            break;
-            
-        case 'bearer':
-            container.innerHTML = `
-                <div class="auth-field">
-                    <label>Token</label>
-                    <input type="text" id="authToken" placeholder="Enter bearer token">
-                </div>
-            `;
-            break;
-            
-        case 'apikey':
-            container.innerHTML = `
-                <div class="auth-field">
-                    <label>Key</label>
-                    <input type="text" id="authKey" placeholder="Enter API key name">
-                </div>
-                <div class="auth-field">
-                    <label>Value</label>
-                    <input type="text" id="authValue" placeholder="Enter API key value">
-                </div>
-                <div class="auth-field">
-                    <label>Add to</label>
-                    <select id="authAddTo">
-                        <option value="header">Header</option>
-                        <option value="query">Query Params</option>
-                    </select>
-                </div>
-            `;
-            break;
-            
-        case 'oauth2':
-            container.innerHTML = `
-                <div class="auth-field">
-                    <label>Access Token</label>
-                    <input type="text" id="authAccessToken" placeholder="Enter access token">
-                </div>
-                <div class="auth-field">
-                    <label>Token Type</label>
-                    <select id="authTokenType">
-                        <option value="Bearer">Bearer</option>
-                        <option value="MAC">MAC</option>
-                    </select>
-                </div>
-            `;
-            break;
-    }
-    
-    // Add event listeners to auth inputs
-    container.querySelectorAll('input, select').forEach(input => {
-        input.addEventListener('input', updateAuthData);
-        input.addEventListener('change', updateAuthData);
-    });
-}
-
-function updateAuthData() {
-    const authType = currentRequest.auth.type;
-    currentRequest.auth = { type: authType };
-    
-    switch (authType) {
-        case 'basic':
-            currentRequest.auth.username = document.getElementById('authUsername')?.value || '';
-            currentRequest.auth.password = document.getElementById('authPassword')?.value || '';
-            break;
-            
-        case 'bearer':
-            currentRequest.auth.token = document.getElementById('authToken')?.value || '';
-            break;
-            
-        case 'apikey':
-            currentRequest.auth.key = document.getElementById('authKey')?.value || '';
-            currentRequest.auth.value = document.getElementById('authValue')?.value || '';
-            currentRequest.auth.addTo = document.getElementById('authAddTo')?.value || 'header';
-            break;
-            
-        case 'oauth2':
-            currentRequest.auth.accessToken = document.getElementById('authAccessToken')?.value || '';
-            currentRequest.auth.tokenType = document.getElementById('authTokenType')?.value || 'Bearer';
-            break;
-    }
-}
-
-// Body type handling
-function handleBodyTypeChange(event) {
-    const bodyType = event.target.value;
-    const bodyEditor = document.getElementById('bodyEditor');
-    const rawBody = document.getElementById('rawBody');
-    const formDataContainer = document.getElementById('formDataContainer');
-    
-    // Hide all body editors
-    rawBody.style.display = 'none';
-    formDataContainer.style.display = 'none';
-    
-    // Show appropriate editor
-    switch (bodyType) {
-        case 'raw':
-            rawBody.style.display = 'block';
-            break;
-        case 'form-data':
-        case 'urlencoded':
-            formDataContainer.style.display = 'block';
-            if (!formDataContainer.children.length) {
-                addKeyValueRow(formDataContainer, 'body');
-            }
-            break;
-    }
-}
-
-// Main request sending function
-async function sendRequest() {
+// Main initialization function - 修正版
+async function initializeApp() {
     try {
-        showLoading(true);
+        // 1. まず基本的なイベントリスナーを設定
+        setupEventListeners();
+        setupTabSwitching();
+        setupModalHandlers();
         
-        // Validate request
-        if (!currentRequest.url.trim()) {
-            showError('URL is required');
-            return;
+        // 2. ストレージからデータを読み込む（順序重要）
+        await loadAllStoredData();
+        
+        // 3. UI初期化
+        initializeKeyValueEditors();
+        setupAuthHandlers();
+        
+        // 4. 変数管理の初期化（環境読み込み後に実行）
+        await initializeVariablesManagement();
+        
+        // 5. 初期レンダリング
+        renderCollections();
+        renderHistory();
+        
+        console.log('API Tester initialized successfully');
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showError('Failed to initialize: ' + error.message);
+    }
+}
+
+// 統合されたストレージ読み込み関数
+async function loadAllStoredData() {
+    try {
+        // すべての必要なデータを一度に読み込む
+        const result = await chrome.storage.local.get([
+            'collections',
+            'history',
+            'variables',
+            'environments',
+            'currentEnvironment',
+            'currentCollection',
+            'settings'
+        ]);
+        
+        // Collections
+        if (result.collections) {
+            collections = result.collections;
         }
         
-        // Process variables in URL and other fields
-        const processedRequest = processVariables(currentRequest);
+        // History
+        if (result.history) {
+            history = result.history;
+        }
         
-        // Build fetch options
-        const fetchOptions = buildFetchOptions(processedRequest);
+        // Variables - グローバル変数のみ
+        if (result.variables?.global) {
+            variables.global = result.variables.global;
+        }
         
-        // Execute pre-request script
-        await executePreRequestScript();
+        // Environments
+        if (result.environments) {
+            environments = result.environments;
+        }
         
-        // Record start time
-        const startTime = Date.now();
+        // Current environment
+        if (result.currentEnvironment) {
+            currentEnvironment = result.currentEnvironment;
+            // 環境変数を読み込む
+            const envData = await chrome.storage.local.get([`env_${currentEnvironment}`]);
+            if (envData[`env_${currentEnvironment}`]) {
+                variables.environment = envData[`env_${currentEnvironment}`];
+            }
+        }
         
-        // Send request
-        const response = await fetch(processedRequest.url, fetchOptions);
-        const endTime = Date.now();
+        // Current collection
+        if (result.currentCollection) {
+            currentCollection = result.currentCollection;
+        }
         
-        // Process response
-        const responseData = await processResponse(response, endTime - startTime);
+        // Collection variables
+        if (result.variables?.collection) {
+            variables.collection = result.variables.collection;
+        }
         
-        // Display response
-        displayResponse(responseData);
-        
-        // Execute test script
-        await executeTestScript(responseData);
-        
-        // Save to history
-        saveToHistory(processedRequest, responseData);
+        console.log('Stored data loaded:', {
+            collectionsCount: collections.length,
+            historyCount: history.length,
+            environmentsCount: environments.length,
+            currentEnvironment,
+            currentCollection
+        });
         
     } catch (error) {
-        showError('Request failed: ' + error.message);
-        console.error('Request error:', error);
-    } finally {
-        showLoading(false);
+        console.error('Error loading stored data:', error);
+        throw error;
     }
 }
 
-function buildFetchOptions(request) {
-    const options = {
-        method: request.method,
-        headers: {}
-    };
+// コレクション管理の改善
+function renderCollections() {
+    const container = document.getElementById('collectionsContainer');
     
-    // Add custom headers
-    Object.assign(options.headers, request.headers);
-    
-    // Add authentication
-    addAuthenticationHeaders(options.headers, request.auth);
-    
-    // Add body for POST, PUT, PATCH requests
-    if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
-        const bodyType = document.querySelector('input[name="bodyType"]:checked').value;
-        
-        switch (bodyType) {
-            case 'raw':
-                options.body = request.body;
-                if (!options.headers['Content-Type']) {
-                    options.headers['Content-Type'] = 'application/json';
-                }
-                break;
-                
-            case 'form-data':
-                const formData = new FormData();
-                const formFields = collectKeyValues('formDataContainer');
-                Object.entries(formFields).forEach(([key, value]) => {
-                    formData.append(key, value);
-                });
-                options.body = formData;
-                break;
-                
-            case 'urlencoded':
-                const params = new URLSearchParams();
-                const urlEncodedFields = collectKeyValues('formDataContainer');
-                Object.entries(urlEncodedFields).forEach(([key, value]) => {
-                    params.append(key, value);
-                });
-                options.body = params;
-                options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-                break;
-        }
-    }
-    
-    return options;
-}
-
-function addAuthenticationHeaders(headers, auth) {
-    switch (auth.type) {
-        case 'basic':
-            if (auth.username && auth.password) {
-                const credentials = btoa(`${auth.username}:${auth.password}`);
-                headers['Authorization'] = `Basic ${credentials}`;
-            }
-            break;
-            
-        case 'bearer':
-            if (auth.token) {
-                headers['Authorization'] = `Bearer ${auth.token}`;
-            }
-            break;
-            
-        case 'apikey':
-            if (auth.key && auth.value) {
-                if (auth.addTo === 'header') {
-                    headers[auth.key] = auth.value;
-                }
-                // Query params will be handled in URL processing
-            }
-            break;
-            
-        case 'oauth2':
-            if (auth.accessToken) {
-                headers['Authorization'] = `${auth.tokenType || 'Bearer'} ${auth.accessToken}`;
-            }
-            break;
-    }
-}
-
-async function processResponse(response, duration) {
-    const responseData = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: {},
-        duration: duration,
-        size: 0,
-        body: null,
-        bodyText: ''
-    };
-    
-    // Extract headers
-    response.headers.forEach((value, key) => {
-        responseData.headers[key] = value;
-    });
-    
-    // Get response body
-    const contentType = response.headers.get('content-type') || '';
-    
-    try {
-        responseData.bodyText = await response.text();
-        responseData.size = new Blob([responseData.bodyText]).size;
-        
-        if (contentType.includes('application/json')) {
-            responseData.body = JSON.parse(responseData.bodyText);
-        } else {
-            responseData.body = responseData.bodyText;
-        }
-    } catch (error) {
-        responseData.bodyText = 'Error reading response body';
-        responseData.body = null;
-    }
-    
-    return responseData;
-}
-
-function displayResponse(responseData, format = 'pretty') {
-    window.lastResponse = responseData;
-    
-    // Update response stats
-    const statsContainer = document.getElementById('responseStats');
-    statsContainer.innerHTML = `
-        <span class="status-${responseData.status < 400 ? 'success' : 'error'}">
-            ${responseData.status} ${responseData.statusText}
-        </span>
-        <span>${responseData.duration}ms</span>
-        <span>${formatBytes(responseData.size)}</span>
-    `;
-    
-    // Display response body
-    displayResponseBody(responseData, format);
-    
-    // Display response headers
-    displayResponseHeaders(responseData.headers);
-    
-    // Display cookies if any
-    displayResponseCookies(responseData.headers);
-}
-
-function displayResponseBody(responseData, format) {
-    const bodyContainer = document.getElementById('responseBody');
-    
-    let content = '';
-    const contentType = responseData.headers['content-type'] || '';
-    
-    switch (format) {
-        case 'pretty':
-            if (contentType.includes('application/json') && responseData.body) {
-                content = JSON.stringify(responseData.body, null, 2);
-            } else {
-                content = responseData.bodyText;
-            }
-            break;
-            
-        case 'raw':
-            content = responseData.bodyText;
-            break;
-            
-        case 'preview':
-            if (contentType.includes('text/html')) {
-                bodyContainer.innerHTML = `<iframe srcdoc="${escapeHtml(responseData.bodyText)}" style="width:100%;height:300px;border:1px solid #ccc;"></iframe>`;
-                return;
-            } else {
-                content = responseData.bodyText;
-            }
-            break;
-    }
-    
-    bodyContainer.textContent = content;
-}
-
-function displayResponseHeaders(headers) {
-    const headersContainer = document.getElementById('response-headers');
-    let html = '<div class="headers-list">';
-    
-    Object.entries(headers).forEach(([key, value]) => {
-        html += `
-            <div class="header-item">
-                <strong>${escapeHtml(key)}:</strong> ${escapeHtml(value)}
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    headersContainer.innerHTML = html;
-}
-
-function displayResponseCookies(headers) {
-    const cookiesContainer = document.getElementById('response-cookies');
-    const setCookieHeader = headers['set-cookie'];
-    
-    if (setCookieHeader) {
-        const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
-        let html = '<div class="cookies-list">';
-        
-        cookies.forEach(cookie => {
-            html += `<div class="cookie-item">${escapeHtml(cookie)}</div>`;
-        });
-        
-        html += '</div>';
-        cookiesContainer.innerHTML = html;
-    } else {
-        cookiesContainer.innerHTML = '<p>No cookies in response</p>';
-    }
-}
-
-// Utility functions
-function processVariables(request) {
-    const processed = JSON.parse(JSON.stringify(request));
-    
-    // Process URL
-    processed.url = replaceVariables(processed.url);
-    
-    // Add query parameters
-    const url = new URL(processed.url);
-    Object.entries(processed.params).forEach(([key, value]) => {
-        url.searchParams.set(key, replaceVariables(value));
-    });
-    
-    // Add API key to query if needed
-    if (processed.auth.type === 'apikey' && processed.auth.addTo === 'query') {
-        url.searchParams.set(processed.auth.key, processed.auth.value);
-    }
-    
-    processed.url = url.toString();
-    
-    // Process headers
-    Object.keys(processed.headers).forEach(key => {
-        processed.headers[key] = replaceVariables(processed.headers[key]);
-    });
-    
-    // Process body
-    if (processed.body) {
-        processed.body = replaceVariables(processed.body);
-    }
-    
-    return processed;
-}
-
-function replaceVariables(text) {
-    if (typeof text !== 'string') return text;
-    
-    return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-        const trimmedName = varName.trim();
-        return variables.environment[trimmedName] || 
-               variables.collection[trimmedName] || 
-               variables.global[trimmedName] || 
-               match;
-    });
-}
-
-function showLoading(show) {
-    const sendBtn = document.getElementById('sendBtn');
-    if (show) {
-        sendBtn.disabled = true;
-        sendBtn.textContent = 'Sending...';
-    } else {
-        sendBtn.disabled = false;
-        sendBtn.textContent = 'Send';
-    }
-}
-
-function showError(message) {
-    // Simple error display - could be enhanced with a modal or toast
-    alert('Error: ' + message);
-}
-
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Script execution functions
-async function executePreRequestScript() {
-    const script = document.getElementById('testScript').value;
-    if (!script.trim()) return;
-    
-    try {
-        // Create a simple pm object for script execution
-        const pm = createPmObject();
-        
-        // Execute the script in a safe context
-        const scriptFunction = new Function('pm', script);
-        scriptFunction(pm);
-    } catch (error) {
-        console.error('Pre-request script error:', error);
-    }
-}
-
-async function executeTestScript(responseData) {
-    const script = document.getElementById('testScript').value;
-    if (!script.trim()) return;
-    
-    const results = [];
-    
-    try {
-        // Create pm object with response data
-        const pm = createPmObject(responseData, results);
-        
-        // Execute the script
-        const scriptFunction = new Function('pm', script);
-        scriptFunction(pm);
-        
-        // Display test results
-        displayTestResults(results);
-    } catch (error) {
-        console.error('Test script error:', error);
-        results.push({
-            name: 'Script Execution Error',
-            passed: false,
-            error: error.message
-        });
-        displayTestResults(results);
-    }
-}
-
-function createPmObject(responseData = null, testResults = []) {
-    return {
-        test: function(name, testFunction) {
-            try {
-                testFunction();
-                testResults.push({ name, passed: true });
-            } catch (error) {
-                testResults.push({ name, passed: false, error: error.message });
-            }
-        },
-        
-        response: responseData ? {
-            to: {
-                have: {
-                    status: function(expectedStatus) {
-                        if (responseData.status !== expectedStatus) {
-                            throw new Error(`Expected status ${expectedStatus}, got ${responseData.status}`);
-                        }
-                    }
-                }
-            },
-            json: function() {
-                return responseData.body;
-            }
-        } : null,
-        
-        expect: function(value) {
-            return {
-                to: {
-                    have: {
-                        property: function(prop) {
-                            if (typeof value !== 'object' || !(prop in value)) {
-                                throw new Error(`Expected object to have property '${prop}'`);
-                            }
-                        }
-                    },
-                    equal: function(expected) {
-                        if (value !== expected) {
-                            throw new Error(`Expected ${value} to equal ${expected}`);
-                        }
-                    }
-                }
-            };
-        },
-        
-        variables: {
-            get: function(key) {
-                return variables.environment[key] || variables.collection[key] || variables.global[key];
-            },
-            set: function(key, value) {
-                variables.environment[key] = value;
-            }
-        }
-    };
-}
-
-function displayTestResults(results) {
-    const testsContainer = document.getElementById('response-tests');
-    
-    if (results.length === 0) {
-        testsContainer.innerHTML = '<p>No tests executed</p>';
+    if (collections.length === 0) {
+        container.innerHTML = '<p class="empty-message">No collections created</p>';
         return;
     }
     
-    let html = '<div class="test-results">';
-    results.forEach(result => {
-        html += `
-            <div class="test-result ${result.passed ? 'passed' : 'failed'}">
-                <span class="test-icon">${result.passed ? '✓' : '✗'}</span>
-                <span class="test-name">${escapeHtml(result.name)}</span>
-                ${result.error ? `<span class="test-error">${escapeHtml(result.error)}</span>` : ''}
-            </div>
+    container.innerHTML = '';
+    collections.forEach(collection => {
+        const item = document.createElement('div');
+        item.className = 'collection-item';
+        item.dataset.id = collection.id;
+        if (currentCollection === collection.id) {
+            item.classList.add('active');
+        }
+        
+        item.innerHTML = `
+            <div class="collection-name">${escapeHtml(collection.name)}</div>
+            <div class="collection-meta">${collection.requests?.length || 0} requests</div>
         `;
+        
+        // クリックイベントを追加
+        item.addEventListener('click', function() {
+            selectCollection(collection.id);
+        });
+        
+        container.appendChild(item);
     });
-    html += '</div>';
-    
-    testsContainer.innerHTML = html;
 }
 
-// Storage functions
-async function loadStoredData() {
-    try {
-        const result = await chrome.storage.local.get(['collections', 'history', 'variables']);
-        
-        if (result.collections) {
-            collections = result.collections;
-            renderCollections();
-        }
-        
-        if (result.history) {
-            history = result.history;
-            renderHistory();
-        }
-        
-        if (result.variables) {
-            variables = { ...variables, ...result.variables };
-        }
-    } catch (error) {
-        console.error('Error loading stored data:', error);
+// コレクション選択機能
+function selectCollection(collectionId) {
+    currentCollection = collectionId;
+    chrome.storage.local.set({ currentCollection });
+    
+    // UIを更新
+    document.querySelectorAll('.collection-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.id === collectionId);
+    });
+    
+    // コレクション内のリクエストを表示
+    renderCollectionRequests(collectionId);
+    
+    // 変数タブのコレクション選択も更新
+    const collectionVarSelect = document.getElementById('collectionVarSelect');
+    if (collectionVarSelect) {
+        collectionVarSelect.value = collectionId;
+        renderVariables('collection');
     }
 }
 
+// コレクション内リクエストの表示
+function renderCollectionRequests(collectionId) {
+    const collection = collections.find(c => c.id == collectionId);
+    if (!collection) return;
+    
+    const header = document.getElementById('collectionRequestsHeader');
+    const container = document.getElementById('collectionRequestsContainer');
+    
+    header.innerHTML = `
+        <h4>${escapeHtml(collection.name)}</h4>
+        <button class="btn btn-sm" onclick="addRequestToCollection('${collectionId}')">Add Request</button>
+    `;
+    
+    container.innerHTML = '';
+    
+    if (!collection.requests || collection.requests.length === 0) {
+        container.innerHTML = '<p class="empty-message">No requests in this collection</p>';
+        return;
+    }
+    
+    collection.requests.forEach((request, index) => {
+        const requestItem = document.createElement('div');
+        requestItem.className = 'collection-request';
+        requestItem.innerHTML = `
+            <span class="request-method-badge method-${request.method}">${request.method}</span>
+            <span class="request-name">${escapeHtml(request.name || 'Untitled Request')}</span>
+            <span class="request-url">${escapeHtml(request.url)}</span>
+            <div class="request-actions">
+                <button class="btn-icon" onclick="editCollectionRequest('${collectionId}', ${index})">✏️</button>
+                <button class="btn-icon" onclick="deleteCollectionRequest('${collectionId}', ${index})">🗑️</button>
+            </div>
+        `;
+        
+        requestItem.addEventListener('click', function(e) {
+            if (!e.target.closest('.request-actions')) {
+                loadCollectionRequest(request);
+            }
+        });
+        
+        container.appendChild(requestItem);
+    });
+}
+
+// コレクションリクエストを現在のエディタに読み込む
+function loadCollectionRequest(request) {
+    currentRequest = JSON.parse(JSON.stringify(request)); // Deep copy
+    
+    // UIに反映
+    document.getElementById('methodSelect').value = request.method;
+    document.getElementById('urlInput').value = request.url;
+    
+    // Headers
+    const headersContainer = document.getElementById('headersContainer');
+    headersContainer.innerHTML = '';
+    if (request.headers) {
+        Object.entries(request.headers).forEach(([key, value]) => {
+            addKeyValueRow(headersContainer, 'header');
+            const rows = headersContainer.querySelectorAll('.key-value-row');
+            const lastRow = rows[rows.length - 1];
+            lastRow.querySelector('.key-input').value = key;
+            lastRow.querySelector('.value-input').value = value;
+        });
+    }
+    
+    // Params
+    const paramsContainer = document.getElementById('paramsContainer');
+    paramsContainer.innerHTML = '';
+    if (request.params) {
+        Object.entries(request.params).forEach(([key, value]) => {
+            addKeyValueRow(paramsContainer, 'param');
+            const rows = paramsContainer.querySelectorAll('.key-value-row');
+            const lastRow = rows[rows.length - 1];
+            lastRow.querySelector('.key-input').value = key;
+            lastRow.querySelector('.value-input').value = value;
+        });
+    }
+    
+    // Body
+    if (request.body) {
+        if (typeof request.body === 'string') {
+            document.querySelector('input[name="bodyType"][value="raw"]').checked = true;
+            handleBodyTypeChange({ target: { value: 'raw' } });
+            document.getElementById('rawBody').value = request.body;
+        } else if (typeof request.body === 'object') {
+            document.querySelector('input[name="bodyType"][value="form-data"]').checked = true;
+            handleBodyTypeChange({ target: { value: 'form-data' } });
+            // Form data handling...
+        }
+    }
+    
+    // Auth
+    if (request.auth) {
+        document.getElementById('authType').value = request.auth.type || 'none';
+        renderAuthDetails(request.auth.type);
+        // Populate auth fields...
+    }
+    
+    // Switch to request tab
+    switchMainTab('request');
+    
+    showSuccess('Request loaded from collection');
+}
+
+// コレクションに新しいリクエストを追加
+window.addRequestToCollection = async function(collectionId) {
+    const name = prompt('Enter request name:');
+    if (!name) return;
+    
+    const collection = collections.find(c => c.id == collectionId);
+    if (!collection) return;
+    
+    if (!collection.requests) {
+        collection.requests = [];
+    }
+    
+    const newRequest = {
+        id: Date.now(),
+        name: name,
+        method: 'GET',
+        url: '',
+        headers: {},
+        params: {},
+        body: null,
+        auth: { type: 'none' }
+    };
+    
+    collection.requests.push(newRequest);
+    await chrome.storage.local.set({ collections });
+    
+    renderCollectionRequests(collectionId);
+    loadCollectionRequest(newRequest);
+};
+
+// コレクションリクエストの削除
+window.deleteCollectionRequest = async function(collectionId, requestIndex) {
+    if (!confirm('Delete this request?')) return;
+    
+    const collection = collections.find(c => c.id == collectionId);
+    if (!collection || !collection.requests) return;
+    
+    collection.requests.splice(requestIndex, 1);
+    await chrome.storage.local.set({ collections });
+    
+    renderCollectionRequests(collectionId);
+};
+
+// 履歴機能の改善 - 完全な情報を保存
 async function saveToHistory(request, response) {
     const historyItem = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
-        method: request.method,
-        url: request.url,
-        status: response.status,
-        duration: response.duration
+        // 完全なリクエスト情報を保存
+        request: {
+            method: request.method,
+            url: request.url,
+            headers: request.headers,
+            params: request.params,
+            body: request.body,
+            auth: request.auth
+        },
+        // レスポンス情報
+        response: {
+            status: response.status,
+            duration: response.duration,
+            size: response.size
+        }
     };
     
     history.unshift(historyItem);
@@ -857,648 +356,578 @@ async function saveToHistory(request, response) {
     renderHistory();
 }
 
+// 履歴からリクエストを復元
+function loadHistoryItem(historyId) {
+    const item = history.find(h => h.id == historyId);
+    if (!item || !item.request) return;
+    
+    loadCollectionRequest(item.request); // 同じロジックを再利用
+    showSuccess('Request loaded from history');
+}
+
+// Notification system
+function showNotification(message, type = 'info') {
+    const area = document.getElementById('notificationArea');
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    area.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+function showSuccess(message) {
+    showNotification(message, 'success');
+}
+
+function showError(message) {
+    showNotification(message, 'error');
+}
+
+// 修正されたreplaceVariables関数
+function replaceVariables(text) {
+    if (typeof text !== 'string') return text;
+    
+    return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+        const trimmedName = varName.trim();
+        let value;
+        
+        // Priority: Environment > Collection > Global
+        if (variables.environment[trimmedName]) {
+            const envVar = variables.environment[trimmedName];
+            value = typeof envVar === 'object' ? envVar.value : envVar;
+        } else if (currentCollection && variables.collection[currentCollection]?.[trimmedName]) {
+            const colVar = variables.collection[currentCollection][trimmedName];
+            value = typeof colVar === 'object' ? colVar.value : colVar;
+        } else if (variables.global[trimmedName]) {
+            const globalVar = variables.global[trimmedName];
+            value = typeof globalVar === 'object' ? globalVar.value : globalVar;
+        }
+        
+        return value !== undefined ? value : match;
+    });
+}
+
+// Deep replace for objects
+function deepReplaceVariables(obj) {
+    if (typeof obj === 'string') {
+        return replaceVariables(obj);
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(deepReplaceVariables);
+    }
+    if (obj && typeof obj === 'object') {
+        const result = {};
+        for (const [key, value] of Object.entries(obj)) {
+            // Replace both key and value
+            const newKey = replaceVariables(key);
+            result[newKey] = deepReplaceVariables(value);
+        }
+        return result;
+    }
+    return obj;
+}
+
+// Process variables with deep replacement
+function processVariables(request) {
+    const processed = JSON.parse(JSON.stringify(request));
+    
+    // Process URL
+    processed.url = replaceVariables(processed.url);
+    
+    // Process headers
+    processed.headers = deepReplaceVariables(processed.headers);
+    
+    // Process params
+    processed.params = deepReplaceVariables(processed.params);
+    
+    // Process body
+    if (processed.body) {
+        if (typeof processed.body === 'string') {
+            processed.body = replaceVariables(processed.body);
+        } else {
+            processed.body = deepReplaceVariables(processed.body);
+        }
+    }
+    
+    // Build final URL with params
+    const url = new URL(processed.url);
+    Object.entries(processed.params).forEach(([key, value]) => {
+        url.searchParams.set(key, value);
+    });
+    
+    // Add API key to query if needed
+    if (processed.auth.type === 'apikey' && processed.auth.addTo === 'query') {
+        url.searchParams.set(processed.auth.key, processed.auth.value);
+    }
+    
+    processed.url = url.toString();
+    
+    return processed;
+}
+
+// 修正されたhistory表示関数
 function renderHistory() {
     const container = document.getElementById('historyContainer');
     
     if (history.length === 0) {
-        container.innerHTML = '<p>No request history</p>';
+        container.innerHTML = '<p class="empty-message">No request history</p>';
         return;
     }
     
-    let html = '';
+    container.innerHTML = '';
     history.forEach(item => {
-        html += `
-            <div class="history-item" data-id="${item.id}">
-                <span class="history-method method-${item.method}">${item.method}</span>
-                <span class="history-url">${escapeHtml(item.url)}</span>
-                <span class="history-status status-${item.status < 400 ? 'success' : 'error'}">${item.status}</span>
-                <span class="history-time">${new Date(item.timestamp).toLocaleTimeString()}</span>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-    
-    // Add click handlers to history items
-    container.querySelectorAll('.history-item').forEach(item => {
-        item.addEventListener('click', function() {
-            // Load this request into the current editor
-            // This would need to be implemented based on stored request data
-            console.log('Load history item:', this.dataset.id);
-        });
-    });
-}
-
-function renderCollections() {
-    const container = document.getElementById('collectionsContainer');
-    
-    if (collections.length === 0) {
-        container.innerHTML = '<p>No collections created</p>';
-        return;
-    }
-    
-    let html = '';
-    collections.forEach(collection => {
-        html += `
-            <div class="collection-item" data-id="${collection.id}">
-                <div class="collection-name">${escapeHtml(collection.name)}</div>
-                <div class="collection-meta">${collection.requests?.length || 0} requests</div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-// Modal handlers
-function setupModalHandlers() {
-    const modal = document.getElementById('importExportModal');
-    const closeButtons = modal.querySelectorAll('.modal-close');
-    
-    closeButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
-            modal.classList.remove('active');
-        });
-    });
-    
-    // Click outside to close
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.classList.remove('active');
-        }
-    });
-    
-    // File input handling
-    const fileInput = document.getElementById('importFile');
-    const fileDropZone = document.getElementById('fileDropZone');
-    
-    fileInput.addEventListener('change', handleFileSelect);
-    
-    fileDropZone.addEventListener('click', function() {
-        fileInput.click();
-    });
-    
-    fileDropZone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        this.classList.add('dragover');
-    });
-    
-    fileDropZone.addEventListener('dragleave', function() {
-        this.classList.remove('dragover');
-    });
-    
-    fileDropZone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        this.classList.remove('dragover');
+        const historyDiv = document.createElement('div');
+        historyDiv.className = 'history-item';
+        historyDiv.dataset.id = item.id;
         
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFileSelect({ target: { files } });
-        }
+        historyDiv.innerHTML = `
+            <span class="history-method method-${item.request?.method || item.method}">${item.request?.method || item.method}</span>
+            <span class="history-url">${escapeHtml(item.request?.url || item.url)}</span>
+            <span class="history-status status-${(item.response?.status || item.status) < 400 ? 'success' : 'error'}">${item.response?.status || item.status || 'N/A'}</span>
+            <span class="history-time">${new Date(item.timestamp).toLocaleTimeString()}</span>
+        `;
+        
+        historyDiv.addEventListener('click', function() {
+            loadHistoryItem(this.dataset.id);
+        });
+        
+        container.appendChild(historyDiv);
     });
-    
-    // Import submit
-    document.getElementById('importSubmitBtn').addEventListener('click', handleImport);
 }
 
-function openImportModal() {
-    document.getElementById('importExportModal').classList.add('active');
-    document.getElementById('modalTitle').textContent = 'Import Data';
-}
+// 変数管理機能の修正版実装
 
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        document.getElementById('importText').value = e.target.result;
-    };
-    reader.readAsText(file);
-}
-
-async function handleImport() {
-    const importType = document.getElementById('importType').value;
-    const importText = document.getElementById('importText').value.trim();
-    
-    if (!importText) {
-        showError('Please select a file or paste content to import');
-        return;
-    }
-    
+// Initialize variables management - 修正版
+async function initializeVariablesManagement() {
     try {
-        let data;
-        try {
-            data = JSON.parse(importText);
-        } catch (e) {
-            if (importType === 'curl') {
-                data = parseCurlCommand(importText);
-            } else {
-                throw new Error('Invalid JSON format');
-            }
-        }
+        // 環境をロード（すでにloadAllStoredDataで読み込み済み）
+        renderEnvironmentSelector();
         
-        switch (importType) {
-            case 'postman':
-                await importPostmanCollection(data);
-                break;
-            case 'apitester':
-                await importApiTesterSettings(data);
-                break;
-            case 'openapi':
-                await importOpenApiSpec(data);
-                break;
-            case 'har':
-                await importHarFile(data);
-                break;
-            case 'curl':
-                importCurlCommand(data);
-                break;
-        }
+        // イベントリスナーを設定
+        setupVariableEventListeners();
         
-        document.getElementById('importExportModal').classList.remove('active');
-        showSuccess('Import completed successfully');
+        // コレクションセレクタを更新
+        updateCollectionVarSelector();
         
+        // すべての変数を表示
+        renderAllVariables();
+        
+        console.log('Variables management initialized');
     } catch (error) {
-        showError('Import failed: ' + error.message);
+        console.error('Error initializing variables management:', error);
     }
 }
 
-async function importPostmanCollection(data) {
-    const collection = {
-        id: Date.now(),
-        name: data.info?.name || 'Imported Collection',
-        description: data.info?.description || '',
-        requests: []
-    };
+// Setup event listeners for variables
+function setupVariableEventListeners() {
+    // Environment management
+    document.getElementById('newEnvironmentBtn').addEventListener('click', createNewEnvironment);
+    document.getElementById('editEnvironmentBtn').addEventListener('click', editCurrentEnvironment);
+    document.getElementById('environmentSelect').addEventListener('change', switchEnvironment);
     
-    if (data.item) {
-        collection.requests = extractPostmanRequests(data.item);
-    }
+    // Add variable buttons
+    document.getElementById('addGlobalVarBtn').addEventListener('click', () => addVariableRow('global'));
+    document.getElementById('addEnvVarBtn').addEventListener('click', () => addVariableRow('environment'));
+    document.getElementById('addCollectionVarBtn').addEventListener('click', () => addVariableRow('collection'));
     
-    collections.push(collection);
-    await chrome.storage.local.set({ collections });
-    renderCollections();
-}
-
-function extractPostmanRequests(items, folder = '') {
-    const requests = [];
-    
-    items.forEach(item => {
-        if (item.request) {
-            // Single request
-            const request = {
-                id: Date.now() + Math.random(),
-                name: item.name || 'Untitled Request',
-                method: item.request.method || 'GET',
-                url: typeof item.request.url === 'string' ? item.request.url : item.request.url?.raw || '',
-                headers: {},
-                params: {},
-                body: null,
-                folder: folder
-            };
-            
-            // Extract headers
-            if (item.request.header) {
-                item.request.header.forEach(header => {
-                    if (!header.disabled) {
-                        request.headers[header.key] = header.value;
-                    }
-                });
-            }
-            
-            // Extract query parameters
-            if (item.request.url?.query) {
-                item.request.url.query.forEach(param => {
-                    if (!param.disabled) {
-                        request.params[param.key] = param.value;
-                    }
-                });
-            }
-            
-            // Extract body
-            if (item.request.body) {
-                switch (item.request.body.mode) {
-                    case 'raw':
-                        request.body = item.request.body.raw;
-                        break;
-                    case 'formdata':
-                        // Convert form data to key-value pairs
-                        request.body = item.request.body.formdata?.reduce((acc, field) => {
-                            if (!field.disabled) {
-                                acc[field.key] = field.value;
-                            }
-                            return acc;
-                        }, {});
-                        break;
-                }
-            }
-            
-            requests.push(request);
-        } else if (item.item) {
-            // Folder with sub-items
-            const folderName = folder ? `${folder}/${item.name}` : item.name;
-            requests.push(...extractPostmanRequests(item.item, folderName));
-        }
+    // Collection selector
+    document.getElementById('collectionVarSelect').addEventListener('change', function() {
+        currentCollection = this.value;
+        renderVariables('collection');
     });
-    
-    return requests;
 }
 
-async function importApiTesterSettings(data) {
-    // ApiTester format - adapt based on actual ApiTester export format
-    if (data.collections) {
-        data.collections.forEach(collection => {
-            collections.push({
-                id: Date.now() + Math.random(),
-                name: collection.name || 'ApiTester Import',
-                description: collection.description || '',
-                requests: collection.requests || []
-            });
-        });
-    }
-    
-    if (data.variables) {
-        Object.assign(variables.global, data.variables);
-    }
-    
-    await chrome.storage.local.set({ collections, variables });
-    renderCollections();
-}
-
-async function importOpenApiSpec(data) {
-    const collection = {
-        id: Date.now(),
-        name: data.info?.title || 'OpenAPI Import',
-        description: data.info?.description || '',
-        requests: []
-    };
-    
-    const baseUrl = getOpenApiBaseUrl(data);
-    
-    if (data.paths) {
-        Object.entries(data.paths).forEach(([path, pathItem]) => {
-            Object.entries(pathItem).forEach(([method, operation]) => {
-                if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options'].includes(method)) {
-                    const request = {
-                        id: Date.now() + Math.random(),
-                        name: operation.summary || `${method.toUpperCase()} ${path}`,
-                        method: method.toUpperCase(),
-                        url: baseUrl + path,
-                        headers: {},
-                        params: {},
-                        body: null,
-                        description: operation.description || ''
-                    };
-                    
-                    // Extract parameters
-                    if (operation.parameters) {
-                        operation.parameters.forEach(param => {
-                            if (param.in === 'query') {
-                                request.params[param.name] = param.example || '';
-                            } else if (param.in === 'header') {
-                                request.headers[param.name] = param.example || '';
-                            }
-                        });
-                    }
-                    
-                    collection.requests.push(request);
-                }
-            });
-        });
-    }
-    
-    collections.push(collection);
-    await chrome.storage.local.set({ collections });
-    renderCollections();
-}
-
-function getOpenApiBaseUrl(spec) {
-    if (spec.servers && spec.servers.length > 0) {
-        return spec.servers[0].url;
-    }
-    
-    // OpenAPI 2.0 format
-    if (spec.host) {
-        const scheme = spec.schemes && spec.schemes.length > 0 ? spec.schemes[0] : 'https';
-        const basePath = spec.basePath || '';
-        return `${scheme}://${spec.host}${basePath}`;
-    }
-    
-    return 'https://api.example.com';
-}
-
-async function importHarFile(data) {
-    const collection = {
-        id: Date.now(),
-        name: 'HAR Import - ' + new Date().toLocaleString(),
-        description: 'Imported from HAR file',
-        requests: []
-    };
-    
-    if (data.log && data.log.entries) {
-        data.log.entries.forEach(entry => {
-            const request = entry.request;
-            if (request) {
-                const importedRequest = {
-                    id: Date.now() + Math.random(),
-                    name: `${request.method} ${new URL(request.url).pathname}`,
-                    method: request.method,
-                    url: request.url,
-                    headers: {},
-                    params: {},
-                    body: null
-                };
-                
-                // Extract headers
-                if (request.headers) {
-                    request.headers.forEach(header => {
-                        importedRequest.headers[header.name] = header.value;
-                    });
-                }
-                
-                // Extract query parameters
-                if (request.queryString) {
-                    request.queryString.forEach(param => {
-                        importedRequest.params[param.name] = param.value;
-                    });
-                }
-                
-                // Extract body
-                if (request.postData) {
-                    importedRequest.body = request.postData.text;
-                }
-                
-                collection.requests.push(importedRequest);
-            }
-        });
-    }
-    
-    collections.push(collection);
-    await chrome.storage.local.set({ collections });
-    renderCollections();
-}
-
-function parseCurlCommand(curlString) {
-    // Basic cURL parsing - can be enhanced
-    const request = {
-        method: 'GET',
-        url: '',
-        headers: {},
-        body: null
-    };
-    
-    const parts = curlString.split(/\s+/);
-    
-    for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        
-        if (part === '-X' || part === '--request') {
-            request.method = parts[i + 1];
-            i++;
-        } else if (part === '-H' || part === '--header') {
-            const header = parts[i + 1].replace(/['"]/g, '');
-            const [key, value] = header.split(':').map(s => s.trim());
-            if (key && value) {
-                request.headers[key] = value;
-            }
-            i++;
-        } else if (part === '-d' || part === '--data') {
-            request.body = parts[i + 1].replace(/['"]/g, '');
-            i++;
-        } else if (part.startsWith('http')) {
-            request.url = part.replace(/['"]/g, '');
-        }
-    }
-    
-    return request;
-}
-
-function importCurlCommand(request) {
-    // Load the parsed cURL command into the current request editor
-    document.getElementById('methodSelect').value = request.method;
-    document.getElementById('urlInput').value = request.url;
-    
-    // Clear existing headers and add new ones
-    const headersContainer = document.getElementById('headersContainer');
-    headersContainer.innerHTML = '';
-    
-    Object.entries(request.headers).forEach(([key, value]) => {
-        addKeyValueRow(headersContainer, 'header');
-        const rows = headersContainer.querySelectorAll('.key-value-row');
-        const lastRow = rows[rows.length - 1];
-        lastRow.querySelector('.key-input').value = key;
-        lastRow.querySelector('.value-input').value = value;
-    });
-    
-    // Set body if present
-    if (request.body) {
-        document.querySelector('input[name="bodyType"][value="raw"]').checked = true;
-        handleBodyTypeChange({ target: { value: 'raw' } });
-        document.getElementById('rawBody').value = request.body;
-    }
-    
-    // Update current request object
-    Object.assign(currentRequest, request);
-}
-
-function exportData() {
-    const exportData = {
-        collections: collections,
-        variables: variables,
-        timestamp: new Date().toISOString()
-    };
-    
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `api-tester-export-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-}
-
-function createNewCollection() {
-    const name = prompt('Enter collection name:');
+// Create new environment
+async function createNewEnvironment() {
+    const name = prompt('Enter environment name:');
     if (!name) return;
     
-    const collection = {
-        id: Date.now(),
+    const env = {
+        id: Date.now().toString(),
         name: name,
-        description: '',
-        requests: []
+        created: new Date().toISOString()
     };
     
-    collections.push(collection);
-    chrome.storage.local.set({ collections });
-    renderCollections();
+    environments.push(env);
+    await chrome.storage.local.set({ environments });
+    
+    // Initialize empty variables for this environment
+    await chrome.storage.local.set({ [`env_${env.id}`]: {} });
+    
+    renderEnvironmentSelector();
+    document.getElementById('environmentSelect').value = env.id;
+    await switchEnvironment();
+    
+    showSuccess('Environment created: ' + name);
 }
 
-function filterHistory() {
-    const searchTerm = document.getElementById('historySearch').value.toLowerCase();
-    const historyItems = document.querySelectorAll('.history-item');
+// Edit current environment name
+async function editCurrentEnvironment() {
+    if (!currentEnvironment) {
+        showError('No environment selected');
+        return;
+    }
     
-    historyItems.forEach(item => {
-        const url = item.querySelector('.history-url').textContent.toLowerCase();
-        const method = item.querySelector('.history-method').textContent.toLowerCase();
-        
-        if (url.includes(searchTerm) || method.includes(searchTerm)) {
-            item.style.display = 'flex';
-        } else {
-            item.style.display = 'none';
+    const env = environments.find(e => e.id === currentEnvironment);
+    if (!env) return;
+    
+    const newName = prompt('Edit environment name:', env.name);
+    if (!newName || newName === env.name) return;
+    
+    env.name = newName;
+    await chrome.storage.local.set({ environments });
+    renderEnvironmentSelector();
+    
+    showSuccess('Environment renamed to: ' + newName);
+}
+
+// Switch environment - 修正版
+async function switchEnvironment() {
+    const envId = document.getElementById('environmentSelect').value;
+    
+    // Save current environment variables if any
+    if (currentEnvironment) {
+        await chrome.storage.local.set({ [`env_${currentEnvironment}`]: variables.environment });
+    }
+    
+    // Update current environment
+    currentEnvironment = envId;
+    await chrome.storage.local.set({ currentEnvironment });
+    
+    // Load new environment variables
+    if (envId) {
+        const envData = await chrome.storage.local.get([`env_${envId}`]);
+        variables.environment = envData[`env_${envId}`] || {};
+    } else {
+        variables.environment = {};
+    }
+    
+    // Re-render environment variables
+    renderVariables('environment');
+    
+    const envName = envId ? environments.find(e => e.id === envId)?.name : 'No Environment';
+    showSuccess('Switched to: ' + envName);
+}
+
+// Render environment selector
+function renderEnvironmentSelector() {
+    const select = document.getElementById('environmentSelect');
+    const currentValue = select.value;
+    
+    select.innerHTML = '<option value="">No Environment</option>';
+    
+    environments.forEach(env => {
+        const option = document.createElement('option');
+        option.value = env.id;
+        option.textContent = env.name;
+        if (env.id === currentEnvironment) {
+            option.selected = true;
         }
+        select.appendChild(option);
     });
 }
 
-async function clearHistory() {
-    if (confirm('Are you sure you want to clear all request history?')) {
-        history = [];
-        await chrome.storage.local.set({ history });
-        renderHistory();
+// Update collection variable selector
+function updateCollectionVarSelector() {
+    const select = document.getElementById('collectionVarSelect');
+    select.innerHTML = '<option value="">Select Collection</option>';
+    
+    collections.forEach(collection => {
+        const option = document.createElement('option');
+        option.value = collection.id;
+        option.textContent = collection.name;
+        if (collection.id == currentCollection) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+}
+
+// Render all variables
+function renderAllVariables() {
+    renderVariables('global');
+    renderVariables('environment');
+    renderVariables('collection');
+}
+
+// Render variables for a specific scope - 修正版
+function renderVariables(scope) {
+    let container, data;
+    
+    switch (scope) {
+        case 'global':
+            container = document.getElementById('globalVariablesContainer');
+            data = variables.global || {};
+            break;
+            
+        case 'environment':
+            container = document.getElementById('envVariablesContainer');
+            if (!currentEnvironment) {
+                container.innerHTML = '<p class="empty-message">Select an environment to manage variables</p>';
+                return;
+            }
+            data = variables.environment || {};
+            break;
+            
+        case 'collection':
+            container = document.getElementById('collectionVariablesContainer');
+            const selectedCollection = document.getElementById('collectionVarSelect').value;
+            if (!selectedCollection) {
+                container.innerHTML = '<p class="empty-message">Select a collection to manage variables</p>';
+                return;
+            }
+            data = variables.collection[selectedCollection] || {};
+            break;
     }
-}
-
-// Interceptor functions
-function startInterceptor() {
-    if (isInterceptorActive) return;
     
-    // Send message to background script to start intercepting
-    chrome.runtime.sendMessage({
-        action: 'startInterceptor',
-        filters: getInterceptorFilters()
-    });
+    container.innerHTML = '';
     
-    isInterceptorActive = true;
-    document.getElementById('startInterceptorBtn').disabled = true;
-    document.getElementById('stopInterceptorBtn').disabled = false;
-    
-    // Listen for intercepted requests
-    chrome.runtime.onMessage.addListener(handleInterceptedRequest);
-}
-
-function stopInterceptor() {
-    if (!isInterceptorActive) return;
-    
-    chrome.runtime.sendMessage({ action: 'stopInterceptor' });
-    
-    isInterceptorActive = false;
-    document.getElementById('startInterceptorBtn').disabled = false;
-    document.getElementById('stopInterceptorBtn').disabled = true;
-    
-    chrome.runtime.onMessage.removeListener(handleInterceptedRequest);
-}
-
-function getInterceptorFilters() {
-    const methodFilters = [];
-    document.querySelectorAll('.method-filters input:checked').forEach(input => {
-        methodFilters.push(input.value);
-    });
-    
-    const domainFilter = document.getElementById('domainFilter').value.trim();
-    
-    return {
-        methods: methodFilters,
-        domain: domainFilter
-    };
-}
-
-function handleInterceptedRequest(message) {
-    if (message.action === 'requestIntercepted') {
-        displayInterceptedRequest(message.request);
-    }
-}
-
-function displayInterceptedRequest(request) {
-    const container = document.getElementById('interceptorContainer');
-    
-    const requestDiv = document.createElement('div');
-    requestDiv.className = 'intercepted-request';
-    requestDiv.innerHTML = `
-        <span class="history-method method-${request.method}">${request.method}</span>
-        <span class="history-url">${escapeHtml(request.url)}</span>
-        <span class="history-status status-${request.status < 400 ? 'success' : 'error'}">${request.status || 'Pending'}</span>
-        <span class="history-time">${new Date().toLocaleTimeString()}</span>
+    // Add header row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'variable-header-row';
+    headerRow.innerHTML = `
+        <span>Variable</span>
+        <span>Value</span>
+        <span>Description</span>
+        <span></span>
     `;
+    container.appendChild(headerRow);
     
-    requestDiv.addEventListener('click', function() {
-        loadInterceptedRequest(request);
-    });
-    
-    container.insertBefore(requestDiv, container.firstChild);
-    
-    // Keep only last 50 intercepted requests
-    while (container.children.length > 50) {
-        container.removeChild(container.lastChild);
-    }
-}
-
-function loadInterceptedRequest(request) {
-    // Load intercepted request into the request editor
-    document.getElementById('methodSelect').value = request.method;
-    document.getElementById('urlInput').value = request.url;
-    
-    // Switch to request tab
-    switchMainTab('request');
-    
-    // Load headers
-    const headersContainer = document.getElementById('headersContainer');
-    headersContainer.innerHTML = '';
-    
-    if (request.headers) {
-        Object.entries(request.headers).forEach(([key, value]) => {
-            addKeyValueRow(headersContainer, 'header');
-            const rows = headersContainer.querySelectorAll('.key-value-row');
-            const lastRow = rows[rows.length - 1];
-            lastRow.querySelector('.key-input').value = key;
-            lastRow.querySelector('.value-input').value = value;
+    // Add variable rows
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+        const emptyRow = document.createElement('div');
+        emptyRow.className = 'empty-variables';
+        emptyRow.innerHTML = '<p>No variables defined. Click "Add" to create one.</p>';
+        container.appendChild(emptyRow);
+    } else {
+        entries.forEach(([key, value]) => {
+            const varData = typeof value === 'object' ? value : { value: value, description: '' };
+            const row = createVariableRow(scope, key, varData.value, varData.description);
+            container.appendChild(row);
         });
     }
-    
-    // Load body if present
-    if (request.body) {
-        document.querySelector('input[name="bodyType"][value="raw"]').checked = true;
-        handleBodyTypeChange({ target: { value: 'raw' } });
-        document.getElementById('rawBody').value = request.body;
-    }
-    
-    updateRequestData('header');
 }
 
-function openSettings() {
-    // Simple settings modal - could be enhanced
-    const settings = {
-        timeout: 30000,
-        followRedirects: true,
-        validateSSL: true
+// Create variable row element - 修正版
+function createVariableRow(scope, key = '', value = '', description = '') {
+    const row = document.createElement('div');
+    row.className = 'variable-row';
+    row.dataset.originalKey = key; // Store original key
+    
+    row.innerHTML = `
+        <input type="text" class="var-key" placeholder="Variable name" value="${escapeHtml(key)}">
+        <input type="text" class="var-value" placeholder="Value" value="${escapeHtml(value)}">
+        <input type="text" class="var-description" placeholder="Description" value="${escapeHtml(description)}">
+        <button class="delete-btn">×</button>
+    `;
+    
+    // Add event listeners
+    const keyInput = row.querySelector('.var-key');
+    const valueInput = row.querySelector('.var-value');
+    const descInput = row.querySelector('.var-description');
+    const deleteBtn = row.querySelector('.delete-btn');
+    
+    // Update on blur
+    const updateVariable = async () => {
+        const newKey = keyInput.value.trim();
+        const newValue = valueInput.value;
+        const newDesc = descInput.value;
+        const originalKey = row.dataset.originalKey;
+        
+        if (!newKey) {
+            if (originalKey) {
+                // If key is empty but we had a key before, delete it
+                await deleteVariable(scope, originalKey);
+                row.remove();
+            }
+            return;
+        }
+        
+        // Check for duplicate keys
+        if (newKey !== originalKey && variableExists(scope, newKey)) {
+            showError(`Variable "${newKey}" already exists in this scope`);
+            keyInput.value = originalKey;
+            return;
+        }
+        
+        // Delete old key if renamed
+        if (originalKey && originalKey !== newKey) {
+            await deleteVariable(scope, originalKey);
+        }
+        
+        // Save new/updated variable
+        await saveVariable(scope, newKey, newValue, newDesc);
+        row.dataset.originalKey = newKey; // Update stored key
     };
     
-    const settingsJson = JSON.stringify(settings, null, 2);
-    const newSettings = prompt('Edit settings (JSON format):', settingsJson);
+    keyInput.addEventListener('blur', updateVariable);
+    valueInput.addEventListener('blur', updateVariable);
+    descInput.addEventListener('blur', updateVariable);
     
-    if (newSettings) {
-        try {
-            const parsed = JSON.parse(newSettings);
-            chrome.storage.local.set({ settings: parsed });
-            showSuccess('Settings saved');
-        } catch (error) {
-            showError('Invalid JSON format');
+    // Delete button
+    deleteBtn.addEventListener('click', async () => {
+        const keyToDelete = row.dataset.originalKey || keyInput.value.trim();
+        if (keyToDelete) {
+            if (confirm(`Delete variable "${keyToDelete}"?`)) {
+                await deleteVariable(scope, keyToDelete);
+                row.remove();
+                showSuccess(`Variable "${keyToDelete}" deleted`);
+            }
+        } else {
+            row.remove();
         }
+    });
+    
+    return row;
+}
+
+// Check if variable exists in scope
+function variableExists(scope, key) {
+    switch (scope) {
+        case 'global':
+            return key in variables.global;
+        case 'environment':
+            return key in variables.environment;
+        case 'collection':
+            const selectedCollection = document.getElementById('collectionVarSelect').value;
+            return selectedCollection && variables.collection[selectedCollection] && 
+                   key in variables.collection[selectedCollection];
+    }
+    return false;
+}
+
+// Save variable - 修正版
+async function saveVariable(scope, key, value, description) {
+    const varData = { value, description };
+    
+    switch (scope) {
+        case 'global':
+            variables.global[key] = varData;
+            await chrome.storage.local.set({ 
+                variables: { 
+                    global: variables.global,
+                    collection: variables.collection 
+                } 
+            });
+            break;
+            
+        case 'environment':
+            if (!currentEnvironment) return;
+            variables.environment[key] = varData;
+            await chrome.storage.local.set({ 
+                [`env_${currentEnvironment}`]: variables.environment 
+            });
+            break;
+            
+        case 'collection':
+            const selectedCollection = document.getElementById('collectionVarSelect').value;
+            if (!selectedCollection) return;
+            
+            if (!variables.collection[selectedCollection]) {
+                variables.collection[selectedCollection] = {};
+            }
+            variables.collection[selectedCollection][key] = varData;
+            
+            await chrome.storage.local.set({ 
+                variables: { 
+                    global: variables.global,
+                    collection: variables.collection 
+                } 
+            });
+            break;
     }
 }
 
-function showSuccess(message) {
-    // Simple success display - could be enhanced with a toast notification
-    console.log('Success:', message);
-    // You could implement a toast notification here
+// Delete variable - 修正版
+async function deleteVariable(scope, key) {
+    switch (scope) {
+        case 'global':
+            delete variables.global[key];
+            await chrome.storage.local.set({ 
+                variables: { 
+                    global: variables.global,
+                    collection: variables.collection 
+                } 
+            });
+            break;
+            
+        case 'environment':
+            if (!currentEnvironment) return;
+            delete variables.environment[key];
+            await chrome.storage.local.set({ 
+                [`env_${currentEnvironment}`]: variables.environment 
+            });
+            break;
+            
+        case 'collection':
+            const selectedCollection = document.getElementById('collectionVarSelect').value;
+            if (selectedCollection && variables.collection[selectedCollection]) {
+                delete variables.collection[selectedCollection][key];
+                await chrome.storage.local.set({ 
+                    variables: { 
+                        global: variables.global,
+                        collection: variables.collection 
+                    } 
+                });
+            }
+            break;
+    }
 }
 
-// Initialize app when popup is opened
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeApp);
-} else {
-    initializeApp();
+// Add new variable row
+function addVariableRow(scope) {
+    // Check if scope is available
+    if (scope === 'environment' && !currentEnvironment) {
+        showError('Please select an environment first');
+        return;
+    }
+    
+    if (scope === 'collection' && !document.getElementById('collectionVarSelect').value) {
+        showError('Please select a collection first');
+        return;
+    }
+    
+    let container;
+    switch (scope) {
+        case 'global':
+            container = document.getElementById('globalVariablesContainer');
+            break;
+        case 'environment':
+            container = document.getElementById('envVariablesContainer');
+            break;
+        case 'collection':
+            container = document.getElementById('collectionVariablesContainer');
+            break;
+    }
+    
+    // Remove empty message if exists
+    const emptyMsg = container.querySelector('.empty-variables');
+    if (emptyMsg) {
+        emptyMsg.remove();
+    }
+    
+    const row = createVariableRow(scope);
+    container.appendChild(row);
+    
+    // Focus on key input
+    row.querySelector('.var-key').focus();
 }
+
+// CSS for empty variables message
+const style = document.createElement('style');
+style.textContent = `
+    .empty-variables {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 20px;
+        color: #6c757d;
+        font-style: italic;
+    }
+`;
+document.head.appendChild(style);
