@@ -22,8 +22,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
     }
   ],
@@ -37,13 +41,93 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["injected.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "injected.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     },
-        {
-          "resources": ["index.js"],
-          "matches": ["<all_urls>"]
-        }
+    {
+      "resources": [
+        "index.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "state.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "init.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "importExport.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "collectionManager.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "historyManager.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "interceptorManager.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "requestManager.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "variableManager.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "utils.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
   ],
   "icons": {
     "16": "icons/icon16.png",
