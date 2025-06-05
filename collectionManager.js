@@ -13,6 +13,7 @@ import { escapeHtml } from './utils.js';
 import { showSuccess } from './utils.js';
 import { updateCollectionVarSelector } from './variableManager.js';
 import { renderVariables } from './variableManager.js';
+import { addRequestToScenario } from './scenarioManager.js';
 
 /**
  * initializeCollections：起動時にコレクション一覧をロードし、必要ならサンプルを投入する
@@ -275,6 +276,17 @@ export function renderCollectionsTree() {
                     deleteRequestFromCollection(col.id, idx);
                 });
                 li.appendChild(deleteBtn);
+
+                // ◆ Add to Scenario ボタン追加
+                const addToScenarioBtn = document.createElement('span');
+                addToScenarioBtn.className = 'request-scenario-create-btn';
+                addToScenarioBtn.textContent = '🌱';
+                addToScenarioBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
+                    addRequestToScenario(req);
+                });
+                li.appendChild(addToScenarioBtn);
+
 
                 // クリック時にリクエストをロード
                 li.addEventListener('click', (e) => {

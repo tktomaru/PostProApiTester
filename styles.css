@@ -197,6 +197,31 @@ body {
 }
 
 /* ──────────────────────────────────────
+   シナリオ追加ボタン（アイコン）のスタイル
+──────────────────────────────────────── */
+.request-scenario-create-btn {
+    position: absolute;
+    /* 削除ボタンが right:8px なので、その右隣に配置するため 32px に設定 */
+    right: 32px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: #28a745;
+    /* 例：追加は緑で目立たせる */
+    padding: 2px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.request-scenario-create-btn:hover {
+    background-color: rgba(255, 0, 0, 0.1);
+}
+
+/* アクティブなコレクション配下のリクエスト行なら色を少し濃く */
+.collection-item.active .request-scenario-crreate-btn {
+    color: #d00;
+}
+
+/* ──────────────────────────────────────
    リクエスト削除ボタン（ゴミ箱アイコン）のスタイル
 ──────────────────────────────────────── */
 .request-delete-btn {
@@ -1558,4 +1583,159 @@ transition: all 0.2s ease;
     font-family: 'Monaco', 'Menlo', monospace;
     font-size: 12px;
     resize: vertical;
+}
+
+
+/* シナリオタブ全体 */
+#scenarios-tab {
+    display: none;
+}
+
+#scenarios-tab.active {
+    display: block;
+}
+
+/* シナリオ本体レイアウト */
+.scenarios-body {
+    display: flex;
+    height: calc(100vh - 60px - 40px);
+    /* Header + タブボタン分を引いた高さ */
+}
+
+/* 左サイド：シナリオ一覧 */
+.scenario-list {
+    width: 240px;
+    background-color: #f8f9fa;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.scenario-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.scenario-list li {
+    cursor: pointer;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    margin-bottom: 0.2rem;
+}
+
+.scenario-list li:hover {
+    background-color: #e9ecef;
+}
+
+.scenario-list li.active {
+    background-color: #d0e2ff;
+}
+
+/* 右メイン：シナリオ編集領域 */
+.scenario-editor {
+    flex-grow: 1;
+    padding: 0.8rem;
+    overflow-y: auto;
+}
+
+.scenario-editor h4 {
+    margin-bottom: 0.6rem;
+}
+
+.scenario-requests {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    min-height: 200px;
+}
+
+.scenario-requests li {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.scenario-requests li:last-child {
+    border-bottom: none;
+}
+
+.scenario-requests .req-name {
+    flex-grow: 1;
+}
+
+.scenario-requests .req-actions {
+    margin-left: 0.5rem;
+}
+
+.scenario-requests .req-actions button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #a00;
+}
+
+.scenario-actions {
+    margin-bottom: 1rem;
+}
+
+.scenario-results {
+    border: 1px solid #ccc;
+    padding: 0.5rem;
+    border-radius: 4px;
+    background: #fafafa;
+}
+
+.scenario-results .result-item {
+    margin-bottom: 0.6rem;
+    padding: 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.scenario-results .result-item:last-child {
+    margin-bottom: 0;
+}
+
+.scenario-request-item {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem;
+    border-bottom: 1px solid #eee;
+}
+
+/* リクエスト名 */
+.scenario-request-item .req-name {
+    flex-grow: 1;
+    margin-right: 0.6rem;
+}
+
+/* 各ボタンを少しだけ余白をつけつつ並べる */
+.scenario-request-item button {
+    margin-left: 0.3rem;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.scenario-request-item button:hover {
+    background: #e0e0e0;
+}
+
+/* もし「＋」を目立たせたい場合 */
+.scenario-request-item button[title="Insert a request here"] {
+    background: #d4edda;
+    /* 薄い緑 */
+    border-color: #c3e6cb;
+}
+
+.scenario-request-item button[title="Insert a request here"]:hover {
+    background: #c3e6cb;
 }

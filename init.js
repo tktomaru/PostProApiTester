@@ -30,6 +30,7 @@ import { renderHistory } from './historyManager.js';
 
 import { addKeyValueRow } from './utils.js';
 import { showError, showSuccess } from './utils.js';
+import { newScenario, runScenario, initializeScenarios } from './scenarioManager.js';
 
 // Authentication handlers
 function setupAuthHandlers() {
@@ -140,6 +141,18 @@ async function initializeApp() {
 
         // 2-2. コレクションの初期化（サンプルコレクション投入）
         await initializeCollections();
+
+        // シナリオ初期化
+        await initializeScenarios();
+
+        // ボタンにイベントを紐づけ
+        document.getElementById('newScenarioBtn').addEventListener('click', () => {
+            newScenario();
+        });
+
+        document.getElementById('runScenarioBtn').addEventListener('click', () => {
+            runScenario();
+        });
 
         // 2-1. 変数管理関連の初期化（グローバル／環境／コレクション変数投入）
         await initializeVariablesManagement();

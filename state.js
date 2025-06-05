@@ -54,7 +54,20 @@ export const state = {
     settings: {},
 
     // ネットワークインターセプトのオン/オフ
-    isInterceptorActive: false
+    isInterceptorActive: false,
+    // ◆ 新規：scenarios を追加
+    scenarios: [
+        // {
+        //   id: 'scenario1',
+        //   name: 'ログイン→取得→ログアウト',
+        //   requests: [
+        //     { id: 'reqA', name: 'Login', method: 'POST', url: '/api/login', headers: {…}, body: '…', … },
+        //     { id: 'reqB', name: 'GetData', method: 'GET', url: '/api/data', … },
+        //     { id: 'reqC', name: 'Logout', method: 'POST', url: '/api/logout', … }
+        //   ]
+        // }
+    ],
+    currentScenario: null, // 今編集中 or 実行対象のシナリオID
 };
 
 
@@ -198,6 +211,13 @@ export async function saveCurrentCollectionToStorage() {
  */
 export async function saveSettingsToStorage() {
     await chrome.storage.local.set({ settings: state.settings });
+}
+
+/**
+ * saveScenariosToStorage
+ */
+export async function saveScenariosToStorage() {
+    await chrome.storage.local.set({ scenarios: state.scenarios });
 }
 
 /**

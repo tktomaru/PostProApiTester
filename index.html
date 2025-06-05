@@ -37,6 +37,7 @@
                 <button class="tab-btn" data-tab="history">History</button>
                 <button class="tab-btn" data-tab="interceptor">Interceptor</button>
                 <button class="tab-btn" data-tab="variables">Variables</button>
+                <button class="tab-btn" data-tab="scenarios">Scenarios</button>
             </div>
 
             <!-- Tab Contents -->
@@ -192,6 +193,42 @@
                             <div id="response-cookies" class="response-tab-content"></div>
                             <div id="response-tests" class="response-tab-content"></div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Scenarios Tab -->
+                <div id="scenarios-tab" class="tab-content">
+                    <div class="scenarios-header">
+                        <h3>Scenarios</h3>
+                        <button class="btn btn-sm" id="newScenarioBtn">+ New Scenario</button>
+                    </div>
+                    <div class="scenarios-body">
+                        <!-- 左列：シナリオ一覧 -->
+                        <aside class="scenario-list">
+                            <ul id="scenarioList">
+                                <!-- JavaScript で <li data-id="scenario1">シナリオ名</li> を描画 -->
+                            </ul>
+                        </aside>
+
+                        <!-- 右列：シナリオ編集エリア -->
+                        <section class="scenario-editor">
+                            <h4 id="scenarioTitle">Select a scenario</h4>
+
+                            <!-- シナリオ内リクエスト一覧 -->
+                            <ul id="scenarioRequestsList" class="scenario-requests">
+                                <!-- JavaScript で描画 -->
+                            </ul>
+
+                            <!-- ボタン群 -->
+                            <div class="scenario-actions">
+                                <button class="btn btn-primary" id="runScenarioBtn" disabled>Run Scenario</button>
+                            </div>
+
+                            <!-- 実行結果表示エリア -->
+                            <div id="scenarioResultContainer" class="scenario-results">
+                                <!-- 各リクエストの実行ステータスやレスポンスをここに表示 -->
+                            </div>
+                        </section>
                     </div>
                 </div>
 
