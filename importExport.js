@@ -10,7 +10,7 @@ import {
 } from './state.js';
 
 import {
-    renderCollections
+    renderCollectionsTree
 } from './collectionManager.js';
 
 import {
@@ -232,8 +232,8 @@ async function importPostmanCollection(data) {
     state.collections.push(collection);
     await saveCollectionsToStorage();
 
-    renderCollections();
     updateCollectionVarSelector();
+    renderCollectionsTree();         // サイドバーのコレクション描画
 }
 
 async function importTalendData(talend) {
@@ -292,10 +292,11 @@ async function importTalendData(talend) {
     state.environments.splice(0, state.environments.length, ...environments);
     await saveEnvironmentsToStorage();
 
-    renderCollections();
     updateCollectionVarSelector();
     renderEnvironmentSelector();
     renderAllVariables();
+    renderCollectionsTree();         // サイドバーのコレクション描画
+
 }
 
 /** importApiTesterData */
@@ -315,10 +316,10 @@ async function importApiTesterData(data) {
     await saveVariablesToStorage();
     await saveEnvironmentsToStorage();
 
-    renderCollections();
     renderEnvironmentSelector();
     updateCollectionVarSelector();
     renderAllVariables();
+    renderCollectionsTree();         // サイドバーのコレクション描画
 }
 
 /** importOpenApiSpec */
@@ -374,8 +375,8 @@ async function importOpenApiSpec(data) {
     collections.push(collection);
     await saveCollectionsToStorage();
 
-    renderCollections();
     updateCollectionVarSelector();
+    renderCollectionsTree();         // サイドバーのコレクション描画
 }
 
 /** importHarFile */
@@ -425,8 +426,8 @@ async function importHarFile(data) {
     collections.push(collection);
     await saveCollectionsToStorage();
 
-    renderCollections();
     updateCollectionVarSelector();
+    renderCollectionsTree();         // サイドバーのコレクション描画
 }
 
 /** parseCurlCommand */

@@ -30,7 +30,7 @@ export async function initializeCollections() {
         }
 
         // 画面にレンダリング
-        renderCollections();
+        renderCollectionsTree();
 
         // コレクション変数セレクタも更新
         updateCollectionVarSelector();
@@ -39,115 +39,31 @@ export async function initializeCollections() {
     }
 }
 
-/**
- * renderCollections
- *  コレクション一覧を画面に描画する
- */
-export function renderCollections() {
-    const container = document.getElementById('collectionsContainer');
-
-    if (state.collections.length === 0) {
-        container.innerHTML = '<p class="empty-message">No collections created</p>';
-        return;
-    }
-
-    container.innerHTML = '';
-    state.collections.forEach(collection => {
-        const item = document.createElement('div');
-        item.className = 'collection-item';
-        item.dataset.id = collection.id;
-        if (state.currentCollection == collection.id) {
-            item.classList.add('active');
-        }
-
-        item.innerHTML = `
-            <div class="collection-name">${escapeHtml(collection.name)}</div>
-            <div class="collection-meta">${collection.requests?.length || 0} requests</div>
-        `;
-
-        item.addEventListener('click', () => selectCollection(collection.id));
-        container.appendChild(item);
-    });
-}
 
 /**
  * selectCollection
  *  コレクションを選択し、画面上の強調・リクエスト一覧を更新する
  */
 export async function selectCollection(collectionId) {
-    // オブジェクト state のプロパティを書き換える（読み取り専用バインディングではないためエラーにならない）
     state.currentCollection = collectionId;
     await saveCurrentCollectionToStorage(collectionId);
 
+    // コレクション行の active 切り替え
     document.querySelectorAll('.collection-item').forEach(item => {
         item.classList.toggle('active', item.dataset.id == collectionId);
     });
 
-    renderCollectionRequests(collectionId);
+    // 選択コレクションのリクエスト一覧を表示（必要に応じて別関数に切り出しても OK）
+    // ここでは、「レンダリング済みの Tree を再描画しない」ので、
+    // 条件に応じてツリーを一旦閉じる／開くなどの処理は必要があれば追加。
 
+    // 右側エディタへロードは loadCollectionRequest() で行う。
+    // 変数セレクタ更新
     const collectionVarSelect = document.getElementById('collectionVarSelect');
     if (collectionVarSelect) {
         collectionVarSelect.value = collectionId;
         renderVariables('collection');
     }
-}
-
-/**
- * renderCollectionRequests
- *  選択中のコレクションに属するリクエスト一覧を描画する
- */
-export function renderCollectionRequests(collectionId) {
-    const collection = state.collections.find(c => c.id == collectionId);
-    if (!collection) return;
-
-    const header = document.getElementById('collectionRequestsHeader');
-    const container = document.getElementById('collectionRequestsContainer');
-
-    header.innerHTML = `
-        <h4>${escapeHtml(collection.name)}</h4>
-        <button class="btn btn-sm addRequestToCollection">Add Request</button>
-    `;
-    // ボタンにイベントを紐づけ
-    const btn = header.querySelector('.addRequestToCollection');
-    btn.addEventListener('click', () => addRequestToCollection(collectionId));
-
-    container.innerHTML = '';
-
-    if (!collection.requests || collection.requests.length === 0) {
-        container.innerHTML = '<p class="empty-message">No requests in this collection</p>';
-        return;
-    }
-
-    collection.requests.forEach((request, index) => {
-        const requestItem = document.createElement('div');
-        requestItem.className = 'collection-request';
-        requestItem.innerHTML = `
-            <span class="request-method-badge method-${request.method}">${request.method}</span>
-            <span class="request-name">${escapeHtml(request.name || 'Untitled Request')}</span>
-            <span class="request-url">${escapeHtml(request.url)}</span>
-            <div class="request-actions">
-                <button class="btn-icon edit-btn">✏️</button>
-                <button class="btn-icon delete-btn">🗑️</button>
-            </div>
-        `;
-
-        // 編集ボタン
-        const editBtn = requestItem.querySelector('.edit-btn');
-        editBtn.addEventListener('click', () => editCollectionRequest(collectionId, index));
-
-        // 削除ボタン
-        const deleteBtn = requestItem.querySelector('.delete-btn');
-        deleteBtn.addEventListener('click', () => deleteCollectionRequest(collectionId, index));
-
-        // リクエスト名・URL をクリックするとエディタにロード
-        requestItem.addEventListener('click', e => {
-            if (!e.target.closest('.request-actions')) {
-                loadCollectionRequest(request);
-            }
-        });
-
-        container.appendChild(requestItem);
-    });
 }
 
 /**
@@ -179,7 +95,6 @@ export async function addRequestToCollection(collectionId) {
     collection.requests.push(newRequest);
     await saveCollectionsToStorage();
 
-    renderCollectionRequests(collectionId);
     loadCollectionRequest(newRequest);
 }
 
@@ -197,27 +112,11 @@ export async function editCollectionRequest(collectionId, requestIndex) {
     if (newName && newName !== request.name) {
         request.name = newName;
         await saveCollectionsToStorage();
-        renderCollectionRequests(collectionId);
         showSuccess('Request renamed');
     }
 }
 
-/**
- * deleteCollectionRequest
- *  コレクション内のリクエストを削除して再保存 → 再レンダリング
- */
-export async function deleteCollectionRequest(collectionId, requestIndex) {
-    if (!confirm('Delete this request?')) return;
 
-    const collection = state.collections.find(c => c.id == collectionId);
-    if (!collection || !collection.requests) return;
-
-    collection.requests.splice(requestIndex, 1);
-    await saveCollectionsToStorage();
-
-    renderCollectionRequests(collectionId);
-    showSuccess('Request deleted');
-}
 
 /**
  * loadCollectionRequest
@@ -228,4 +127,194 @@ export async function loadCollectionRequest(request) {
     const { loadRequestIntoEditor } = await import('./requestManager.js');
     loadRequestIntoEditor(request);
     showSuccess('Request loaded from collection');
+}
+
+
+export function createNewCollection() {
+    const name = prompt('Enter collection name:');
+    if (!name) return;
+
+    const collection = {
+        id: Date.now(),
+        name: name,
+        description: '',
+        requests: []
+    };
+
+    state.collections.push(collection);
+    chrome.storage.local.set({ collections: state.collections });
+    renderCollectionsTree();         // サイドバーのコレクション描画
+    updateCollectionVarSelector();
+
+    showSuccess('Collection created: ' + name);
+}
+
+
+
+/**
+ * deleteCollection
+ *  指定された ID のコレクションを削除し、Storage に保存 → 再描画
+ */
+async function deleteCollection(collectionId) {
+    if (!confirm('本当にこのコレクションを削除しますか？')) {
+        return;
+    }
+
+    // state.collections から該当を取り除く
+    const idx = state.collections.findIndex(col => col.id == collectionId);
+    if (idx === -1) return;
+
+    state.collections.splice(idx, 1);
+    await saveCollectionsToStorage();
+
+    // currentCollection が削除されたものを指していたらクリア
+    if (state.currentCollection == collectionId) {
+        state.currentCollection = null;
+        await saveCurrentCollectionToStorage(null);
+    }
+
+    // ツリーを再描画
+    renderCollectionsTree();
+    showSuccess('コレクションを削除しました');
+}
+
+
+/**
+ * deleteRequestFromCollection
+ *  collectionId 内の requestIndex 番目を削除して再保存 → 再描画
+ */
+async function deleteRequestFromCollection(collectionId, requestIndex) {
+    if (!confirm('本当にこのリクエストを削除しますか？')) return;
+
+    const col = state.collections.find(c => c.id == collectionId);
+    if (!col || !col.requests || requestIndex < 0 || requestIndex >= col.requests.length) return;
+
+    col.requests.splice(requestIndex, 1);
+    await saveCollectionsToStorage();
+
+    // 削除後のツリーを再描画
+    renderCollectionsTree();
+    showSuccess('リクエストを削除しました');
+}
+
+/**
+ * renderCollectionsTree
+ *  state.collections の内容をもとに、サイドバーに「コレクション行＋子リクエスト一覧」を描画
+ */
+export function renderCollectionsTree() {
+    const container = document.getElementById('collectionsTree');
+    container.innerHTML = ''; // まずクリア
+
+    state.collections.forEach((col) => {
+        // ① コレクション行
+        const colDiv = document.createElement('div');
+        colDiv.className = 'collection-item';
+        colDiv.dataset.id = col.id;
+
+        // 「▶」トグルアイコン
+        const toggleIcon = document.createElement('span');
+        toggleIcon.className = 'toggle-icon';
+        toggleIcon.textContent = '▶';
+        colDiv.appendChild(toggleIcon);
+
+        // フォルダアイコン
+        const folderIcon = document.createElement('span');
+        folderIcon.className = 'collection-icon';
+        folderIcon.textContent = '📁';
+        colDiv.appendChild(folderIcon);
+
+        // コレクション名
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'collection-name';
+        nameSpan.textContent = col.name;
+        colDiv.appendChild(nameSpan);
+
+        // 追加：削除ボタン（🗑️）
+        const deleteBtn = document.createElement('span');
+        deleteBtn.className = 'collection-delete-btn';
+        deleteBtn.textContent = '🗑️';
+        // 削除イベント（クリック）
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();  // 親要素の toggle を阻止
+            deleteCollection(col.id);
+        });
+        colDiv.appendChild(deleteBtn);
+
+
+        container.appendChild(colDiv);
+
+        // ② リクエスト一覧（最初は非表示）
+        const ul = document.createElement('ul');
+        ul.className = 'request-list';
+        ul.style.display = 'none'; // デフォルトで非表示
+
+        if (col.requests && col.requests.length > 0) {
+            col.requests.forEach((req, idx) => {
+                const li = document.createElement('li');
+                li.className = 'request-item';
+                li.dataset.id = req.id;
+
+                // メソッドバッジ
+                const methodBadge = document.createElement('span');
+                methodBadge.className = `method-badge method-${req.method}`;
+                methodBadge.textContent = req.method;
+                li.appendChild(methodBadge);
+
+                // リクエスト名
+                const reqName = document.createElement('span');
+                reqName.className = 'request-name';
+                reqName.textContent = req.name;
+                li.appendChild(reqName);
+
+                // 「🗑️」削除ボタンを作成
+                const deleteBtn = document.createElement('span');
+                deleteBtn.className = 'request-delete-btn';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
+                    deleteRequestFromCollection(col.id, idx);
+                });
+                li.appendChild(deleteBtn);
+
+                // クリック時にリクエストをロード
+                li.addEventListener('click', (e) => {
+                    e.stopPropagation(); // 上位のコレクションクリックと衝突しないように
+                    loadCollectionRequest(req);
+                });
+
+                ul.appendChild(li);
+            });
+        } else {
+            // コレクションにリクエストがない場合
+            const li = document.createElement('li');
+            li.className = 'request-item empty-message';
+            li.textContent = 'No requests';
+            ul.appendChild(li);
+        }
+
+        container.appendChild(ul);
+
+        // ③ コレクション行クリックで「リクエスト一覧を開閉」
+        colDiv.addEventListener('click', () => {
+            if (ul.style.display === 'none') {
+                ul.style.display = 'block';
+                toggleIcon.textContent = '▼';
+                // クリックされたコレクションを選択状態に
+                document.querySelectorAll('.collection-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.id == col.id);
+                });
+                state.currentCollection = col.id;
+                saveCurrentCollectionToStorage(col.id);
+                // 変数セレクタ更新など
+                const collectionVarSelect = document.getElementById('collectionVarSelect');
+                if (collectionVarSelect) {
+                    collectionVarSelect.value = col.id;
+                    renderVariables('collection');
+                }
+            } else {
+                ul.style.display = 'none';
+                toggleIcon.textContent = '▶';
+            }
+        });
+    });
 }

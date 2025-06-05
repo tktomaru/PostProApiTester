@@ -6,284 +6,282 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="logo">
-                <h1>API Tester</h1>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-outline btn-sm" id="importBtn">Import</button>
-                <button class="btn btn-outline btn-sm" id="exportBtn">Export</button>
-                <button class="btn btn-outline btn-sm" id="settingsBtn">Settings</button>
-            </div>
+<body><!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <h1>API Tester</h1>
         </div>
-
-        <!-- Main Navigation -->
-        <div class="nav-tabs">
-            <button class="tab-btn active" data-tab="request">Request</button>
-            <button class="tab-btn" data-tab="collections">Collections</button>
-            <button class="tab-btn" data-tab="history">History</button>
-            <button class="tab-btn" data-tab="interceptor">Interceptor</button>
-            <button class="tab-btn" data-tab="variables">Variables</button>
-        </div>
-
-        <!-- Tab Contents -->
-        <div class="tab-contents">
-            <!-- Request Tab -->
-            <div id="request-tab" class="tab-content active">
-                <div class="request-section">
-                    <div class="request-line">
-                        <select id="methodSelect" class="method-select">
-                            <option value="GET">GET</option>
-                            <option value="POST">POST</option>
-                            <option value="PUT">PUT</option>
-                            <option value="DELETE">DELETE</option>
-                            <option value="PATCH">PATCH</option>
-                            <option value="HEAD">HEAD</option>
-                            <option value="OPTIONS">OPTIONS</option>
-                        </select>
-                        <input type="text" id="urlInput" class="url-input" placeholder="Enter request URL">
-                        <button id="sendBtn" class="btn btn-primary">Send</button>
-                    </div>
-
-                    <!-- Request Sub-tabs -->
-                    <div class="sub-tabs">
-                        <button class="sub-tab-btn active" data-subtab="params">Params</button>
-                        <button class="sub-tab-btn" data-subtab="headers">Headers</button>
-                        <button class="sub-tab-btn" data-subtab="body">Body</button>
-                        <button class="sub-tab-btn" data-subtab="auth">Auth</button>
-                        <button class="sub-tab-btn" data-subtab="pre-script">Pre-request</button>
-                        <button class="sub-tab-btn" data-subtab="tests">Tests</button>
-                    </div>
-
-                    <!-- Sub Tab Contents -->
-                    <div class="sub-tab-contents">
-                        <!-- Params -->
-                        <div id="params-subtab" class="sub-tab-content active">
-                            <div class="key-value-editor">
-                                <div class="key-value-header">
-                                    <span>Key</span>
-                                    <span>Value</span>
-                                    <span>Description</span>
-                                    <span></span>
-                                </div>
-                                <div id="paramsContainer" class="key-value-container"></div>
-                                <button class="btn btn-sm add-param">Add Param</button>
-                            </div>
-                        </div>
-
-                        <!-- Headers -->
-                        <div id="headers-subtab" class="sub-tab-content">
-                            <div class="key-value-editor">
-                                <div class="key-value-header">
-                                    <span>Key</span>
-                                    <span>Value</span>
-                                    <span>Description</span>
-                                    <span></span>
-                                </div>
-                                <div id="headersContainer" class="key-value-container"></div>
-                                <button class="btn btn-sm add-header">Add Header</button>
-                            </div>
-                        </div>
-
-                        <!-- Body -->
-                        <div id="body-subtab" class="sub-tab-content">
-                            <div class="body-type-selector">
-                                <label><input type="radio" name="bodyType" value="none" checked> None</label>
-                                <label><input type="radio" name="bodyType" value="raw"> Raw</label>
-                                <label><input type="radio" name="bodyType" value="json"> Json</label>
-                                <label><input type="radio" name="bodyType" value="form-data"> Form Data</label>
-                                <label><input type="radio" name="bodyType" value="urlencoded"> URL Encoded</label>
-                            </div>
-                            <div id="bodyEditor">
-                                <textarea id="rawBody" class="raw-body" placeholder="Enter request body"></textarea>
-
-                                <!-- JSON 用エリア（最初は非表示）-->
-                                <div id="jsonEditor" style="display: none;">
-                                    <textarea id="jsonBody" class="json-body" placeholder="{ key : value }"></textarea>
-                                </div>
-
-                                <!-- Form Data 用エリア（最初は非表示）-->
-                                <div id="formDataContainer" class="key-value-container" style="display: none;">
-                                </div>
-                                <div id="formDataContainer" class="key-value-container" style="display:none;"></div>
-                            </div>
-
-
-                        </div>
-
-                        <!-- Auth -->
-                        <div id="auth-subtab" class="sub-tab-content">
-                            <div class="auth-type-selector">
-                                <label>Type:</label>
-                                <select id="authType">
-                                    <option value="none">None</option>
-                                    <option value="basic">Basic Auth</option>
-                                    <option value="bearer">Bearer Token</option>
-                                    <option value="apikey">API Key</option>
-                                    <option value="oauth2">OAuth 2.0</option>
-                                </select>
-                            </div>
-                            <div id="authDetails" class="auth-details"></div>
-                        </div>
-
-                        <!-- Pre-request Script -->
-                        <div id="pre-script-subtab" class="sub-tab-content">
-                            <div class="script-section">
-                                <h4>Pre-request Script</h4>
-                                <p class="script-description">This script runs before the request is sent</p>
-                                <textarea id="preRequestScript" class="script-editor"
-                                    placeholder="// Example: pm.variables.set('timestamp', Date.now());"></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Test Script -->
-                        <div id="tests-subtab" class="sub-tab-content">
-                            <div class="script-section">
-                                <h4>Test Script</h4>
-                                <p class="script-description">This script runs after the response is received</p>
-                                <textarea id="testScript" class="script-editor"
-                                    placeholder="// Example: pm.test('Status is 200', () => pm.response.to.have.status(200));"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Response Section -->
-                <div class="response-section">
-                    <div class="response-header">
-                        <h3>Response</h3>
-                        <div id="responseStats" class="response-stats"></div>
-                    </div>
-
-                    <div class="response-tabs">
-                        <button class="response-tab-btn active" data-restab="body">Body</button>
-                        <button class="response-tab-btn" data-restab="headers">Headers</button>
-                        <button class="response-tab-btn" data-restab="cookies">Cookies</button>
-                        <button class="response-tab-btn" data-restab="tests">Test Results</button>
-                    </div>
-
-                    <div class="response-content">
-                        <div id="response-body" class="response-tab-content active">
-                            <div class="response-format-selector">
-                                <button class="format-btn active" data-format="pretty">Pretty</button>
-                                <button class="format-btn" data-format="raw">Raw</button>
-                                <button class="format-btn" data-format="preview">Preview</button>
-                            </div>
-                            <div id="responseBody" class="response-body-content"></div>
-                        </div>
-                        <div id="response-headers" class="response-tab-content"></div>
-                        <div id="response-cookies" class="response-tab-content"></div>
-                        <div id="response-tests" class="response-tab-content"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Collections Tab -->
-            <div id="collections-tab" class="tab-content">
-                <div class="collections-header">
-                    <h3>Collections</h3>
-                    <button id="newCollectionBtn" class="btn btn-primary btn-sm">New Collection</button>
-                </div>
-                <div class="collections-layout">
-                    <div class="collections-sidebar">
-                        <div id="collectionsContainer" class="collections-container"></div>
-                    </div>
-                    <div class="collection-requests-panel">
-                        <div id="collectionRequestsHeader" class="collection-requests-header">
-                            <h4>Select a collection</h4>
-                        </div>
-                        <div id="collectionRequestsContainer" class="collection-requests-container"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- History Tab -->
-            <div id="history-tab" class="tab-content">
-                <div class="history-header">
-                    <h3>Request History</h3>
-                    <div class="history-actions">
-                        <input type="text" id="historySearch" class="search-input" placeholder="Search history...">
-                        <button id="clearHistoryBtn" class="btn btn-sm">Clear All</button>
-                    </div>
-                </div>
-                <div id="historyContainer" class="history-container"></div>
-            </div>
-
-            <!-- Interceptor Tab -->
-            <div id="interceptor-tab" class="tab-content">
-                <div class="interceptor-header">
-                    <h3>Request Interceptor</h3>
-                    <div class="interceptor-controls">
-                        <button id="startInterceptorBtn" class="btn btn-primary btn-sm">Start Capture</button>
-                        <button id="stopInterceptorBtn" class="btn btn-sm" disabled>Stop</button>
-                    </div>
-                </div>
-                <div class="interceptor-filters">
-                    <div class="filter-group">
-                        <label>Filter by Method:</label>
-                        <div class="method-filters">
-                            <label><input type="checkbox" value="GET" checked> GET</label>
-                            <label><input type="checkbox" value="POST" checked> POST</label>
-                            <label><input type="checkbox" value="PUT" checked> PUT</label>
-                            <label><input type="checkbox" value="DELETE" checked> DELETE</label>
-                        </div>
-                    </div>
-                    <div class="filter-group">
-                        <label>Domain Filter:</label>
-                        <input type="text" id="domainFilter" class="filter-input" placeholder="e.g. api.example.com">
-                    </div>
-                </div>
-                <div id="interceptorContainer" class="interceptor-container"></div>
-            </div>
-
-            <!-- Variables Tab -->
-            <div id="variables-tab" class="tab-content">
-                <div class="variables-header">
-                    <h3>Variables Management</h3>
-                </div>
-
-                <div class="variables-content">
-                    <!-- Global Variables -->
-                    <div class="variable-section">
-                        <div class="variable-section-header">
-                            <h4>Global Variables</h4>
-                            <button class="btn btn-sm" id="addGlobalVarBtn">Add</button>
-                        </div>
-                        <div id="globalVariablesContainer" class="variables-container"></div>
-                    </div>
-
-                    <!-- Environment Variables -->
-                    <div class="variable-section">
-                        <div class="variable-section-header">
-                            <h4>Environment Variables</h4>
-                            <select id="environmentSelect">
-                                <option value="">No Environment</option>
-                            </select>
-                            <button class="btn btn-sm" id="newEnvironmentBtn">New</button>
-                            <button class="btn btn-sm" id="editEnvironmentBtn">Edit</button>
-                            <button class="btn btn-sm" id="addEnvVarBtn">Add</button>
-                        </div>
-                        <div id="envVariablesContainer" class="variables-container"></div>
-                    </div>
-
-                    <!-- Collection Variables -->
-                    <div class="variable-section">
-                        <div class="variable-section-header">
-                            <h4>Collection Variables</h4>
-                            <select id="collectionVarSelect">
-                                <option value="">Select Collection</option>
-                            </select>
-                            <button class="btn btn-sm" id="addCollectionVarBtn">Add</button>
-                        </div>
-                        <div id="collectionVariablesContainer" class="variables-container"></div>
-                    </div>
-                </div>
-            </div>
+        <div class="header-actions">
+            <button class="btn btn-outline btn-sm" id="importBtn">Import</button>
+            <button class="btn btn-outline btn-sm" id="exportBtn">Export</button>
+            <button class="btn btn-outline btn-sm" id="settingsBtn">Settings</button>
         </div>
     </div>
+    <div class="app-container">
+        <!-- 左サイドバー：コレクション一覧＋各コレクションのリクエスト一覧を表示 -->
+        <aside class="sidebar" id="collectionsSidebar">
+            <!-- 「＋ New Collection」ボタンなどもここに配置可 -->
+            <div class="sidebar-header">
+                <button class="btn btn-sm" id="createCollectionBtn">＋ コレクション作成</button>
+            </div>
+            <div id="collectionsTree">
+                <!-- JS で動的にコレクションおよびそのリクエスト一覧をここに描画 -->
+            </div>
+        </aside>
+
+
+        <main class="main-content">
+            <!-- Main Navigation -->
+            <div class="nav-tabs">
+                <button class="tab-btn active" data-tab="request">Request</button>
+                <button class="tab-btn" data-tab="history">History</button>
+                <button class="tab-btn" data-tab="interceptor">Interceptor</button>
+                <button class="tab-btn" data-tab="variables">Variables</button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div class="tab-contents">
+                <!-- Request Tab -->
+                <div id="request-tab" class="tab-content active">
+                    <div class="request-section">
+                        <div class="request-line">
+                            <select id="methodSelect" class="method-select">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="HEAD">HEAD</option>
+                                <option value="OPTIONS">OPTIONS</option>
+                            </select>
+                            <input type="text" id="urlInput" class="url-input" placeholder="Enter request URL">
+                            <button id="sendBtn" class="btn btn-primary">Send</button>
+                        </div>
+
+                        <!-- Request Sub-tabs -->
+                        <div class="sub-tabs">
+                            <button class="sub-tab-btn active" data-subtab="params">Params</button>
+                            <button class="sub-tab-btn" data-subtab="headers">Headers</button>
+                            <button class="sub-tab-btn" data-subtab="body">Body</button>
+                            <button class="sub-tab-btn" data-subtab="auth">Auth</button>
+                            <button class="sub-tab-btn" data-subtab="pre-script">Pre-request</button>
+                            <button class="sub-tab-btn" data-subtab="tests">Tests</button>
+                        </div>
+
+                        <!-- Sub Tab Contents -->
+                        <div class="sub-tab-contents">
+                            <!-- Params -->
+                            <div id="params-subtab" class="sub-tab-content active">
+                                <div class="key-value-editor">
+                                    <div class="key-value-header">
+                                        <span>Key</span>
+                                        <span>Value</span>
+                                        <span>Description</span>
+                                        <span></span>
+                                    </div>
+                                    <div id="paramsContainer" class="key-value-container"></div>
+                                    <button class="btn btn-sm add-param">Add Param</button>
+                                </div>
+                            </div>
+
+                            <!-- Headers -->
+                            <div id="headers-subtab" class="sub-tab-content">
+                                <div class="key-value-editor">
+                                    <div class="key-value-header">
+                                        <span>Key</span>
+                                        <span>Value</span>
+                                        <span>Description</span>
+                                        <span></span>
+                                    </div>
+                                    <div id="headersContainer" class="key-value-container"></div>
+                                    <button class="btn btn-sm add-header">Add Header</button>
+                                </div>
+                            </div>
+
+                            <!-- Body -->
+                            <div id="body-subtab" class="sub-tab-content">
+                                <div class="body-type-selector">
+                                    <label><input type="radio" name="bodyType" value="none" checked> None</label>
+                                    <label><input type="radio" name="bodyType" value="raw"> Raw</label>
+                                    <label><input type="radio" name="bodyType" value="json"> Json</label>
+                                    <label><input type="radio" name="bodyType" value="form-data"> Form Data</label>
+                                    <label><input type="radio" name="bodyType" value="urlencoded"> URL
+                                        Encoded</label>
+                                </div>
+                                <div id="bodyEditor">
+                                    <textarea id="rawBody" class="raw-body" placeholder="Enter request body"></textarea>
+
+                                    <!-- JSON 用エリア（最初は非表示）-->
+                                    <div id="jsonEditor" style="display: none;">
+                                        <textarea id="jsonBody" class="json-body"
+                                            placeholder="{ key : value }"></textarea>
+                                    </div>
+
+                                    <!-- Form Data 用エリア（最初は非表示）-->
+                                    <div id="formDataContainer" class="key-value-container" style="display: none;">
+                                    </div>
+                                    <div id="formDataContainer" class="key-value-container" style="display:none;">
+                                    </div>
+                                </div>
+
+
+                            </div>
+
+                            <!-- Auth -->
+                            <div id="auth-subtab" class="sub-tab-content">
+                                <div class="auth-type-selector">
+                                    <label>Type:</label>
+                                    <select id="authType">
+                                        <option value="none">None</option>
+                                        <option value="basic">Basic Auth</option>
+                                        <option value="bearer">Bearer Token</option>
+                                        <option value="apikey">API Key</option>
+                                        <option value="oauth2">OAuth 2.0</option>
+                                    </select>
+                                </div>
+                                <div id="authDetails" class="auth-details"></div>
+                            </div>
+
+                            <!-- Pre-request Script -->
+                            <div id="pre-script-subtab" class="sub-tab-content">
+                                <div class="script-section">
+                                    <h4>Pre-request Script</h4>
+                                    <p class="script-description">This script runs before the request is sent</p>
+                                    <textarea id="preRequestScript" class="script-editor"
+                                        placeholder="// Example: pm.variables.set('timestamp', Date.now());"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Test Script -->
+                            <div id="tests-subtab" class="sub-tab-content">
+                                <div class="script-section">
+                                    <h4>Test Script</h4>
+                                    <p class="script-description">This script runs after the response is received
+                                    </p>
+                                    <textarea id="testScript" class="script-editor"
+                                        placeholder="// Example: pm.test('Status is 200', () => pm.response.to.have.status(200));"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Response Section -->
+                    <div class="response-section">
+                        <div class="response-header">
+                            <h3>Response</h3>
+                            <div id="responseStats" class="response-stats"></div>
+                        </div>
+
+                        <div class="response-tabs">
+                            <button class="response-tab-btn active" data-restab="body">Body</button>
+                            <button class="response-tab-btn" data-restab="headers">Headers</button>
+                            <button class="response-tab-btn" data-restab="cookies">Cookies</button>
+                            <button class="response-tab-btn" data-restab="tests">Test Results</button>
+                        </div>
+
+                        <div class="response-content">
+                            <div id="response-body" class="response-tab-content active">
+                                <div class="response-format-selector">
+                                    <button class="format-btn active" data-format="pretty">Pretty</button>
+                                    <button class="format-btn" data-format="raw">Raw</button>
+                                    <button class="format-btn" data-format="preview">Preview</button>
+                                </div>
+                                <div id="responseBody" class="response-body-content"></div>
+                            </div>
+                            <div id="response-headers" class="response-tab-content"></div>
+                            <div id="response-cookies" class="response-tab-content"></div>
+                            <div id="response-tests" class="response-tab-content"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div id="history-tab" class="tab-content">
+                    <div class="history-header">
+                        <h3>Request History</h3>
+                        <div class="history-actions">
+                            <input type="text" id="historySearch" class="search-input" placeholder="Search history...">
+                            <button id="clearHistoryBtn" class="btn btn-sm">Clear All</button>
+                        </div>
+                    </div>
+                    <div id="historyContainer" class="history-container"></div>
+                </div>
+
+                <!-- Interceptor Tab -->
+                <div id="interceptor-tab" class="tab-content">
+                    <div class="interceptor-header">
+                        <h3>Request Interceptor</h3>
+                        <div class="interceptor-controls">
+                            <button id="startInterceptorBtn" class="btn btn-primary btn-sm">Start Capture</button>
+                            <button id="stopInterceptorBtn" class="btn btn-sm" disabled>Stop</button>
+                        </div>
+                    </div>
+                    <div class="interceptor-filters">
+                        <div class="filter-group">
+                            <label>Filter by Method:</label>
+                            <div class="method-filters">
+                                <label><input type="checkbox" value="GET" checked> GET</label>
+                                <label><input type="checkbox" value="POST" checked> POST</label>
+                                <label><input type="checkbox" value="PUT" checked> PUT</label>
+                                <label><input type="checkbox" value="DELETE" checked> DELETE</label>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <label>Domain Filter:</label>
+                            <input type="text" id="domainFilter" class="filter-input"
+                                placeholder="e.g. api.example.com">
+                        </div>
+                    </div>
+                    <div id="interceptorContainer" class="interceptor-container"></div>
+                </div>
+
+                <!-- Variables Tab -->
+                <div id="variables-tab" class="tab-content">
+                    <div class="variables-header">
+                        <h3>Variables Management</h3>
+                    </div>
+
+                    <div class="variables-content">
+                        <!-- Global Variables -->
+                        <div class="variable-section">
+                            <div class="variable-section-header">
+                                <h4>Global Variables</h4>
+                                <button class="btn btn-sm" id="addGlobalVarBtn">Add</button>
+                            </div>
+                            <div id="globalVariablesContainer" class="variables-container"></div>
+                        </div>
+
+                        <!-- Environment Variables -->
+                        <div class="variable-section">
+                            <div class="variable-section-header">
+                                <h4>Environment Variables</h4>
+                                <select id="environmentSelect">
+                                    <option value="">No Environment</option>
+                                </select>
+                                <button class="btn btn-sm" id="newEnvironmentBtn">New</button>
+                                <button class="btn btn-sm" id="editEnvironmentBtn">Edit</button>
+                                <button class="btn btn-sm" id="addEnvVarBtn">Add</button>
+                            </div>
+                            <div id="envVariablesContainer" class="variables-container"></div>
+                        </div>
+
+                        <!-- Collection Variables -->
+                        <div class="variable-section">
+                            <div class="variable-section-header">
+                                <h4>Collection Variables</h4>
+                                <select id="collectionVarSelect">
+                                    <option value="">Select Collection</option>
+                                </select>
+                                <button class="btn btn-sm" id="addCollectionVarBtn">Add</button>
+                            </div>
+                            <div id="collectionVariablesContainer" class="variables-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
 
     <!-- Import/Export Modal -->
     <div id="importExportModal" class="modal">

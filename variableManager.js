@@ -22,6 +22,25 @@ import {
 import { showError, showSuccess, escapeHtml } from './utils.js';
 
 /**
+ * setupVariableEventListeners
+ *  各「Add」「Edit」ボタン、セレクト変更時のイベント登録
+ */
+function setupVariableEventListeners() {
+    document.getElementById('newEnvironmentBtn').addEventListener('click', createNewEnvironment);
+    document.getElementById('editEnvironmentBtn').addEventListener('click', editCurrentEnvironment);
+    document.getElementById('environmentSelect').addEventListener('change', switchEnvironment);
+
+    document.getElementById('addGlobalVarBtn').addEventListener('click', () => addVariableRow('global'));
+    document.getElementById('addEnvVarBtn').addEventListener('click', () => addVariableRow('environment'));
+    document.getElementById('addCollectionVarBtn').addEventListener('click', () => addVariableRow('collection'));
+
+    document.getElementById('collectionVarSelect').addEventListener('change', () => {
+        state.currentCollection = document.getElementById('collectionVarSelect').value;
+        renderVariables('collection');
+    });
+}
+
+/**
  * initializeVariablesManagement
  *  ページロード時に環境セレクタや「New/Edit/追加」ボタン等のイベント登録 → 描画
  */
@@ -131,27 +150,6 @@ export async function initializeVariablesManagement() {
     } catch (error) {
         console.error('Error initializing variables management:', error);
     }
-}
-
-/**
- * setupVariableEventListeners
- *  各「Add」「Edit」ボタン、セレクト変更時のイベント登録
- */
-export function setupVariableEventListeners() {
-    document.getElementById('newEnvironmentBtn').addEventListener('click', createNewEnvironment);
-    document.getElementById('editEnvironmentBtn').addEventListener('click', editCurrentEnvironment);
-    document.getElementById('environmentSelect').addEventListener('change', () => {
-        switchEnvironment();
-    });
-
-    document.getElementById('addGlobalVarBtn').addEventListener('click', () => addVariableRow('global'));
-    document.getElementById('addEnvVarBtn').addEventListener('click', () => addVariableRow('environment'));
-    document.getElementById('addCollectionVarBtn').addEventListener('click', () => addVariableRow('collection'));
-
-    document.getElementById('collectionVarSelect').addEventListener('change', () => {
-        state.currentCollection = document.getElementById('collectionVarSelect').value;
-        renderVariables('collection');
-    });
 }
 
 
@@ -346,7 +344,7 @@ export function renderVariables(scope) {
             console.log("renderVariables is return currentCollection");
             return;
         }
-        data = state.variables.collection[state.currentCollection] || {};
+        data = state.variables.collection || {};
     } else {
         console.log("renderVariables is return");
         return;
@@ -555,17 +553,6 @@ export function addVariableRow(scope) {
     const row = createVariableRow(scope);
     container.appendChild(row);
     row.querySelector('.var-key').focus();
-    switch (scope) {
-        case 'global':
-            renderVariables('global');
-            break;
-        case 'environment':
-            renderVariables('environment');
-            break;
-        case 'collection':
-            renderVariables('collection');
-            break;
-    }
 }
 
 export function getVariable(key) {

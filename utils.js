@@ -4,6 +4,10 @@
 // state.js を動的にインポートしてstate.currentRequest を取得
 import { state } from './state.js';
 import { displayResponse } from './requestManager.js';
+import { createNewCollection } from './collectionManager.js';
+import { clearHistory } from './historyManager.js';
+import { startInterceptor } from './interceptorManager.js';
+import { stopInterceptor } from './interceptorManager.js';
 /**
  * escapeHtml
  *  XSS 対策用にテキストをエスケープして安全に innerHTML に渡す
@@ -148,8 +152,7 @@ export function setupEventListeners() {
         showError('Settings panel not yet implemented');
     });
     // コレクション管理（New Collection）
-    document.getElementById('newCollectionBtn').addEventListener('click', async () => {
-        const { createNewCollection } = await import('./collectionManager.js');
+    document.getElementById('createCollectionBtn').addEventListener('click', async () => {
         createNewCollection();
     });
     // 履歴（検索・クリア）
@@ -157,16 +160,13 @@ export function setupEventListeners() {
         import('./historyManager.js').then(mod => mod.filterHistory());
     });
     document.getElementById('clearHistoryBtn').addEventListener('click', async () => {
-        const { clearHistory } = await import('./historyManager.js');
         clearHistory();
     });
     // インターセプタ（開始・停止）
     document.getElementById('startInterceptorBtn').addEventListener('click', async () => {
-        const { startInterceptor } = await import('./interceptorManager.js');
         startInterceptor();
     });
     document.getElementById('stopInterceptorBtn').addEventListener('click', async () => {
-        const { stopInterceptor } = await import('./interceptorManager.js');
         stopInterceptor();
     });
     // Body タイプ切り替え
@@ -225,9 +225,10 @@ export function setupTabSwitching() {
  *  メインタブ選択時の表示切り替え
  */
 export function switchMainTab(tabName) {
+    console.log(tabName);
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
     document.getElementById(`${tabName}-tab`).classList.add('active');
 }
 
