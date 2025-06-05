@@ -89,6 +89,10 @@ export async function handleImport() {
             case 'curl':
                 importCurlCommand(data);
                 break;
+            case 'talentedapitester':
+                importTalendData(data);
+                break;
+
         }
 
         document.getElementById('importExportModal').classList.remove('active');
@@ -230,6 +234,68 @@ async function importPostmanCollection(data) {
 
     renderCollections();
     updateCollectionVarSelector();
+}
+
+async function importTalendData(talend) {
+    // ① Project → Service → Request のマッピング
+    const project = talend.entities.find(e => e.entity.type === 'Project');
+    if (!project) throw new Error('Talend JSON に Project が見つかりません');
+    const collections = project.children
+        .filter(s => s.entity.type === 'Service')
+        .map(serviceNode => {
+            const svc = serviceNode.entity;
+            const requests = (serviceNode.children || [])
+                .filter(r => r.entity.type === 'Request')
+                .map(rNode => {
+                    const e = rNode.entity;
+                    // Talend では必ず bodyType:"Text" なので、TextBody を body にそのまま使う
+                    return {
+                        id: e.id,
+                        name: e.name,
+                        method: e.method.name,
+                        url: e.uri.path,
+                        headers: (e.headers || []).filter(h => h.enabled).reduce((acc, h) => {
+                            acc[h.name] = h.value;
+                            return acc;
+                        }, {}),
+                        params: {},
+                        body: e.body.textBody || '',
+                        auth: { type: 'none' }
+                    };
+                });
+            return {
+                id: svc.id,
+                name: svc.name,
+                description: '',
+                requests
+            };
+        });
+
+    // ② 環境変数のマッピング
+    const environments = (talend.environments || []).map(envNode => {
+        const vars = Object.values(envNode.variables || {}).reduce((acc, v) => {
+            if (v.enabled) acc[v.name] = { value: v.value, description: '' };
+            return acc;
+        }, {});
+        return {
+            id: envNode.id,
+            name: envNode.name,
+            variables: vars
+        };
+    });
+
+    // ③ 変換結果を当方の state に登録してストレージに保存
+    //    （saveCollectionsToStorage / saveEnvironmentsToStorage などを使う）
+    state.collections.splice(0, state.collections.length, ...collections);
+    await saveCollectionsToStorage();
+
+    state.environments.splice(0, state.environments.length, ...environments);
+    await saveEnvironmentsToStorage();
+
+    renderCollections();
+    updateCollectionVarSelector();
+    renderEnvironmentSelector();
+    renderAllVariables();
 }
 
 /** importApiTesterData */
