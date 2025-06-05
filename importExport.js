@@ -535,12 +535,12 @@ export async function exportData() {
         exportDate: new Date().toISOString(),
         collections: state.collections,
         variables: {
-            global: variables.global,
-            collection: variables.collection
+            global: state.variables.global,
+            collection: state.variables.collection
         },
-        environments: environments,
-        currentEnvironment: currentEnvironment,
-        history: history.slice(0, 50)
+        environments: state.environments,
+        currentEnvironment: state.currentEnvironment,
+        history: state.history.slice(0, 50)
     };
 
     const dataStr = JSON.stringify(dataToExport, null, 2);
