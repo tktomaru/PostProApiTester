@@ -3,7 +3,9 @@
 // リクエスト送受信・プリリクエストスクリプト・テストスクリプト・レスポンス表示をまとめる
 
 import {
-    state
+    state,
+    saveCollectionsToStorage,
+    saveScenariosToStorage
 } from './state.js';
 
 import {
@@ -24,6 +26,7 @@ import { getVariable, replaceVariables, deepReplaceVariables, renderVariables } 
  */
 export function loadRequestIntoEditor(request) {
     // state.currentRequest の値をまるごと置き換え
+    state.currentRequest = JSON.parse(JSON.stringify(request));
     state.currentRequest.method = request.method;
     state.currentRequest.url = request.url;
     state.currentRequest.headers = { ...request.headers };
@@ -953,4 +956,129 @@ export function processVariables(request) {
 export async function saveToHistory(request, responseData) {
     const { saveToHistory: saveFn } = await import('./historyManager.js');
     await saveFn(request, responseData);
+}
+
+/**
+ * saveCurrentRequest
+ *  - state.currentRequest の内容を取得し、
+ *    ● もし「コレクション配下のリクエスト」としてロードされているなら、そのコレクションデータを更新して保存
+ *    ● もし「シナリオ配下のリクエスト」としてロードされているなら、そのシナリオデータを更新して保存
+ *    ● それ以外（新規作成）なら、state.currentRequest 自体をそのままローカルに保存（履歴などに利用）
+ */
+export async function saveCurrentRequest() {
+    const req = state.currentRequest;
+    if (!req || !req.id) {
+        showError('No request to save.');
+        return;
+    }
+
+    try {
+        // ① まず、フォームの各入力欄から値を取得して state.currentRequest を更新する
+        //    メソッドと URL
+        req.method = document.getElementById('methodSelect').value;
+        req.url = document.getElementById('urlInput').value.trim();
+
+        //    ヘッダー（key/value をループしてオブジェクト化する例。HTML 構造に合わせて修正を）
+        const headerRows = document.querySelectorAll('#headersContainer .key-value-row');
+        const newHeaders = {};
+        headerRows.forEach(row => {
+            const key = row.querySelector('.key-input').value.trim();
+            const value = row.querySelector('.value-input').value.trim();
+            if (key) newHeaders[key] = value;
+        });
+        req.headers = newHeaders;
+
+        //    パラメータ
+        const paramRows = document.querySelectorAll('#paramsContainer .key-value-row');
+        const newParams = {};
+        paramRows.forEach(row => {
+            const key = row.querySelector('.key-input').value.trim();
+            const value = row.querySelector('.value-input').value.trim();
+            if (key) newParams[key] = value;
+        });
+        req.params = newParams;
+
+        //    ボディ
+        const selectedBodyType = document.querySelector('input[name="bodyType"]').value;
+        if (selectedBodyType === 'raw') {
+            req.body = document.getElementById('rawBody').value;
+        } else if (selectedBodyType === 'json') {
+            req.body = document.getElementById('jsonBody').value;
+        } else if (selectedBodyType === 'form-data') {
+            // form-data の複数 key-value をオブジェクトに格納
+            const formRows = document.querySelectorAll('#formDataContainer .key-value-row');
+            const formDataObj = {};
+            formRows.forEach(row => {
+                const key = row.querySelector('.key-input').value.trim();
+                const value = row.querySelector('.value-input').value.trim();
+                if (key) formDataObj[key] = value;
+            });
+            req.body = formDataObj;
+        } else if (selectedBodyType === 'urlencoded') {
+            const urlRows = document.querySelectorAll('#urlEncodedContainer .key-value-row');
+            const urlObj = {};
+            urlRows.forEach(row => {
+                const key = row.querySelector('.key-input').value.trim();
+                const value = row.querySelector('.value-input').value.trim();
+                if (key) urlObj[key] = value;
+            });
+            req.body = urlObj;
+        } else {
+            // none の場合は body を null にしておく
+            req.body = null;
+        }
+
+        //    認証設定
+        const authType = document.getElementById('authType').value;
+        req.auth = { type: authType };
+        if (authType === 'basic') {
+            req.auth.username = document.getElementById('authUsername').value;
+            req.auth.password = document.getElementById('authPassword').value;
+        } else if (authType === 'bearer') {
+            req.auth.token = document.getElementById('authToken').value;
+        } else if (authType === 'apikey') {
+            req.auth.key = document.getElementById('authKey').value;
+            req.auth.value = document.getElementById('authValue').value;
+            req.auth.addTo = document.getElementById('authAddTo').value; // query or header
+        }
+        // ※ OAuth2 や他の認証タイプがあれば適宜追加
+
+        // ② どこに保存するか判定する
+        //    a) state.currentCollection に属するリクエストならコレクションを更新
+        if (state.currentCollection) {
+            const col = state.collections.find(c => c.id === state.currentCollection);
+            if (col && col.requests) {
+                const idx = col.requests.findIndex(r => r.id === req.id);
+                if (idx !== -1) {
+                    col.requests[idx] = JSON.parse(JSON.stringify(req)); // オブジェクトを置き換え
+                    await saveCollectionsToStorage();
+                    showSuccess('Request saved to collection.');
+                    return;
+                }
+            }
+        }
+
+        //    b) state.currentScenario に属するリクエストならシナリオを更新
+        if (state.currentScenario) {
+            const scenario = state.scenarios.find(s => s.id === state.currentScenario);
+            if (scenario && scenario.requests) {
+                const idx2 = scenario.requests.findIndex(r => r.id === req.id);
+                if (idx2 !== -1) {
+                    scenario.requests[idx2] = JSON.parse(JSON.stringify(req));
+                    await saveScenariosToStorage();
+                    showSuccess('Request saved to scenario.');
+                    return;
+                }
+            }
+        }
+
+        //    c) それ以外（単体リクエストを新規作成 or 履歴として残す場合）は
+        //       state.currentRequest をそのままストレージに保持する
+        await saveCurrentRequestToStorage(req);
+        showSuccess('Request saved.');
+
+    } catch (error) {
+        console.error('Error saving request:', error);
+        showError('Failed to save request: ' + error.message);
+    }
 }

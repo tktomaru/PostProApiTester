@@ -2,6 +2,10 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // グローバル変数と、chrome.storage への読み書きロジックをまとめる
 
+import { renderCollectionsTree } from './collectionManager.js';
+import { updateCollectionVarSelector } from './variableManager.js';
+import { renderScenarioList } from './scenarioManager.js';
+
 // コレクション・履歴・変数群
 export const state = {
     // 現在編集中のリクエスト全体を保持
@@ -150,6 +154,14 @@ export async function loadAllStoredData() {
  */
 export async function saveCollectionsToStorage() {
     await chrome.storage.local.set({ collections: state.collections });
+
+    const stored = await chrome.storage.local.get(['collections']);
+    state.collections.splice(0, state.collections.length, ...stored.collections);
+    // 画面にレンダリング
+    renderCollectionsTree();
+    // コレクション変数セレクタも更新
+    updateCollectionVarSelector();
+
 }
 
 /**
@@ -218,6 +230,7 @@ export async function saveSettingsToStorage() {
  */
 export async function saveScenariosToStorage() {
     await chrome.storage.local.set({ scenarios: state.scenarios });
+    renderScenarioList();
 }
 
 /**

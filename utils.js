@@ -3,7 +3,7 @@
 // 汎用ユーティリティ関数群、タブ切り替え、イベント登録、一部の小さなヘルパーをまとめる
 // state.js を動的にインポートしてstate.currentRequest を取得
 import { state } from './state.js';
-import { displayResponse } from './requestManager.js';
+import { displayResponse, saveCurrentRequest } from './requestManager.js';
 import { createNewCollection } from './collectionManager.js';
 import { clearHistory } from './historyManager.js';
 import { startInterceptor } from './interceptorManager.js';
@@ -125,6 +125,14 @@ export async function updateRequestData(type) {
  *  ページ全体で使う「クリック・入力」などのイベントを一度にまとめる
  */
 export function setupEventListeners() {
+    // Save ボタンのクリック登録
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', (e) => {
+            e.preventDefault();     // フォーム送信などを抑止
+            saveCurrentRequest();
+        });
+    }
     // Send ボタン
     document.getElementById('sendBtn').addEventListener('click', async () => {
         const { sendRequest } = await import('./requestManager.js');

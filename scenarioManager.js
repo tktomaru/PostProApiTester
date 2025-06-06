@@ -142,7 +142,13 @@ export function renderScenarioRequests(scenarioId) {
         loadBtn.textContent = 'Load';
         loadBtn.title = 'Load this request into editor';
         loadBtn.addEventListener('click', () => {
-            loadRequestIntoEditor(req);
+            const scenario = state.scenarios.find(s => s.id === state.currentScenario);
+            if (scenario && scenario.requests) {
+                const idx2 = scenario.requests.findIndex(r => r.id === req.id);
+                if (idx2 !== -1) {
+                    loadRequestIntoEditor(scenario.requests[idx2]);
+                }
+            }
         });
         li.appendChild(loadBtn);
 

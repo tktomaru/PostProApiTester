@@ -115,6 +115,8 @@ export async function editCollectionRequest(collectionId, requestIndex) {
         await saveCollectionsToStorage();
         showSuccess('Request renamed');
     }
+    // ④ 画面再描画
+    renderCollectionsTree();                // サイドバーのコレクション一覧
 }
 
 
@@ -283,7 +285,13 @@ export function renderCollectionsTree() {
                 addToScenarioBtn.textContent = '🌱';
                 addToScenarioBtn.addEventListener('click', (e) => {
                     e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
-                    addRequestToScenario(req);
+                    const scenario = state.scenarios.find(s => s.id === state.currentScenario);
+                    if (scenario && scenario.requests) {
+                        const idx2 = scenario.requests.findIndex(r => r.id === req.id);
+                        if (idx2 !== -1) {
+                            addRequestToScenario(scenario.requests[idx2]);
+                        }
+                    }
                 });
                 li.appendChild(addToScenarioBtn);
 
@@ -291,7 +299,14 @@ export function renderCollectionsTree() {
                 // クリック時にリクエストをロード
                 li.addEventListener('click', (e) => {
                     e.stopPropagation(); // 上位のコレクションクリックと衝突しないように
-                    loadCollectionRequest(req);
+
+                    const scenario = state.scenarios.find(s => s.id === state.currentScenario);
+                    if (scenario && scenario.requests) {
+                        const idx2 = scenario.requests.findIndex(r => r.id === req.id);
+                        if (idx2 !== -1) {
+                            loadCollectionRequest(scenario.requests[idx2]);
+                        }
+                    }
                 });
 
                 ul.appendChild(li);
