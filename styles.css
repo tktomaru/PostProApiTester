@@ -699,6 +699,21 @@ transition: all 0.2s ease;
 }
 
 /* Request Section */
+/* Request ID 表示用 */
+.request-id-display {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.9rem;
+    color: #555;
+    border-bottom: 1px solid #ddd;
+    background-color: #f9f9f9;
+    margin-bottom: 0.6rem;
+}
+
+.request-id-display span em {
+    font-style: normal;
+    font-weight: bold;
+}
+
 .request-section {
     padding: 16px;
     border-bottom: 1px solid #e1e5e9;

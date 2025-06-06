@@ -82,3 +82,86 @@ jsonValueEquals data.id 1234
 bodyContains success
 headerExists Content-Type
   `;
+
+
+
+/**
+ * サンプルシナリオ
+ *  すでに上記の sampleCollections に含まれているリクエストを順番に実行する例
+ */
+export const sampleScenarios = [
+    {
+        id: 'scenario_sample_get_flow',
+        name: 'Sample get Flow',
+        requests: [
+            // ↑で定義した sampleCollections 内のリクエストをそのまま利用
+            {
+                id: 'req_sample_get1',
+                name: 'サンプル GET',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/items?page=1',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' }
+            },
+            {
+                id: 'req_sample_get2',
+                name: 'サンプル GET',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/items?page=2',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' }
+            },
+            {
+                id: 'req_sample_get3',
+                name: 'サンプル GET',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/items?page=3',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' }
+            }
+        ]
+    },
+    {
+        id: 'scenario_sample_get_flow2',
+        name: 'Sample get Flow 2',
+        requests: [
+            // ↑で定義した sampleCollections 内のリクエストをそのまま利用
+            {
+                id: 'req_sample_get1',
+                name: 'サンプル GET',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/items?page=10',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' }
+            },
+            {
+                id: 'req_sample_get2',
+                name: 'サンプル GET',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/items?page=11',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' }
+            },
+            {
+                id: 'req_sample_get3',
+                name: 'サンプル GET',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/items?page=12',
+                headers: {},
+                params: {},
+                body: null,
+                auth: { type: 'none' }
+            }
+        ]
+    }
+];

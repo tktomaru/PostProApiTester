@@ -3,20 +3,30 @@
 import { state, saveScenariosToStorage } from './state.js';
 import { loadRequestIntoEditor } from './requestManager.js';
 import { showSuccess, showError } from './utils.js';
+import { sampleScenarios } from './defaultData.js';
 
 /**
- * initializeScenarios
- *  ページロード時にローカルストレージからシナリオを読み込み、左リストに描画
+ * initializeScenarios：起動時に localStorage からシナリオをロードし、もし存在しなければサンプルを挿入
  */
 export async function initializeScenarios() {
-    // 1) ローカルストレージからシナリオを取得
-    const stored = await chrome.storage.local.get(['scenarios']);
-    if (stored.scenarios) {
-        state.scenarios.splice(0, state.scenarios.length, ...stored.scenarios);
-    }
+    try {
+        const stored = await chrome.storage.local.get(['scenarios']);
+        if (!stored.scenarios || stored.scenarios.length === 0) {
+            // まだシナリオがなければ sampleScenarios を投入
+            state.scenarios.splice(0, state.scenarios.length, ...sampleScenarios);
+            await chrome.storage.local.set({ scenarios: state.scenarios });
+        } else {
+            // すでにあればそちらを優先
+            state.scenarios.splice(0, state.scenarios.length, ...stored.scenarios);
+        }
 
-    renderScenarioList();
+        // 画面上のシナリオ一覧を描画
+        renderScenarioList();
+    } catch (error) {
+        console.error('Error initializing scenarios:', error);
+    }
 }
+
 
 /**
  * renderScenarioList
