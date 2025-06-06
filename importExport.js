@@ -6,23 +6,15 @@ import {
     saveCollectionsToStorage,
     saveVariablesToStorage,
     saveEnvironmentsToStorage,
+    saveScenariosToStorage,
     state
 } from './state.js';
-
-import {
-    renderCollectionsTree
-} from './collectionManager.js';
-
-import {
-    updateCollectionVarSelector
-} from './variableManager.js';
-
-import { renderEnvironmentSelector, renderAllVariables } from './variableManager.js';
-
+import { renderCollectionsTree } from './collectionManager.js';
+import { renderEnvironmentSelector, renderAllVariables, updateCollectionVarSelector } from './variableManager.js';
 import { showSuccess, showError } from './utils.js';
-
 import { sampleTestScript } from './defaultData.js';
 import { addKeyValueRow, handleBodyTypeChange } from './utils.js';
+import { renderScenarioList } from './scenarioManager.js';
 
 
 /** initializeTestScript：ページ上にある TestScript 欄にサンプルを反映 */
@@ -236,26 +228,32 @@ async function importPostmanCollection(data) {
     renderCollectionsTree();         // サイドバーのコレクション描画
 }
 
-
 /**
- * Talend JSON をインポートして、既存の state.collections・state.environments に
- * 追加保存するように修正したバージョン
+ * importTalendData（修正版）
+ *  - service → state.collections に追加
+ *  - scenario → state.scenarios に追加
+ *  - environment → state.environments に追加し、同時に state.variables.environment にも格納
  */
-
-async function importTalendData(talend) {
+export async function importTalendData(talend) {
     // ① Project ノードを探す
-    const project = talend.entities.find(e => e.entity.type === 'Project');
-    if (!project) throw new Error('Talend JSON に Project が見つかりません');
+    const projectNode = talend.entities.find(e => e.entity.type === 'Project');
+    if (!projectNode) {
+        throw new Error('Talend JSON に Project が見つかりません');
+    }
 
-    // ② Service および Scenario ノードを分けてマッピングする
+    const projectChildren = projectNode.children || [];
+
+    // 追加用バッファ
     const collectionsToAdd = [];
     const scenariosToAdd = [];
+    const environmentsToAdd = [];
 
-    project.children.forEach(childNode => {
-        const { entity, children } = childNode;
+    // ② 各 Service/Scenario をパースして配列を作成
+    projectChildren.forEach(child => {
+        const { entity, children } = child;
 
         // ──────────────
-        // (A) Service → Collections
+        // (A) Service → Collections にマッピング
         // ──────────────
         if (entity.type === 'Service') {
             const svc = entity;
@@ -289,7 +287,7 @@ async function importTalendData(talend) {
         }
 
         // ──────────────
-        // (B) Scenario → Scenarios
+        // (B) Scenario → Scenarios にマッピング
         // ──────────────
         else if (entity.type === 'Scenario') {
             const sce = entity;
@@ -317,21 +315,42 @@ async function importTalendData(talend) {
             scenariosToAdd.push({
                 id: sce.id,
                 name: sce.name,
-                description: '',       // 必要に応じて description を追加しても構いません
+                description: '',
                 requests: scenarioRequests
             });
         }
     });
 
-    // ③ 既存の state.collections に追加してストレージへ保存
+    // ③ Talend environments 配列をパースして { id, name, variables } の形にマッピング
+    const talendEnvs = talend.environments || [];
+    talendEnvs.forEach(envNode => {
+        const e = envNode;
+        // e.variables は { uuid: { createdAt, name, value, enabled, ... }, ... } という構造
+        const vars = {};
+        Object.values(e.variables || {}).forEach(v => {
+            if (v.enabled) {
+                vars[v.name] = {
+                    value: v.value,
+                    description: '' // 説明がなければ空文字
+                };
+            }
+        });
+        environmentsToAdd.push({
+            id: e.id,
+            name: e.name,
+            variables: vars
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // ④ state.collections に Collections を追加し、ストレージ保存
     if (collectionsToAdd.length > 0) {
         state.collections.push(...collectionsToAdd);
         await saveCollectionsToStorage();
     }
 
-    // ④ 既存の state.scenarios に追加してストレージへ保存
+    // ⑤ state.scenarios に Scenarios を追加し、ストレージ保存
     if (!Array.isArray(state.scenarios)) {
-        // state.scenarios が未定義なら初期化
         state.scenarios = [];
     }
     if (scenariosToAdd.length > 0) {
@@ -339,31 +358,42 @@ async function importTalendData(talend) {
         await saveScenariosToStorage();
     }
 
-    // ⑤ 環境変数のマッピング（従来どおり）
-    const environments = (talend.environments || []).map(envNode => {
-        const vars = Object.values(envNode.variables || {}).reduce((acc, v) => {
-            if (v.enabled) acc[v.name] = { value: v.value, description: '' };
-            return acc;
-        }, {});
-        return {
-            id: envNode.id,
-            name: envNode.name,
-            variables: vars
-        };
-    });
-
-    if (environments.length > 0) {
-        state.environments.push(...environments);
-        await saveEnvironmentsToStorage();
+    // ⑥ state.environments と state.variables.environment に環境変数を追加
+    if (!Array.isArray(state.environments)) {
+        state.environments = [];
+    }
+    if (!state.variables.environment) {
+        state.variables.environment = {};
     }
 
-    // ⑥ 画面表示を更新
+    for (const envObj of environmentsToAdd) {
+        // (1) state.environments に追加
+        state.environments.push({
+            id: envObj.id,
+            name: envObj.name,
+            variables: { ...envObj.variables } // ここで key/value を格納
+        });
+
+        // (2) state.variables.environment[env.id] に変数オブジェクトを追加
+        state.variables.environment[envObj.id] = envObj.variables;
+        await chrome.storage.local.set({ [`env_${envObj.id}`]: envObj.variables });
+    }
+
+    if (environmentsToAdd.length > 0) {
+        // 環境一覧と変数ストレージの両方を更新
+        await saveEnvironmentsToStorage();
+        await saveVariablesToStorage();
+    }
+    // ─────────────────────────────────────────────────────────────
+
+    // ⑦ 画面表示を更新
     updateCollectionVarSelector();
     renderEnvironmentSelector();
     renderAllVariables();
-    renderCollectionsTree();   // サイドバーのコレクション描画
-    renderScenariosList();     // ** ← 追加：シナリオの一覧描画関数を呼び出す **
+    renderCollectionsTree();
+    renderScenarioList(); // シナリオ一覧を再描画する関数
 }
+
 
 /** importApiTesterData */
 async function importApiTesterData(data) {

@@ -180,7 +180,8 @@ export async function saveVariablesToStorage() {
     await chrome.storage.local.set({
         variables: {
             global: state.variables.global,
-            collection: state.variables.collection
+            collection: state.variables.collection,
+            environment: state.variables.environment
         }
     });
 }

@@ -472,9 +472,8 @@ export async function saveVariable(scope, key, value, description) {
             await saveVariablesToStorage();
             break;
         case 'environment':
-            if (!state.currentEnvironment) return;
-            state.variables.environment[state.currentEnvironment] = varData;
-            await saveEnvDataToStorage(state.currentEnvironment);
+            state.variables.environment[key] = varData;
+            await saveEnvDataToStorage(key);
             break;
         case 'collection':
             if (!state.currentCollection) return;
@@ -496,26 +495,18 @@ export async function deleteVariable(scope, key) {
         case 'global':
             delete state.variables.global[key];
             await saveVariablesToStorage();
+            renderVariables('global');
             break;
         case 'environment':
             if (!state.currentEnvironment) return;
             delete state.variables.environment[key];
             await saveEnvDataToStorage(state.currentEnvironment);
+            renderVariables('environment');
             break;
         case 'collection':
             if (!state.currentCollection) return;
             delete state.variables.collection[state.currentCollection][key];
             await saveVariablesToStorage();
-            break;
-    }
-    switch (scope) {
-        case 'global':
-            renderVariables('global');
-            break;
-        case 'environment':
-            renderVariables('environment');
-            break;
-        case 'collection':
             renderVariables('collection');
             break;
     }
