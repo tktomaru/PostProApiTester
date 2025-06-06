@@ -383,6 +383,7 @@ export async function sendRequest(requestObj) {
 
         // 7. 履歴に保存
         await saveToHistory(processedRequest, parsed);
+        return response || "";
 
     } catch (error) {
         showError('Request failed: ' + error.message);
@@ -390,6 +391,17 @@ export async function sendRequest(requestObj) {
     } finally {
         showLoading(false);
     }
+
+    const responseData = {
+        status: "",
+        statusText: "",
+        headers: {},
+        duration: "",
+        size: 0,
+        body: null,
+        bodyText: ''
+    };
+    return responseData;
 }
 
 /**

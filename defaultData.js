@@ -115,76 +115,104 @@ headerExists Content-Type
  */
 export const sampleScenarios = [
     {
-        id: 'scenario_sample_get_flow',
-        name: 'Sample get Flow',
+        id: 'scenario_sample_post_flow',
+        name: 'Sample post Flow',
         requests: [
             // ↑で定義した sampleCollections 内のリクエストをそのまま利用
             {
-                id: 'req_sample_get1',
-                name: 'サンプル GET',
-                method: 'GET',
+                id: 'req_sample_POST1',
+                name: 'サンプル POST',
+                method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=1',
                 headers: {},
                 params: {},
                 body: null,
-                auth: { type: 'none' }
+                auth: { type: 'none' },
+                bodyType: "raw",
+                preRequestScript: `
+addHeader test scriptadd1
+setBody setBodyWithScript1
+  `
             },
             {
-                id: 'req_sample_get2',
-                name: 'サンプル GET',
-                method: 'GET',
+                id: 'req_sample_POST2',
+                name: 'サンプル POST',
+                method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=2',
                 headers: {},
                 params: {},
-                body: null,
-                auth: { type: 'none' }
+                body: "{\"jsonKey\" : \"jsonValue\"}",
+                auth: { type: 'none' },
+                bodyType: "json",
+                preRequestScript: `
+addHeader test scriptadd2
+  `
             },
             {
-                id: 'req_sample_get3',
-                name: 'サンプル GET',
-                method: 'GET',
+                id: 'req_sample_POST3',
+                name: 'サンプル POST',
+                method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=3',
                 headers: {},
                 params: {},
-                body: null,
-                auth: { type: 'none' }
+                body: "{\"jsonKey\" : \"jsonValue\"}",
+                auth: { type: 'none' },
+                bodyType: "raw",
+                preRequestScript: `
+addHeader test scriptadd3
+setBody setBodyWithScript3
+  `
             }
         ]
     },
     {
         id: 'scenario_sample_get_flow2',
-        name: 'Sample get Flow 2',
+        name: 'Sample get Flow',
         requests: [
             // ↑で定義した sampleCollections 内のリクエストをそのまま利用
             {
-                id: 'req_sample_get1',
+                id: 'req_sample_get2_1',
                 name: 'サンプル GET',
                 method: 'GET',
                 url: 'https://reply.tukutano.jp/items?page=10',
                 headers: {},
                 params: {},
-                body: null,
-                auth: { type: 'none' }
+                body: "1",
+                auth: { type: 'none' },
+                bodyType: "raw",
+                preRequestScript: `
+addHeader test scriptadd1
+setBody setBodyWithScript1
+  `
             },
             {
-                id: 'req_sample_get2',
+                id: 'req_sample_get2_2',
                 name: 'サンプル GET',
                 method: 'GET',
                 url: 'https://reply.tukutano.jp/items?page=11',
                 headers: {},
                 params: {},
-                body: null,
-                auth: { type: 'none' }
+                body: "{\"jsonKey\" : \"jsonValue\"}",
+                auth: { type: 'none' },
+                bodyType: "json",
+                preRequestScript: `
+addHeader test scriptadd2
+  `
             },
             {
-                id: 'req_sample_get3',
+                id: 'req_sample_post2_3',
                 name: 'サンプル GET',
                 method: 'GET',
                 url: 'https://reply.tukutano.jp/items?page=12',
                 headers: {},
                 params: {},
                 body: null,
-                auth: { type: 'none' }
+                auth: { type: 'none' },
+                bodyType: "raw",
+                preRequestScript: `
+addHeader test scriptadd2
+setBody setBodyWithScript3
+  `
             }
         ]
     }

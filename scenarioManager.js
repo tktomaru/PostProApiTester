@@ -1,7 +1,7 @@
 // scenarioManager.js
 
 import { state, saveScenariosToStorage } from './state.js';
-import { loadRequestIntoEditor } from './requestManager.js';
+import { loadRequestIntoEditor, sendRequest } from './requestManager.js';
 import { showSuccess, showError } from './utils.js';
 import { sampleScenarios } from './defaultData.js';
 
@@ -297,7 +297,7 @@ export async function runScenario() {
 
         try {
             // 実際に fetch などでリクエストを送信する
-            const response = await executeHttpRequest(req);
+            const response = await sendRequest(req);
             const text = await response.text();
 
             resultDiv.textContent = `[${i + 1}] ${req.name} → ${response.status} ${response.statusText}`;
@@ -316,21 +316,4 @@ export async function runScenario() {
     }
 
     showSuccess('Scenario execution completed.');
-}
-
-/**
- * executeHttpRequest
- *  fetch を使って実際にリクエストを送信する（必要に応じてメソッド・ヘッダ・ボディを指定）
- */
-async function executeHttpRequest(req) {
-    const options = {
-        method: req.method,
-        headers: req.headers || {}
-    };
-    if (req.method !== 'GET' && req.body) {
-        options.body = req.body;
-    }
-    // 簡易的に fetch でリクエストを送信
-    // （CORS や Credential が絡む場合は適宜調整）
-    return fetch(req.url, options);
 }
