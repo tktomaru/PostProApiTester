@@ -36,7 +36,7 @@ export const sampleCollections = [
                 name: 'POST Users',
                 method: 'POST',
                 url: '{{apiUrl}}/api/auth/login',
-                headers: { 'Accept': 'application/json' },
+                headers: { 'Accept': 'application/json', "removeHeader": "removeHeaderValue" },
                 params: { page: '1' },
                 body: JSON.stringify({
                     "username": "tomaru",
@@ -44,17 +44,41 @@ export const sampleCollections = [
                 }),
                 auth: { type: 'bearer', token: '{{devToken}}' },
                 folder: '',
-                description: 'ユーザー一覧を取得する'
+                description: 'ユーザー一覧を取得する',
+                // 「bodyType」を保持する。初期値は 'none'
+                bodyType: "none",
+                preRequestScript: `
+// args[0] に URL 文字列が入る
+setUrl https://reply.tukutano.jp/items?page=9
+addHeader test scriptadd
+removeHeader removeHeader
+setBody setBodyWithScript
+//setUrlWithVar apiBaseUrl
+//addHeaderWithVar Authorization authtoken
+//setBodyWithVar requestPayload
+  `
             },
             {
-                id: 'req_sample_get',
-                name: 'サンプル GET',
-                method: 'GET',
+                id: 'req_sample_post',
+                name: 'サンプル POST',
+                method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=1',
                 headers: {},
                 params: {},
-                body: null,
-                auth: { type: 'none' }
+                body: "test body text",
+                auth: { type: 'none' },
+                bodyType: "raw",
+                preRequestScript: `
+// args[0] に URL 文字列が入る
+setUrl https://reply.tukutano.jp/items?page=9
+addHeader test scriptadd
+removeHeader removeHeader
+setBody setBodyWithScript
+//setUrlWithVar apiBaseUrl
+//addHeaderWithVar Authorization authtoken
+//setBodyWithVar requestPayload
+
+  `
             }
         ]
     }

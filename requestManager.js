@@ -130,6 +130,76 @@ export function loadRequestIntoEditor(request) {
         updateAuthData();
     }
 
+    // ① 「Pre-request Script」エディタに既存スクリプトをセット
+    const preReqTextarea = document.getElementById('preRequestScript');
+    preReqTextarea.value = request.preRequestScript || '';
+
+    // ② 入力が変わったら state.currentRequest.preRequestScript を更新してストレージに保存
+    preReqTextarea.addEventListener('blur', async () => {
+        const newScript = preReqTextarea.value;
+        // state.currentRequest に上書き
+        state.currentRequest.preRequestScript = newScript;
+
+        // どのコレクションのどのリクエストかを特定するには、
+        // state.currentCollection と request.id を使って探す必要があります
+        const collection = state.collections.find(
+            c => c.id === state.currentCollection
+        );
+        if (collection) {
+            const targetReq = collection.requests.find(r => r.id === request.id);
+            if (targetReq) {
+                targetReq.preRequestScript = newScript;
+            }
+        }
+
+        // 保存しておく
+        await saveCollectionsToStorage();
+        showSuccess('Pre-request script を保存しました');
+    });
+
+
+    // ③ Body Type の radio ボタンをチェック
+    //    例： <input type="radio" name="bodyType" value="none"> などがある前提
+    const bodyType = request.bodyType || 'none';
+    document.querySelectorAll('input[name="bodyType"]').forEach(radio => {
+        radio.checked = radio.value === bodyType;
+    });
+
+    // ④ Body 本文エリアを切り替えて表示する
+    switch (bodyType) {
+        case 'raw':
+            document.getElementById('rawBody').style.display = 'block';
+            document.getElementById('jsonBody').parentElement.style.display = 'none';
+            document.getElementById('formDataContainer').style.display = 'none';
+            break;
+        case 'json':
+            document.getElementById('rawBody').style.display = 'none';
+            document.getElementById('jsonBody').parentElement.style.display = 'block';
+            document.getElementById('formDataContainer').style.display = 'none';
+            break;
+        case 'form-data':
+            document.getElementById('rawBody').style.display = 'none';
+            document.getElementById('jsonBody').parentElement.style.display = 'none';
+            document.getElementById('formDataContainer').style.display = 'block';
+            break;
+        case 'urlencoded':
+            document.getElementById('rawBody').style.display = 'none';
+            document.getElementById('jsonBody').parentElement.style.display = 'none';
+            document.getElementById('formDataContainer').style.display = 'block';
+            break;
+        default:
+            // none
+            document.getElementById('rawBody').style.display = 'none';
+            document.getElementById('jsonBody').parentElement.style.display = 'none';
+            document.getElementById('formDataContainer').style.display = 'none';
+            break;
+    }
+
+    // ⑤ Body の中身をセット（たとえば rawBody, jsonBody の textarea に request.body を入れる）
+    document.getElementById('rawBody').value = request.body || '';
+    document.getElementById('jsonBody').value = request.body || '';
+    // ※ form-data / urlencoded 用コンテナは populate するときに独自実装が必要
+
     // タブをリクエストタブに切り替え
     switchMainTab('request');
 }
@@ -174,55 +244,55 @@ export async function executeTestScript(responseData) {
  * sendRequest (XHR 版)
  *  プリリクエストスクリプトを実行 → XMLHttpRequest で送信 → レスポンス表示 → テストスクリプト → 履歴保存
  */
-export async function sendRequest() {
+/**
+ * sendRequest
+ *  引数 requestObj を使って XHR 送信を行うバージョン
+ *  （引数に state.currentRequest などを渡す想定）
+ *
+ *  例：
+ *    // これまで
+ *    // await sendRequest();
+ *
+ *    // これから
+ *    await sendRequest(state.currentRequest);
+ */
+export async function sendRequest(requestObj) {
     try {
         showLoading(true);
 
         // 必須チェック: URL が空でないか
-        if (!state.currentRequest.url.trim()) {
+        if (!requestObj.url || !requestObj.url.trim()) {
             showError('URL is required');
             return;
         }
 
-        // ① bodyType の選択状況を反映
-        const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
-        state.currentRequest.body = null; // まずクリア
-
-        switch (bodyType) {
-            case 'raw':
-                state.currentRequest.body = document.getElementById('rawBody').value;
-                break;
-            case 'json':
-                state.currentRequest.body = document.getElementById('jsonBody').value;
-                break;
-            case 'form-data':
-            case 'urlencoded':
-                // collectKeyValues でオブジェクトを作り、
-                // buildFetchOptions 内でボディ文字列を組み立てる想定
-                break;
-            default:
-                // none の場合は body を null にしておく
-                break;
-        }
+        // 2. 変数置換後のリクエストを生成
+        //    引数として渡された requestObj をコピーせずそのまま使う場合は注意が必要ですが、
+        //    ここでは参照を壊さないよう、processVariables 内でコピーされる想定です。
+        let processedRequest = processVariables(requestObj);
 
         // 1. プリリクエストスクリプト実行
-        await executePreRequestScript();
+        processedRequest = await executePreRequestScript(processedRequest);
 
-        // 2. 変数置換後のリクエストを生成
-        const processedRequest = processVariables(state.currentRequest);
+        // 3. XHR 用オプションを作成
+        //    buildFetchOptions は { method, headers, bodyData } を返す想定です
+        const opts = buildFetchOptions(processedRequest);
+        if (!opts) {
+            // JSON 検証などでオプション組み立てに失敗した場合は null が返ってくる
+            return;
+        }
 
-        // 3. XHR オプションを作成
-        //    buildFetchOptions で { method, headers, bodyData } の形を返すようにしておく
-        const { method, headers, bodyData } = buildFetchOptions(processedRequest);
+        const { method, headers, bodyData } = opts;
 
         // 4. XMLHttpRequest で送信（タイムアウト付き）
         const url = processedRequest.url;
         const startTime = Date.now();
 
+        // ここで Promise 化して非同期に待つ
         const responseData = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
 
-            // XHR を open するときに GET/HEAD でも body を後から send に渡せる
+            // GET/HEAD でも send(body) を呼べるが、ブラウザ上は無視される可能性がある
             xhr.open(method, url, true);
 
             // タイムアウト設定 (ミリ秒)
@@ -235,25 +305,22 @@ export async function sendRequest() {
                 }
             }
 
-            // ⑤ リクエスト送信（bodyData が null なら send() に何も渡さない）
+            // リクエスト送信（bodyData が null なら send()）
             if (bodyData != null) {
-                console.log(bodyData);
                 xhr.send(bodyData);
             } else {
                 xhr.send();
             }
 
-            // レスポンス取得時
+            // レスポンス取得時のイベント
             xhr.onreadystatechange = () => {
                 if (xhr.readyState !== 4) return;
 
                 const duration = Date.now() - startTime;
 
-                // ステータスが 0 のときはネットワークエラーなど
                 if (xhr.status !== 0) {
-                    // レスポンスヘッダーをパース
+                    // レスポンスヘッダーをパースしてオブジェクトに変換
                     const rawHeaders = xhr.getAllResponseHeaders();
-                    // ヘッダーをオブジェクトに変換
                     const headerLines = rawHeaders.trim().split(/[\r\n]+/);
                     const headerObj = {};
                     headerLines.forEach(line => {
@@ -266,13 +333,17 @@ export async function sendRequest() {
                     // レスポンス本文を取得
                     const text = xhr.responseText || '';
 
-                    // processResponse が期待する形式に合わせてオブジェクト化
+                    // Fetch の Response っぽい要素を持つ「疑似レスポンス」を作成
                     const pseudoResponse = {
                         status: xhr.status,
                         statusText: xhr.statusText,
                         headers: {
-                            get: (name) => headerObj[name] || null
-                            // ※ 必要に応じて lower-case 対応を追加
+                            get: (name) => {
+                                // headerObj は大文字小文字そのままなので、両方を試す
+                                return headerObj[name] != null
+                                    ? headerObj[name]
+                                    : headerObj[name.toLowerCase()] || null;
+                            }
                         },
                         text: async () => text,
                         json: async () => {
@@ -286,8 +357,8 @@ export async function sendRequest() {
 
                     resolve({ response: pseudoResponse, duration });
                 } else {
-                    // ネットワークエラーなど
-                    reject(new Error(`Network error or CORS issue (status 0).`));
+                    // ネットワークエラーなど status が 0 のとき
+                    reject(new Error('Network error or CORS issue (status 0).'));
                 }
             };
 
@@ -296,21 +367,21 @@ export async function sendRequest() {
                 reject(new Error('Request timeout'));
             };
 
-            // エラー時
+            // ネットワークエラー時
             xhr.onerror = () => {
                 reject(new Error('Network error'));
             };
         });
 
-        // ⑥ プロミス解決後に processResponse と displayResponse を呼び出し
+        // 5. processResponse と displayResponse を使って結果を表示
         const { response, duration } = responseData;
         const parsed = await processResponse(response, duration);
         displayResponse(parsed);
 
-        // 7. テストスクリプト実行
+        // 6. テストスクリプト実行
         await executeTestScript(parsed);
 
-        // 8. 履歴に保存
+        // 7. 履歴に保存
         await saveToHistory(processedRequest, parsed);
 
     } catch (error) {
@@ -344,7 +415,7 @@ export function buildFetchOptions(request) {
     // if (!['GET', 'HEAD'].includes(method)) {
     if (true) {
         // bodyType の選択状況を取得
-        const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
+        const bodyType = request.bodyType;
 
         switch (bodyType) {
             case 'json': {
@@ -820,9 +891,10 @@ export function runTestCommand(commandString, responseData) {
  *  Pre-request タブに書かれたスクリプトを実行（pm オブジェクト経由で state.currentRequest を操作可能）
  */
 
-export async function executePreRequestScript() {
-    const raw = document.getElementById('preRequestScript')?.value;
-    if (!raw?.trim()) return;
+export async function executePreRequestScript(requestObj) {
+    // 2. リクエストオブジェクト内の preRequestScript を取得
+    const raw = requestObj.preRequestScript || '';
+    if (!raw.trim()) return;
 
     // 行ごとに分割してコマンドを解析
     const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('//'));
@@ -836,7 +908,7 @@ export async function executePreRequestScript() {
                 case 'setUrl': {
                     // args[0] に URL 文字列が入る
                     const newUrl = args.join(' ');
-                    state.currentRequest.url = newUrl;
+                    requestObj.url = newUrl;
                     break;
                 }
 
@@ -844,25 +916,26 @@ export async function executePreRequestScript() {
                     // args[0] = Header 名, args[1..] = 値 (空白を含む可能性を考慮)
                     const headerName = args[0];
                     const headerValue = args.slice(1).join(' ');
-                    state.currentRequest.headers[headerName] = headerValue;
+                    requestObj.headers[headerName] = headerValue;
                     break;
                 }
 
                 case 'removeHeader': {
                     // args[0] = Header 名
                     const headerName = args[0];
-                    delete state.currentRequest.headers[headerName];
+                    delete requestObj.headers[headerName];
                     break;
                 }
 
                 case 'setBody': {
                     // args.join(' ') = JSON 文字列 (または自由テキスト)
                     const text = args.join(' ');
+                    console.log(text);
                     // JSON 解析を試み、失敗すればそのまま文字列をセット
                     try {
-                        state.currentRequest.body = JSON.parse(text);
+                        requestObj.body = JSON.parse(text);
                     } catch {
-                        state.currentRequest.body = text;
+                        requestObj.body = text;
                     }
                     break;
                 }
@@ -873,9 +946,9 @@ export async function executePreRequestScript() {
                     const varName = args[0];
                     const val = getVariable(varName);
                     if (typeof val === 'string') {
-                        state.currentRequest.url = val;
+                        requestObj.url = val;
                     } else {
-                        throw new Error(`変数「${varName}」が文字列ではありません`);
+                        throw new Error(`変数「${varName}」が変数ではありません`);
                     }
                     break;
                 }
@@ -887,9 +960,9 @@ export async function executePreRequestScript() {
                     const varName = args[1];
                     const val = getVariable(varName);
                     if (typeof val === 'string') {
-                        state.currentRequest.headers[headerName] = val;
+                        requestObj.headers[headerName] = val;
                     } else {
-                        throw new Error(`変数「${varName}」が文字列ではありません`);
+                        throw new Error(`変数「${varName}」が変数ではありません`);
                     }
                     break;
                 }
@@ -899,7 +972,7 @@ export async function executePreRequestScript() {
                     // 例: setBodyWithVar requestPayload
                     const varName = args[0];
                     const val = getVariable(varName);
-                    state.currentRequest.body = val;
+                    requestObj.body = val;
                     break;
                 }
 
@@ -911,6 +984,7 @@ export async function executePreRequestScript() {
         console.error('Pre-request script 実行エラー:', error);
         showError('Pre-request script エラー: ' + error.message);
     }
+    return requestObj;
 }
 /**
  * createTestPmObject

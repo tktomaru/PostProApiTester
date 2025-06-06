@@ -90,7 +90,10 @@ export async function addRequestToCollection(collectionId) {
         headers: {},
         params: {},
         body: null,
-        auth: { type: 'none' }
+        bodyType: "none",
+        auth: {},
+        type: 'none',
+        preRequestScript: "",
     };
 
     collection.requests.push(newRequest);

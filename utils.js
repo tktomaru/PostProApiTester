@@ -2,7 +2,7 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // 汎用ユーティリティ関数群、タブ切り替え、イベント登録、一部の小さなヘルパーをまとめる
 // state.js を動的にインポートしてstate.currentRequest を取得
-import { state } from './state.js';
+import { state, saveCollectionsToStorage } from './state.js';
 import { displayResponse, saveCurrentRequest } from './requestManager.js';
 import { createNewCollection } from './collectionManager.js';
 import { clearHistory } from './historyManager.js';
@@ -120,11 +120,69 @@ export async function updateRequestData(type) {
         state.currentRequest.headers = collectKeyValues('headersContainer');
     }
 }
+
+
+function setupBodyTypeListener() {
+    document.querySelectorAll('input[name="bodyType"]').forEach(radio => {
+        radio.addEventListener('change', async () => {
+            // 選択されたラジオの value を取得
+            const selected = document.querySelector('input[name="bodyType"]:checked').value;
+
+            // state.currentRequest に反映
+            state.currentRequest.bodyType = selected;
+
+            // コレクション内の該当リクエストにも同期
+            const col = state.collections.find(c => c.id === state.currentCollection);
+            if (col) {
+                const req = col.requests.find(r => r.id === state.currentRequest.id);
+                if (req) {
+                    req.bodyType = selected;
+                }
+            }
+
+            // ストレージ保存
+            await saveCollectionsToStorage();
+            showSuccess(`Body Type を "${selected}" に切り替えました`);
+
+            // 表示部分も切り替える
+            switch (selected) {
+                case 'raw':
+                    document.getElementById('rawBody').style.display = 'block';
+                    document.getElementById('jsonBody').parentElement.style.display = 'none';
+                    document.getElementById('formDataContainer').style.display = 'none';
+                    break;
+                case 'json':
+                    document.getElementById('rawBody').style.display = 'none';
+                    document.getElementById('jsonBody').parentElement.style.display = 'block';
+                    document.getElementById('formDataContainer').style.display = 'none';
+                    break;
+                case 'form-data':
+                    document.getElementById('rawBody').style.display = 'none';
+                    document.getElementById('jsonBody').parentElement.style.display = 'none';
+                    document.getElementById('formDataContainer').style.display = 'block';
+                    break;
+                case 'urlencoded':
+                    document.getElementById('rawBody').style.display = 'none';
+                    document.getElementById('jsonBody').parentElement.style.display = 'none';
+                    document.getElementById('formDataContainer').style.display = 'block';
+                    break;
+                default:
+                    document.getElementById('rawBody').style.display = 'none';
+                    document.getElementById('jsonBody').parentElement.style.display = 'none';
+                    document.getElementById('formDataContainer').style.display = 'none';
+                    break;
+            }
+        });
+    });
+}
+
 /**
  * setupEventListeners
  *  ページ全体で使う「クリック・入力」などのイベントを一度にまとめる
  */
 export function setupEventListeners() {
+    // BodyTypeのリスナ登録
+    setupBodyTypeListener();
     // Save ボタンのクリック登録
     const saveBtn = document.getElementById('saveBtn');
     if (saveBtn) {
