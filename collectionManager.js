@@ -232,6 +232,16 @@ export function renderCollectionsTree() {
         nameSpan.textContent = col.name;
         colDiv.appendChild(nameSpan);
 
+        // ◆ Add to Request ボタン追加
+        const addToCollectionBtn = document.createElement('span');
+        addToCollectionBtn.className = 'request-collection-request-create-btn';
+        addToCollectionBtn.textContent = '🌱';
+        addToCollectionBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
+            addRequestToCollection(state.currentCollection);
+        });
+        colDiv.appendChild(addToCollectionBtn);
+
         // 追加：削除ボタン（🗑️）
         const deleteBtn = document.createElement('span');
         deleteBtn.className = 'collection-delete-btn';
@@ -285,11 +295,11 @@ export function renderCollectionsTree() {
                 addToScenarioBtn.textContent = '🌱';
                 addToScenarioBtn.addEventListener('click', (e) => {
                     e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
-                    const scenario = state.scenarios.find(s => s.id === state.currentScenario);
-                    if (scenario && scenario.requests) {
-                        const idx2 = scenario.requests.findIndex(r => r.id === req.id);
+                    const currentCollection = state.collections.find(s => s.id === state.currentCollection);
+                    if (currentCollection && currentCollection.requests) {
+                        const idx2 = currentCollection.requests.findIndex(r => r.id === req.id);
                         if (idx2 !== -1) {
-                            addRequestToScenario(scenario.requests[idx2]);
+                            addRequestToScenario(currentCollection.requests[idx2]);
                         }
                     }
                 });
@@ -300,11 +310,11 @@ export function renderCollectionsTree() {
                 li.addEventListener('click', (e) => {
                     e.stopPropagation(); // 上位のコレクションクリックと衝突しないように
 
-                    const scenario = state.scenarios.find(s => s.id === state.currentScenario);
-                    if (scenario && scenario.requests) {
-                        const idx2 = scenario.requests.findIndex(r => r.id === req.id);
+                    const currentCollection = state.collections.find(s => s.id === state.currentCollection);
+                    if (currentCollection && currentCollection.requests) {
+                        const idx2 = currentCollection.requests.findIndex(r => r.id === req.id);
                         if (idx2 !== -1) {
-                            loadCollectionRequest(scenario.requests[idx2]);
+                            loadCollectionRequest(currentCollection.requests[idx2]);
                         }
                     }
                 });

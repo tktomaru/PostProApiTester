@@ -34,7 +34,7 @@ export function loadRequestIntoEditor(request) {
     state.currentRequest.body = request.body;
     state.currentRequest.auth = { ...request.auth };
     // ① リクエスト ID を表示する
-    const idDisplay = document.getElementById('requestIdDisplay');
+    const idDisplay = document.getElementById('request-id-display');
     if (idDisplay) {
         // 例：<span>Request ID: <em>...</em></span> の <em> 部分を書き換え
         idDisplay.innerHTML = `<span>Request ID: <em>${request.id}</em></span>`;

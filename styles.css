@@ -197,6 +197,31 @@ body {
 }
 
 /* ──────────────────────────────────────
+   リクエスト追加ボタン（アイコン）のスタイル
+──────────────────────────────────────── */
+.request-collection-request-create-btn {
+    position: absolute;
+    /* 削除ボタンが right:8px なので、その右隣に配置するため 32px に設定 */
+    right: 32px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: #28a745;
+    /* 例：追加は緑で目立たせる */
+    padding: 2px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.request-collection-request-create-btn:hover {
+    background-color: rgba(255, 0, 0, 0.1);
+}
+
+/* アクティブなコレクション配下のリクエスト行なら色を少し濃く */
+.collection-item.active .request-collection-request-create-btn {
+    color: #d00;
+}
+
+/* ──────────────────────────────────────
    シナリオ追加ボタン（アイコン）のスタイル
 ──────────────────────────────────────── */
 .request-scenario-create-btn {
