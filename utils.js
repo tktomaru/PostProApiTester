@@ -136,7 +136,31 @@ export function setupEventListeners() {
     // Send ボタン
     document.getElementById('sendBtn').addEventListener('click', async () => {
         const { sendRequest } = await import('./requestManager.js');
-        sendRequest();
+
+
+        let requestObj = state.currentRequest;
+        // ① bodyType の選択状況を反映し、requestObj.body を適宜セット
+        const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
+        // ここで requestObj.body を毎回クリアしておく
+        requestObj.body = null;
+
+        switch (bodyType) {
+            case 'raw':
+                requestObj.body = document.getElementById('rawBody').value;
+                break;
+            case 'json':
+                requestObj.body = document.getElementById('jsonBody').value;
+                break;
+            // form-data / urlencoded の場合はあとで collectKeyValues() で組み立てる想定
+            case 'form-data':
+            case 'urlencoded':
+                break;
+            default:
+                // none の場合は body を null のままに
+                break;
+        }
+
+        sendRequest(requestObj);
     });
     // メソッド・URL 更新時
     document.getElementById('methodSelect').addEventListener('change', e => {
