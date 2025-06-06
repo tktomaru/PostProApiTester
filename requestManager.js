@@ -322,94 +322,6 @@ export async function sendRequest() {
 }
 
 /**
- * sendRequest
- *  プリリクエストスクリプトを実行 → リクエストを送信 → レスポンスを表示 → テストスクリプトを実行 → 履歴に保存
- */
-// export async function sendRequestFetch() {
-//     try {
-//         showLoading(true);
-
-//         // 必須チェック: URL が空でないか
-//         if (!state.currentRequest.url.trim()) {
-//             showError('URL is required');
-//             return;
-//         }
-
-//         // ① bodyType の選択状況を反映
-//         const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
-//         state.currentRequest.body = null; // まずクリア
-
-//         switch (bodyType) {
-//             case 'raw':
-//                 state.currentRequest.body = document.getElementById('rawBody').value;
-//                 break;
-
-//             case 'json':
-//                 state.currentRequest.body = document.getElementById('jsonBody').value;
-//                 break;
-
-//             case 'form-data':
-//             case 'urlencoded':
-//                 // collectKeyValues('formDataContainer') でオブジェクトを作り、
-//                 // それを buildFetchOptions 内で処理する想定
-//                 // （そのまま state.currentRequest.body には代入しません）
-//                 break;
-
-//             default:
-//                 // none の場合は body を null にしておく
-//                 break;
-//         }
-
-//         // 1. プリリクエストスクリプト実行
-//         await executePreRequestScript();
-
-//         // 2. 変数置換後のリクエストを生成
-//         const processedRequest = processVariables(state.currentRequest);
-
-//         // 3. fetch オプションを作成
-//         const fetchOptions = buildFetchOptions(processedRequest);
-
-//         // 4. リクエスト送信（タイムアウト付き）
-//         const startTime = Date.now();
-//         const controller = new AbortController();
-//         const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-//         let response;
-//         try {
-//             fetchOptions.signal = controller.signal;
-//             response = await fetch(processedRequest.url, fetchOptions);
-
-//             clearTimeout(timeoutId);
-//         } catch (error) {
-//             clearTimeout(timeoutId);
-//             if (error.name === 'AbortError') {
-//                 throw new Error('Request timeout');
-//             }
-//             throw error;
-//         }
-//         const duration = Date.now() - startTime;
-
-//         // 5. レスポンス解析
-//         const responseData = await processResponse(response, duration);
-
-//         // 6. レスポンス表示
-//         displayResponse(responseData);
-
-//         // 7. テストスクリプト実行
-//         await executeTestScript(responseData);
-
-//         // 8. 履歴に保存
-//         await saveToHistory(processedRequest, responseData);
-
-//     } catch (error) {
-//         showError('Request failed: ' + error.message);
-//         console.error('Request error:', error);
-//     } finally {
-//         showLoading(false);
-//     }
-// }
-
-/**
  * buildFetchOptions
  *  引数のリクエスト情報をもとに、XHR 送信用の { method, headers, bodyData } を返す
  *  bodyData は文字列または FormData／URLSearchParams のいずれか、  
@@ -499,74 +411,6 @@ export function buildFetchOptions(request) {
 }
 
 /**
- * buildFetchOptions
- *  リクエスト情報をもとに fetch 用のオプション（method, headers, body 等）を組み立てる
- */
-// export function buildFetchOptions(request) {
-//     const options = {
-//         method: request.method,
-//         headers: {}
-//     };
-
-//     // カスタムヘッダを追加
-//     Object.assign(options.headers, request.headers);
-
-//     // 認証ヘッダを追加
-//     addAuthenticationHeaders(options.headers, request.auth);
-
-//     // GET,POST/PUT/PATCH では Body を追加
-//     if (['GET', 'POST', 'PUT', 'PATCH'].includes(request.method)) {
-//         const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
-//         switch (bodyType) {
-
-//             case 'json':
-//                 // ==== JSON 検証ロジックを追加 ====
-//                 const rawText = request.body?.trim();
-//                 if (rawText) {
-//                     try {
-//                         // JSON.parse して検証
-//                         JSON.parse(rawText);
-//                         // 正常にパースできれば、そのまま送信
-//                         options.body = rawText;
-//                         if (!options.headers['Content-Type']) {
-//                             options.headers['Content-Type'] = 'application/json';
-//                         }
-//                     } catch (e) {
-//                         // パースに失敗したらエラーを表示し、そのリクエストは中断する
-//                         showError('不正な JSON です');
-//                         // 中断のため、fetch に渡すオプションを null にする（sendRequest で検出できるように）
-//                         return null;
-//                     }
-//                 }
-//                 break;
-//             case 'raw':
-//                 options.body = request.body;
-//                 break;
-//             case 'form-data':
-//                 const formData = new FormData();
-//                 const formFields = collectKeyValues('formDataContainer');
-//                 Object.entries(formFields).forEach(([key, value]) => {
-//                     formData.append(key, value);
-//                 });
-//                 options.body = formData;
-//                 delete options.headers['Content-Type'];
-//                 break;
-//             case 'urlencoded':
-//                 const params = new URLSearchParams();
-//                 const urlEncodedFields = collectKeyValues('formDataContainer');
-//                 Object.entries(urlEncodedFields).forEach(([key, value]) => {
-//                     params.append(key, value);
-//                 });
-//                 options.body = params;
-//                 options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-//                 break;
-//         }
-//     }
-
-//     return options;
-// }
-
-/**
  * addAuthenticationHeaders
  *  state.currentRequest.auth に応じて Authorization ヘッダなどを追加する
  */
@@ -597,18 +441,16 @@ export function addAuthenticationHeaders(headers, auth) {
             }
             break;
     }
-}
-
-/**
+}/**
  * processResponse
- *  fetch あるいは XHR で返された疑似レスポンスオブジェクトをパースし、
+ *  XHR で返された疑似レスポンスオブジェクト（または Fetch の Response）をパースし、
  *  status, headers, body 等を返す
  */
 export async function processResponse(response, duration) {
     const responseData = {
         status: response.status,
         statusText: response.statusText,
-        headers: {},
+        headers: {},   // 実際のすべてのヘッダーを小文字キーにして格納する
         duration: duration,
         size: 0,
         body: null,
@@ -616,40 +458,43 @@ export async function processResponse(response, duration) {
     };
 
     // ─────────────────────────────────────────────────────────────
-    // ヘッダを読み込み（Fetch の Headers か、plain object かで分岐）
+    // ① レスポンスヘッダーの取り込み
+    //    - Fetch の場合: response.headers.forEach が使える
+    //    - XHR 偽装レスポンスの場合: response.headers は { get: func } のみなので、
+    //      そのときは response._headerObj という内部に隠されたオブジェクトから読み出す想定
     if (response.headers) {
-        // Fetch の場合: response.headers.forEach が存在する
         if (typeof response.headers.forEach === 'function') {
+            // Fetch の Headers オブジェクト
             response.headers.forEach((value, key) => {
-                responseData.headers[key] = value;
+                responseData.headers[key.toLowerCase()] = value;
             });
-        }
-        // XHR 偽装レスポンスで plain object の場合
-        else {
-            for (const [key, value] of Object.entries(response.headers)) {
-                responseData.headers[key] = value;
+        } else if (response._headerObj && typeof response._headerObj === 'object') {
+            // XHR 偽装レスポンスで、sendRequest 側で _headerObj を格納しているケース
+            // (例: sendRequest 内で headerObj を作成したあと、response._headerObj = headerObj としている)
+            Object.entries(response._headerObj).forEach(([rawKey, value]) => {
+                responseData.headers[rawKey.toLowerCase()] = value;
+            });
+        } else {
+            // 万一どちらにも該当しない場合は「response.headers」自体を plain object とみなし、
+            // get プロパティはスキップしてコピー
+            for (const [rawKey, value] of Object.entries(response.headers)) {
+                if (rawKey === 'get' && typeof value === 'function') continue;
+                responseData.headers[rawKey.toLowerCase()] = value;
             }
         }
     }
 
     // ─────────────────────────────────────────────────────────────
-    // ボディを読み込み
-    // contentType は header.get を使って取得する。
-    // XHR 偽装レスポンスでも response.headers.get があれば正しく取得できる設計を想定
-    let contentType = '';
-    if (typeof response.headers.get === 'function') {
-        contentType = response.headers.get('content-type') || '';
-    } else {
-        // 万一 .get がなければ直接 object から
-        contentType = responseData.headers['content-type'] || '';
-    }
+    // ② contentType を取得
+    const contentType = responseData.headers['content-type'] || '';
 
     try {
-        // text() メソッドが使える前提。Fetch レスポンスも、XHR 偽装レスポンスも
-        // text() が async で文字列を返すように作ってある
+        // ③ レスポンス本文を文字列として取得
+        //    Fetch の場合も XHR 偽装レスポンスの場合も、response.text() が使える想定
         responseData.bodyText = await response.text();
         responseData.size = new Blob([responseData.bodyText]).size;
 
+        // ④ Content-Type に応じて body をオブジェクト化
         if (contentType.includes('application/json')) {
             try {
                 responseData.body = JSON.parse(responseData.bodyText);
@@ -666,50 +511,6 @@ export async function processResponse(response, duration) {
 
     return responseData;
 }
-
-/**
- * processResponse
- *  fetch から返された Response オブジェクトをパースし、status, headers, body 等を返す
- */
-// export async function processResponse(response, duration) {
-//     const responseData = {
-//         status: response.status,
-//         statusText: response.statusText,
-//         headers: {},
-//         duration: duration,
-//         size: 0,
-//         body: null,
-//         bodyText: ''
-//     };
-
-//     // ヘッダを読み込み
-//     response.headers.forEach((value, key) => {
-//         responseData.headers[key] = value;
-//     });
-
-//     // ボディを読み込み
-//     const contentType = response.headers.get('content-type') || '';
-//     try {
-//         responseData.bodyText = await response.text();
-//         responseData.size = new Blob([responseData.bodyText]).size;
-
-//         if (contentType.includes('application/json')) {
-//             try {
-//                 responseData.body = JSON.parse(responseData.bodyText);
-//             } catch (e) {
-//                 responseData.body = responseData.bodyText;
-//             }
-//         } else {
-//             responseData.body = responseData.bodyText;
-//         }
-//     } catch (error) {
-//         responseData.bodyText = 'Error reading response body';
-//         responseData.body = null;
-//     }
-
-//     return responseData;
-// }
-
 /**
  * displayResponse
  *  画面右側に「ステータス・時間・サイズ」「Body／Headers／Cookies／Tests」の各タブを描画する

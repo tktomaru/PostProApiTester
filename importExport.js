@@ -236,42 +236,110 @@ async function importPostmanCollection(data) {
     renderCollectionsTree();         // サイドバーのコレクション描画
 }
 
+
+/**
+ * Talend JSON をインポートして、既存の state.collections・state.environments に
+ * 追加保存するように修正したバージョン
+ */
+
 async function importTalendData(talend) {
-    // ① Project → Service → Request のマッピング
+    // ① Project ノードを探す
     const project = talend.entities.find(e => e.entity.type === 'Project');
     if (!project) throw new Error('Talend JSON に Project が見つかりません');
-    const collections = project.children
-        .filter(s => s.entity.type === 'Service')
-        .map(serviceNode => {
-            const svc = serviceNode.entity;
-            const requests = (serviceNode.children || [])
+
+    // ② Service および Scenario ノードを分けてマッピングする
+    const collectionsToAdd = [];
+    const scenariosToAdd = [];
+
+    project.children.forEach(childNode => {
+        const { entity, children } = childNode;
+
+        // ──────────────
+        // (A) Service → Collections
+        // ──────────────
+        if (entity.type === 'Service') {
+            const svc = entity;
+            const requests = (children || [])
                 .filter(r => r.entity.type === 'Request')
                 .map(rNode => {
                     const e = rNode.entity;
-                    // Talend では必ず bodyType:"Text" なので、TextBody を body にそのまま使う
                     return {
                         id: e.id,
                         name: e.name,
                         method: e.method.name,
                         url: e.uri.path,
-                        headers: (e.headers || []).filter(h => h.enabled).reduce((acc, h) => {
-                            acc[h.name] = h.value;
-                            return acc;
-                        }, {}),
+                        headers: (e.headers || [])
+                            .filter(h => h.enabled)
+                            .reduce((acc, h) => {
+                                acc[h.name] = h.value;
+                                return acc;
+                            }, {}),
                         params: {},
-                        body: e.body.textBody || '',
+                        body: (e.body && e.body.textBody) || '',
                         auth: { type: 'none' }
                     };
                 });
-            return {
+
+            collectionsToAdd.push({
                 id: svc.id,
                 name: svc.name,
                 description: '',
                 requests
-            };
-        });
+            });
+        }
 
-    // ② 環境変数のマッピング
+        // ──────────────
+        // (B) Scenario → Scenarios
+        // ──────────────
+        else if (entity.type === 'Scenario') {
+            const sce = entity;
+            const scenarioRequests = (children || [])
+                .filter(r => r.entity.type === 'Request')
+                .map(rNode => {
+                    const e = rNode.entity;
+                    return {
+                        id: e.id,
+                        name: e.name,
+                        method: e.method.name,
+                        url: e.uri.path,
+                        headers: (e.headers || [])
+                            .filter(h => h.enabled)
+                            .reduce((acc, h) => {
+                                acc[h.name] = h.value;
+                                return acc;
+                            }, {}),
+                        params: {},
+                        body: (e.body && e.body.textBody) || '',
+                        auth: { type: 'none' }
+                    };
+                });
+
+            scenariosToAdd.push({
+                id: sce.id,
+                name: sce.name,
+                description: '',       // 必要に応じて description を追加しても構いません
+                requests: scenarioRequests
+            });
+        }
+    });
+
+    // ③ 既存の state.collections に追加してストレージへ保存
+    if (collectionsToAdd.length > 0) {
+        state.collections.push(...collectionsToAdd);
+        await saveCollectionsToStorage();
+    }
+
+    // ④ 既存の state.scenarios に追加してストレージへ保存
+    if (!Array.isArray(state.scenarios)) {
+        // state.scenarios が未定義なら初期化
+        state.scenarios = [];
+    }
+    if (scenariosToAdd.length > 0) {
+        state.scenarios.push(...scenariosToAdd);
+        await saveScenariosToStorage();
+    }
+
+    // ⑤ 環境変数のマッピング（従来どおり）
     const environments = (talend.environments || []).map(envNode => {
         const vars = Object.values(envNode.variables || {}).reduce((acc, v) => {
             if (v.enabled) acc[v.name] = { value: v.value, description: '' };
@@ -284,19 +352,17 @@ async function importTalendData(talend) {
         };
     });
 
-    // ③ 変換結果を当方の state に登録してストレージに保存
-    //    （saveCollectionsToStorage / saveEnvironmentsToStorage などを使う）
-    state.collections.splice(0, state.collections.length, ...collections);
-    await saveCollectionsToStorage();
+    if (environments.length > 0) {
+        state.environments.push(...environments);
+        await saveEnvironmentsToStorage();
+    }
 
-    state.environments.splice(0, state.environments.length, ...environments);
-    await saveEnvironmentsToStorage();
-
+    // ⑥ 画面表示を更新
     updateCollectionVarSelector();
     renderEnvironmentSelector();
     renderAllVariables();
-    renderCollectionsTree();         // サイドバーのコレクション描画
-
+    renderCollectionsTree();   // サイドバーのコレクション描画
+    renderScenariosList();     // ** ← 追加：シナリオの一覧描画関数を呼び出す **
 }
 
 /** importApiTesterData */
