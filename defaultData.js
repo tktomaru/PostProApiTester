@@ -182,6 +182,7 @@ setBody setBodyWithScript3
                 bodyType: "raw",
                 preRequestScript: `
 addHeader test scriptadd1
+// bodyをセットしてもGETリクエストのため送信されない事に注意する
 setBody setBodyWithScript1
   `
             },
@@ -196,11 +197,12 @@ setBody setBodyWithScript1
                 auth: { type: 'none' },
                 bodyType: "json",
                 preRequestScript: `
+// key＝test、value=scriptadd2
 addHeader test scriptadd2
   `
             },
             {
-                id: 'req_sample_post2_3',
+                id: 'req_sample_get2_3',
                 name: 'サンプル GET',
                 method: 'GET',
                 url: 'https://reply.tukutano.jp/items?page=12',
@@ -211,6 +213,7 @@ addHeader test scriptadd2
                 bodyType: "raw",
                 preRequestScript: `
 addHeader test scriptadd2
+// bodyをセットしてもGETリクエストのため送信されない事に注意する
 setBody setBodyWithScript3
   `
             }
