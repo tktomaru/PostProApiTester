@@ -83,7 +83,7 @@ export async function addRequestToCollection(collectionId) {
     }
 
     const newRequest = {
-        id: Date.now(),
+        id: `req_${Date.now()}_${Math.random().toString(36).substring(2)}`,
         name: name,
         method: 'GET',
         url: '',

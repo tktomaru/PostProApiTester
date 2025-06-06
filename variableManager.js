@@ -195,7 +195,7 @@ export async function createNewEnvironment() {
     if (!name) return;
 
     const env = {
-        id: Date.now().toString(),
+        id: `env_${Date.now()}_${Math.random().toString(36).substring(2)}`,
         name: name,
         created: new Date().toISOString()
     };

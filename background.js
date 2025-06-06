@@ -406,8 +406,7 @@ function buildAuthUrl(config) {
 }
 
 function generateRandomState() {
-    return Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15);
+    return `state_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 }
 
 // Token exchange for OAuth2

@@ -144,7 +144,7 @@ function extractPostmanRequests(items, folder = '') {
     items.forEach(item => {
         if (item.request) {
             const request = {
-                id: Date.now() + Math.random(),
+                id: `req_${Date.now()}_${Math.random().toString(36).substring(2)}`,
                 name: item.name || 'Untitled Request',
                 method: item.request.method || 'GET',
                 url: typeof item.request.url === 'string' ? item.request.url : item.request.url?.raw || '',
@@ -209,7 +209,7 @@ function extractPostmanRequests(items, folder = '') {
 /** importPostmanCollection */
 async function importPostmanCollection(data) {
     const collection = {
-        id: Date.now(),
+        id: `collection_${Date.now()}_${Math.random().toString(36).substring(2)}`,
         name: data.info?.name || 'Imported Collection',
         description: data.info?.description || '',
         requests: []
@@ -325,7 +325,7 @@ async function importApiTesterData(data) {
 /** importOpenApiSpec */
 async function importOpenApiSpec(data) {
     const collection = {
-        id: Date.now(),
+        id: `collection_${Date.now()}_${Math.random().toString(36).substring(2)}`,
         name: data.info?.title || 'OpenAPI Import',
         description: data.info?.description || '',
         requests: []
@@ -337,7 +337,7 @@ async function importOpenApiSpec(data) {
             Object.entries(pathItem).forEach(([method, operation]) => {
                 if (['get', 'post', 'put', 'delete', 'patch', 'head', 'options'].includes(method)) {
                     const request = {
-                        id: Date.now() + Math.random(),
+                        id: `req_${Date.now()}_${Math.random().toString(36).substring(2)}`,
                         name: operation.summary || `${method.toUpperCase()} ${path}`,
                         method: method.toUpperCase(),
                         url: baseUrl + path,
@@ -382,7 +382,7 @@ async function importOpenApiSpec(data) {
 /** importHarFile */
 async function importHarFile(data) {
     const collection = {
-        id: Date.now(),
+        id: `collection_${Date.now()}_${Math.random().toString(36).substring(2)}`,
         name: 'HAR Import - ' + new Date().toLocaleString(),
         description: 'Imported from HAR file',
         requests: []
@@ -393,7 +393,7 @@ async function importHarFile(data) {
             const request = entry.request;
             if (request) {
                 const importedRequest = {
-                    id: Date.now() + Math.random(),
+                    id: `req_${Date.now()}_${Math.random().toString(36).substring(2)}`,
                     name: `${request.method} ${new URL(request.url).pathname}`,
                     method: request.method,
                     url: request.url,

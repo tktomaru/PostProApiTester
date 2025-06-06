@@ -101,7 +101,7 @@ export async function insertRequestIntoScenario(scenarioId, insertIndex) {
     // ③ 深いコピーして、新しいオブジェクトとして挿入
     const newReq = JSON.parse(JSON.stringify(foundReq));
     // 必要なら newReq.id を別のユニーク ID に上書き
-    newReq.id = Date.now() + '_' + Math.random();
+    newReq.id = `req_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
     scenario.requests.splice(insertIndex, 0, newReq);
 
@@ -230,7 +230,7 @@ export async function newScenario() {
     const name = prompt('Enter scenario name:');
     if (!name) return;
 
-    const newId = 'scenario_' + Date.now();
+    const newId = `scenario_${Date.now()}_${Math.random().toString(36).substring(2)}`;
     const newScenario = {
         id: newId,
         name: name,
@@ -258,7 +258,10 @@ export async function addRequestToScenario(req) {
 
     // リクエストを複製して追加（state に直接持たせる）
     const newReq = JSON.parse(JSON.stringify(req));
+
     // ※ 必要であれば newReq.id をユニークに変える
+    //    Date.now() とランダム文字列を組み合わせて一意の ID を作成
+    newReq.id = `req_${Date.now()}_${Math.random().toString(36).substring(2)}`;
     scenario.requests.push(newReq);
     await saveScenariosToStorage();
 
