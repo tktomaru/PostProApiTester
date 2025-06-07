@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Advanced API Tester",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Comprehensive API testing tool with ApiTester and Postman compatibility",
   "permissions": [
     "activeTab",
@@ -18,7 +18,8 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.bundle.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -26,7 +27,7 @@
         "<all_urls>"
       ],
       "js": [
-        "content.js"
+        "dist/content.bundle.js"
       ],
       "run_at": "document_start"
     }
@@ -42,7 +43,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "injected.js"
+        "dist/injected.bundle.js"
       ],
       "matches": [
         "<all_urls>"

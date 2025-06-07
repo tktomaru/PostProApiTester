@@ -84,7 +84,7 @@ setBody setBodyWithScript
 // 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
 addHeader test scriptadd
-addHeader authorization scriptadd-authorization
+addHeader authorization scriptadd-authorization11
 removeHeader removeHeader
 setBody setBodyWithScript1
 //setUrlWithVar apiBaseUrl
@@ -106,13 +106,13 @@ setBody setBodyWithScript1
 // リクエスト/レスポンス実行結果の参照例
 // 前のリクエストのレスポンスから値を取得して使用
 addHeaderWithVar Authorization \${"Sample Collection"."サンプル POST 1"."response"."headers"."authorization"}
-setBodyWithVar \${"Sample Collection"."サンプル POST 1"."response"."body"}
+setBodyWithVar \${"Sample Collection"."サンプル POST 1"."response"."body".jsonPath("$.headers.authorization")}
 
 // 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
 addHeader test scriptadd
 removeHeader removeHeader
-setBody setBodyWithScript2
+//setBody setBodyWithScript2
 //setUrlWithVar apiBaseUrl
 //addHeaderWithVar Authorization authtoken
 //setBodyWithVar requestPayload
@@ -134,15 +134,15 @@ export const sampleCollectionVariables = {
 /** テストスクリプトのサンプル */
 export const sampleTestScript = `
 // ステータスコードが 200 かをチェック
-status 200
+//status 200
 // Authorization ヘッダーの値を取得して、環境変数 authToken に保存
-setVarFromHeader authToken Authorization
+//setVarFromHeader authToken Authorization
 // ボディの JSON に users プロパティがあるかをチェック
-jsonHasProperty users
-jsonArrayLengthEquals users 5
-jsonValueEquals data.id 1234
-bodyContains success
-headerExists Content - Type
+// jsonHasProperty users
+// jsonArrayLengthEquals users 5
+// jsonValueEquals data.id 1234
+// bodyContains success
+// headerExists Content - Type
                 `;
 
 

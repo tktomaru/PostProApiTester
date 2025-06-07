@@ -70,15 +70,40 @@ body {
   ----------------------------------- */
 .sidebar {
     width: 280px;
-    /* 固定幅 */
+    min-width: 200px;
+    max-width: 500px;
     background-color: #f8f9fa;
-    /* 薄いグレー背景 */
     border-right: 1px solid #e0e0e0;
     overflow-y: auto;
-    /* 縦スクロール */
     padding: 0.5rem;
-    /* 内側余白 */
     box-sizing: border-box;
+    resize: horizontal;
+    position: relative;
+}
+
+/* リサイズハンドル */
+.sidebar::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: transparent;
+    cursor: col-resize;
+    transition: background-color 0.2s;
+}
+
+.sidebar::after:hover {
+    background-color: #007bff;
+}
+
+/* メインコンテンツエリア */
+.main-content {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    padding: 1rem;
 }
 
 /* サイドバー上部の「＋ コレクション作成」ボタン */

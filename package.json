@@ -1,0 +1,17 @@
+{
+  "name": "postpro-api-tester",
+  "version": "1.0.0",
+  "description": "API Testing Tool",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dependencies": {
+    "jsonpath-plus": "^7.2.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "vite": "^5.0.0"
+  }
+}
