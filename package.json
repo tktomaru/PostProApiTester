@@ -1,13 +1,14 @@
 {
   "name": "postpro-api-tester",
   "version": "1.0.0",
-  "description": "API Testing Tool",
+  "description": "API Tester Chrome Extension",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
+    "build": "npx vite build",
+    "watch": "npx vite build --watch",
+    "dev": "vite"
   },
   "dependencies": {
-    "jsonpath-plus": "^7.2.0"
+    "jsonpath-plus": "^8.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",

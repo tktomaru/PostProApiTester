@@ -8,22 +8,36 @@ export default defineConfig({
     build: {
         rollupOptions: {
             input: {
-                index: resolve(__dirname, 'index.js'),
                 app: resolve(__dirname, 'app.js'),
                 background: resolve(__dirname, 'background.js'),
                 content: resolve(__dirname, 'content.js'),
-                injected: resolve(__dirname, 'injected.js')
+                injected: resolve(__dirname, 'injected.js'),
+                index: resolve(__dirname, 'index.js')
             },
             output: {
                 entryFileNames: '[name].bundle.js',
-                dir: 'dist'
+                chunkFileNames: '[name].bundle.js',
+                assetFileNames: '[name].[ext]'
             }
-        }
+        },
+        outDir: 'dist',
+        emptyOutDir: true
     },
     plugins: [
         nodeResolve({
             browser: true
         }),
         commonjs()
-    ]
+    ],
+    watch: {
+        include: [
+            '*.js',
+            '*.html',
+            '*.css'
+        ],
+        exclude: [
+            'node_modules/**',
+            'dist/**'
+        ]
+    }
 });

@@ -86,7 +86,7 @@ setUrl https://reply.tukutano.jp/items?page=9
 addHeader test scriptadd
 addHeader authorization scriptadd-authorization11
 removeHeader removeHeader
-setBody setBodyWithScript1
+setBody setBodyWithScript2
 //setUrlWithVar apiBaseUrl
 //addHeaderWithVar Authorization authtoken
 //setBodyWithVar requestPayload
