@@ -551,6 +551,7 @@ export function addVariableRow(scope) {
  * 変数名から値を取得する
  * 例: getVariable('apiBaseUrl') → 'https://api.example.com'
  * 例: getVariable('${"Sample Collection"."サンプル POST 1"."response"."headers"."authorization"}') → 'Bearer xxx...'
+ * 例: getVariable('${"Sample Collection"."サンプル POST 1"."response"."body".jsonPath("$.Headers.host")}') → 'reply.tukutano.jp'
  */
 export function getVariable(varName) {
     // 新しい変数参照形式（${...}）の処理
@@ -584,19 +585,47 @@ export function getVariable(varName) {
 
             // プロパティパスに従って値を取得
             let value = execution;
-            for (const prop of propertyPath) {
+            for (let i = 0; i < propertyPath.length; i++) {
+                const prop = propertyPath[i];
+                console.log("prop", prop);
                 if (value && typeof value === 'object') {
                     // ヘッダーの場合は大文字小文字を区別せずに検索
                     if (prop === 'headers') {
-                        const headerKey = propertyPath[propertyPath.indexOf(prop) + 1];
+                        const headerKey = propertyPath[i + 1];
                         if (headerKey) {
                             const headerKeyLower = headerKey.toLowerCase();
                             const headerValue = Object.entries(value[prop]).find(([k]) => k.toLowerCase() === headerKeyLower)?.[1];
                             if (headerValue !== undefined) {
                                 value = headerValue;
+                                i++; // 次のプロパティ（ヘッダーキー）をスキップ
                                 break;
                             }
                         }
+                        break;
+                    }
+                    // bodyの場合は直接値を返す
+                    if (prop === 'body') {
+                        value = value[prop];
+                        console.log("value", value);
+                        // JSONPathの処理
+                        if (i + 1 < propertyPath.length && propertyPath[i + 1].startsWith('jsonPath(')) {
+                            const jsonPathExpr = propertyPath[i + 1].slice(9, -1); // jsonPath("...") から "..." を抽出
+                            try {
+                                // レスポンスボディをJSONとしてパース
+                                const jsonBody = typeof value === 'string' ? JSON.parse(value) : value;
+                                // JSONPathで値を抽出
+                                const result = jsonPath(jsonBody, jsonPathExpr);
+                                if (result && result.length > 0) {
+                                    value = result[0]; // 最初の結果を返す
+                                } else {
+                                    throw new Error(`JSONPath「${jsonPathExpr}」に一致する値が見つかりません`);
+                                }
+                            } catch (error) {
+                                throw new Error(`JSONPathの処理に失敗しました: ${error.message}`);
+                            }
+                            i++; // jsonPathの処理をスキップ
+                        }
+                        break;
                     }
                     // 通常のプロパティアクセス
                     if (prop in value) {

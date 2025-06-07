@@ -258,7 +258,7 @@ export async function sendRequest(requestObj) {
         let processedRequest = processVariables(requestObj);
 
         // 1. プリリクエストスクリプト実行
-        processedRequest = await executePreRequestScript(processedRequest);
+        processedRequest = await executePreRequestScript(processedRequest.preRequestScript, processedRequest);
 
         // リクエスト実行結果を保存
         const requestExecution = {
@@ -933,103 +933,100 @@ export function runTestCommand(commandString, responseData) {
 
 /**
  * executePreRequestScript
- *  Pre-request タブに書かれたスクリプトを実行（pm オブジェクト経由で state.currentRequest を操作可能）
+ * プリリクエストスクリプトを実行する
+ * @param {string} script - 実行するスクリプト
+ * @param {object} requestObj - リクエストオブジェクト
+ * @returns {object} 更新されたリクエストオブジェクト
  */
-export async function executePreRequestScript(requestObj) {
-    // 2. リクエストオブジェクト内の preRequestScript を取得
-    const raw = requestObj.preRequestScript || '';
-    if (!raw.trim()) return requestObj;
+export function executePreRequestScript(script, requestObj) {
+    if (!script) return requestObj;
 
-    // 行ごとに分割してコマンドを解析
-    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('//'));
+    const lines = script.split('\n');
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine || trimmedLine.startsWith('//')) continue;
 
-    try {
-        for (const line of lines) {
-            // 空白で先頭コマンドと引数を分割
-            const [cmd, ...args] = line.split(/\s+/);
+        // コマンドと引数を分離（最初の空白までをコマンドとして扱う）
+        const firstSpaceIndex = trimmedLine.indexOf(' ');
+        if (firstSpaceIndex === -1) {
+            console.warn(`Invalid command format: ${trimmedLine}`);
+            continue;
+        }
 
-            switch (cmd) {
-                case 'setUrl': {
-                    // args[0] に URL 文字列が入る
-                    const newUrl = args.join(' ');
-                    requestObj.url = newUrl;
+        const command = trimmedLine.substring(0, firstSpaceIndex);
+        const argsString = trimmedLine.substring(firstSpaceIndex + 1).trim();
+        console.log('Executing command:', command, argsString);
+
+        try {
+            switch (command) {
+                case 'setUrlWithVar':
+                    if (!argsString) {
+                        console.warn('setUrlWithVar requires a variable name');
+                        continue;
+                    }
+                    const urlValue = getVariable(argsString);
+                    if (urlValue === undefined) {
+                        throw new Error(`変数「${argsString}」が変数ではありません`);
+                    }
+                    requestObj.url = urlValue;
                     break;
-                }
 
-                case 'addHeader': {
-                    // args[0] = Header 名, args[1..] = 値 (空白を含む可能性を考慮)
-                    const headerName = args[0];
-                    const headerValue = args.slice(1).join(' ');
+                case 'addHeader':
+                    if (!argsString) {
+                        console.warn('addHeader requires a header name and value');
+                        continue;
+                    }
+                    // 最初の空白までをヘッダー名として扱う
+                    const headerNameEndIndex = argsString.indexOf(' ');
+                    if (headerNameEndIndex === -1) {
+                        console.warn('addHeader requires both header name and value');
+                        continue;
+                    }
+                    const headerName = argsString.substring(0, headerNameEndIndex);
+                    const headerValue = argsString.substring(headerNameEndIndex + 1).trim();
                     requestObj.headers[headerName] = headerValue;
                     break;
-                }
 
-                case 'removeHeader': {
-                    // args[0] = Header 名
-                    const headerName = args[0];
-                    delete requestObj.headers[headerName];
-                    break;
-                }
-
-                case 'setBody': {
-                    // args.join(' ') = JSON 文字列 (または自由テキスト)
-                    const text = args.join(' ');
-                    console.log(text);
-                    // JSON 解析を試み、失敗すればそのまま文字列をセット
-                    try {
-                        requestObj.body = JSON.parse(text);
-                    } catch {
-                        requestObj.body = text;
+                case 'addHeaderWithVar':
+                    if (!argsString) {
+                        console.warn('addHeaderWithVar requires a header name and variable name');
+                        continue;
                     }
-                    break;
-                }
-
-                case 'setUrlWithVar': {
-                    // 「setUrlWithVar VAR_NAME」で、環境変数から取り出した文字列を URL に設定
-                    // 例: setUrlWithVar apiBaseUrl
-                    const varName = args[0];
-                    const val = getVariable(varName);
-                    if (typeof val === 'string') {
-                        requestObj.url = val;
-                    } else {
-                        throw new Error(`変数「${varName}」が変数ではありません`);
+                    // 最初の空白までをヘッダー名として扱う
+                    const headerVarNameEndIndex = argsString.indexOf(' ');
+                    if (headerVarNameEndIndex === -1) {
+                        console.warn('addHeaderWithVar requires both header name and variable name');
+                        continue;
                     }
-                    break;
-                }
-
-                case 'addHeaderWithVar': {
-                    // 「addHeaderWithVar HEADER_NAME VAR_NAME」で、VAR_NAME 変数の値をヘッダー値に設定
-                    // 例: addHeaderWithVar Authorization authToken
-                    const headerName = args[0];
-                    const varName = args.slice(1).join(' '); // 変数名に空白が含まれる可能性を考慮
-                    const val = getVariable(varName);
-                    if (typeof val === 'string') {
-                        requestObj.headers[headerName] = val;
-                    } else {
-                        throw new Error(`変数「${varName}」が変数ではありません`);
+                    const headerVarName = argsString.substring(0, headerVarNameEndIndex);
+                    const headerVarValue = argsString.substring(headerVarNameEndIndex + 1).trim();
+                    const headerVarResult = getVariable(headerVarValue);
+                    if (headerVarResult === undefined) {
+                        throw new Error(`変数「${headerVarValue}」が変数ではありません`);
                     }
+                    requestObj.headers[headerVarName] = headerVarResult;
                     break;
-                }
 
-                case 'setBodyWithVar': {
-                    // 「setBodyWithVar VAR_NAME」で、VAR_NAME 変数の値をボディに設定
-                    const varName = args.join(' '); // 変数名に空白が含まれる可能性を考慮
-                    const val = getVariable(varName);
-                    if (val !== undefined) {
-                        requestObj.body = val;
-                    } else {
-                        throw new Error(`変数「${varName}」が変数ではありません`);
+                case 'setBodyWithVar':
+                    if (!argsString) {
+                        console.warn('setBodyWithVar requires a variable name');
+                        continue;
                     }
+                    console.log("argsString", argsString);
+                    const bodyValue = getVariable(argsString);
+                    if (bodyValue === undefined) {
+                        throw new Error(`変数「${argsString}」が変数ではありません`);
+                    }
+                    requestObj.body = bodyValue;
                     break;
-                }
 
                 default:
-                    console.warn(`Unknown command: ${cmd}`);
+                    console.warn(`Unknown command: ${command}`);
             }
+        } catch (error) {
+            console.error('Pre-request script 実行エラー:', error);
+            throw error;
         }
-    } catch (error) {
-        console.error('Pre-request script 実行エラー:', error);
-        throw error;
     }
 
     return requestObj;

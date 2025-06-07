@@ -55,7 +55,7 @@ addHeaderWithVar Authorization \${"Sample Collection"."POST Users"."request"."he
 setVarFromHeader statusCode \${"Sample Collection"."POST Users"."response"."status"}
 
 // レスポンスのボディから値を取得
-setBodyWithVar token \${"Sample Collection"."POST Users"."response"."body"."token"}
+setBodyWithVar \${"Sample Collection"."POST Users"."response"."body"."token"}
 
 // 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
@@ -106,7 +106,7 @@ setBody setBodyWithScript1
 // リクエスト/レスポンス実行結果の参照例
 // 前のリクエストのレスポンスから値を取得して使用
 addHeaderWithVar Authorization \${"Sample Collection"."サンプル POST 1"."response"."headers"."authorization"}
-setBodyWithVar userData \${"Sample Collection"."サンプル POST 1"."response"."body"}
+setBodyWithVar \${"Sample Collection"."サンプル POST 1"."response"."body"}
 
 // 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
