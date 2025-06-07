@@ -241,20 +241,8 @@ export async function executeTestScript(responseData) {
 
 
 /**
- * sendRequest (XHR 版)
- *  プリリクエストスクリプトを実行 → XMLHttpRequest で送信 → レスポンス表示 → テストスクリプト → 履歴保存
- */
-/**
  * sendRequest
  *  引数 requestObj を使って XHR 送信を行うバージョン
- *  （引数に state.currentRequest などを渡す想定）
- *
- *  例：
- *    // これまで
- *    // await sendRequest();
- *
- *    // これから
- *    await sendRequest(state.currentRequest);
  */
 export async function sendRequest(requestObj) {
     try {
@@ -267,18 +255,29 @@ export async function sendRequest(requestObj) {
         }
 
         // 2. 変数置換後のリクエストを生成
-        //    引数として渡された requestObj をコピーせずそのまま使う場合は注意が必要ですが、
-        //    ここでは参照を壊さないよう、processVariables 内でコピーされる想定です。
         let processedRequest = processVariables(requestObj);
 
         // 1. プリリクエストスクリプト実行
         processedRequest = await executePreRequestScript(processedRequest);
 
+        // リクエスト実行結果を保存
+        const requestExecution = {
+            timestamp: new Date().toISOString(),
+            method: processedRequest.method,
+            url: processedRequest.url,
+            headers: processedRequest.headers,
+            params: processedRequest.params,
+            body: processedRequest.body,
+            auth: processedRequest.auth,
+            folder: processedRequest.folder || '',
+            description: processedRequest.description || '',
+            bodyType: processedRequest.bodyType || 'none',
+            preRequestScript: processedRequest.preRequestScript || ''
+        };
+
         // 3. XHR 用オプションを作成
-        //    buildFetchOptions は { method, headers, bodyData } を返す想定です
         const opts = buildFetchOptions(processedRequest);
         if (!opts) {
-            // JSON 検証などでオプション組み立てに失敗した場合は null が返ってくる
             return;
         }
 
@@ -288,29 +287,15 @@ export async function sendRequest(requestObj) {
         const url = processedRequest.url;
         const startTime = Date.now();
 
-        // ここで Promise 化して非同期に待つ
         const responseData = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
-
-            // GET/HEAD でも send(body) を呼べるが、ブラウザ上は無視される可能性がある
             xhr.open(method, url, true);
+            xhr.timeout = 30000; // 30秒
 
-            // タイムアウト設定 (ミリ秒)
-            xhr.timeout = 30000;
-
-            // ヘッダーをセット
-            for (const key in headers) {
-                if (headers.hasOwnProperty(key)) {
-                    xhr.setRequestHeader(key, headers[key]);
-                }
-            }
-
-            // リクエスト送信（bodyData が null なら send()）
-            if (bodyData != null) {
-                xhr.send(bodyData);
-            } else {
-                xhr.send();
-            }
+            // ヘッダーを設定
+            Object.entries(headers).forEach(([key, value]) => {
+                xhr.setRequestHeader(key, value);
+            });
 
             // レスポンス取得時のイベント
             xhr.onreadystatechange = () => {
@@ -337,14 +322,7 @@ export async function sendRequest(requestObj) {
                     const pseudoResponse = {
                         status: xhr.status,
                         statusText: xhr.statusText,
-                        headers: {
-                            get: (name) => {
-                                // headerObj は大文字小文字そのままなので、両方を試す
-                                return headerObj[name] != null
-                                    ? headerObj[name]
-                                    : headerObj[name.toLowerCase()] || null;
-                            }
-                        },
+                        headers: headerObj,  // ヘッダーオブジェクトを直接設定
                         text: async () => text,
                         json: async () => {
                             try {
@@ -371,6 +349,9 @@ export async function sendRequest(requestObj) {
             xhr.onerror = () => {
                 reject(new Error('Network error'));
             };
+
+            // リクエスト送信
+            xhr.send(bodyData);
         });
 
         // 5. processResponse と displayResponse を使って結果を表示
@@ -383,6 +364,44 @@ export async function sendRequest(requestObj) {
 
         // 7. 履歴に保存
         await saveToHistory(processedRequest, parsed);
+
+        // 8. コレクションのリクエストに最新の実行結果を保存
+        if (state.currentCollection) {
+            const collection = state.collections.find(c => c.id === state.currentCollection);
+            if (collection) {
+                const request = collection.requests.find(r => r.id === requestObj.id);
+                if (request) {
+                    // リクエスト実行結果を保存
+                    request.lastRequestExecution = requestExecution;
+
+                    // レスポンス実行結果を保存
+                    request.lastResponseExecution = {
+                        status: parsed.status,
+                        duration: parsed.duration,
+                        size: parsed.size,
+                        timestamp: new Date().toISOString(),
+                        headers: parsed.headers,  // パース済みのヘッダーを保存
+                        body: parsed.body
+                    };
+
+                    await saveCollectionsToStorage();
+                }
+            }
+        }
+
+        // 9. 現在のリクエストにも実行結果を保存
+        if (state.currentRequest && state.currentRequest.id === requestObj.id) {
+            state.currentRequest.lastRequestExecution = requestExecution;
+            state.currentRequest.lastResponseExecution = {
+                status: parsed.status,
+                duration: parsed.duration,
+                size: parsed.size,
+                timestamp: new Date().toISOString(),
+                headers: parsed.headers,  // パース済みのヘッダーを保存
+                body: parsed.body
+            };
+        }
+
         return response || "";
 
     } catch (error) {
@@ -524,7 +543,9 @@ export function addAuthenticationHeaders(headers, auth) {
             }
             break;
     }
-}/**
+}
+
+/**
  * processResponse
  *  XHR で返された疑似レスポンスオブジェクト（または Fetch の Response）をパースし、
  *  status, headers, body 等を返す
@@ -533,7 +554,7 @@ export async function processResponse(response, duration) {
     const responseData = {
         status: response.status,
         statusText: response.statusText,
-        headers: {},   // 実際のすべてのヘッダーを小文字キーにして格納する
+        headers: {},   // 実際のすべてのヘッダーを格納する
         duration: duration,
         size: 0,
         body: null,
@@ -549,20 +570,31 @@ export async function processResponse(response, duration) {
         if (typeof response.headers.forEach === 'function') {
             // Fetch の Headers オブジェクト
             response.headers.forEach((value, key) => {
-                responseData.headers[key.toLowerCase()] = value;
+                responseData.headers[key] = value;
             });
         } else if (response._headerObj && typeof response._headerObj === 'object') {
             // XHR 偽装レスポンスで、sendRequest 側で _headerObj を格納しているケース
-            // (例: sendRequest 内で headerObj を作成したあと、response._headerObj = headerObj としている)
-            Object.entries(response._headerObj).forEach(([rawKey, value]) => {
-                responseData.headers[rawKey.toLowerCase()] = value;
+            Object.entries(response._headerObj).forEach(([key, value]) => {
+                responseData.headers[key] = value;
             });
+        } else if (response.headers.get) {
+            // XHR 偽装レスポンスの get メソッドを使用
+            const rawHeaders = response.headers.get('all');
+            if (rawHeaders) {
+                const headerLines = rawHeaders.trim().split(/[\r\n]+/);
+                headerLines.forEach(line => {
+                    const parts = line.split(': ');
+                    const headerKey = parts.shift();
+                    const headerVal = parts.join(': ');
+                    responseData.headers[headerKey] = headerVal;
+                });
+            }
         } else {
             // 万一どちらにも該当しない場合は「response.headers」自体を plain object とみなし、
             // get プロパティはスキップしてコピー
-            for (const [rawKey, value] of Object.entries(response.headers)) {
-                if (rawKey === 'get' && typeof value === 'function') continue;
-                responseData.headers[rawKey.toLowerCase()] = value;
+            for (const [key, value] of Object.entries(response.headers)) {
+                if (key === 'get' && typeof value === 'function') continue;
+                responseData.headers[key] = value;
             }
         }
     }
@@ -594,6 +626,7 @@ export async function processResponse(response, duration) {
 
     return responseData;
 }
+
 /**
  * displayResponse
  *  画面右側に「ステータス・時間・サイズ」「Body／Headers／Cookies／Tests」の各タブを描画する
@@ -902,11 +935,10 @@ export function runTestCommand(commandString, responseData) {
  * executePreRequestScript
  *  Pre-request タブに書かれたスクリプトを実行（pm オブジェクト経由で state.currentRequest を操作可能）
  */
-
 export async function executePreRequestScript(requestObj) {
     // 2. リクエストオブジェクト内の preRequestScript を取得
     const raw = requestObj.preRequestScript || '';
-    if (!raw.trim()) return;
+    if (!raw.trim()) return requestObj;
 
     // 行ごとに分割してコマンドを解析
     const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('//'));
@@ -969,7 +1001,7 @@ export async function executePreRequestScript(requestObj) {
                     // 「addHeaderWithVar HEADER_NAME VAR_NAME」で、VAR_NAME 変数の値をヘッダー値に設定
                     // 例: addHeaderWithVar Authorization authToken
                     const headerName = args[0];
-                    const varName = args[1];
+                    const varName = args.slice(1).join(' '); // 変数名に空白が含まれる可能性を考慮
                     const val = getVariable(varName);
                     if (typeof val === 'string') {
                         requestObj.headers[headerName] = val;
@@ -980,24 +1012,29 @@ export async function executePreRequestScript(requestObj) {
                 }
 
                 case 'setBodyWithVar': {
-                    // 「setBodyWithVar VAR_NAME」で、変数の中身を body に JSON としてセット
-                    // 例: setBodyWithVar requestPayload
-                    const varName = args[0];
+                    // 「setBodyWithVar VAR_NAME」で、VAR_NAME 変数の値をボディに設定
+                    const varName = args.join(' '); // 変数名に空白が含まれる可能性を考慮
                     const val = getVariable(varName);
-                    requestObj.body = val;
+                    if (val !== undefined) {
+                        requestObj.body = val;
+                    } else {
+                        throw new Error(`変数「${varName}」が変数ではありません`);
+                    }
                     break;
                 }
 
                 default:
-                    throw new Error(`不明なコマンド: ${cmd}`);
+                    console.warn(`Unknown command: ${cmd}`);
             }
         }
     } catch (error) {
         console.error('Pre-request script 実行エラー:', error);
-        showError('Pre-request script エラー: ' + error.message);
+        throw error;
     }
+
     return requestObj;
 }
+
 /**
  * createTestPmObject
  *  テスト用 pm オブジェクトを構築

@@ -45,10 +45,19 @@ export const sampleCollections = [
                 auth: { type: 'bearer', token: '{{devToken}}' },
                 folder: '',
                 description: 'ユーザー一覧を取得する',
-                // 「bodyType」を保持する。初期値は 'none'
                 bodyType: "none",
                 preRequestScript: `
-// args[0] に URL 文字列が入る
+// リクエスト/レスポンス実行結果の参照例
+// リクエストのヘッダーを参照
+addHeaderWithVar Authorization \${"Sample Collection"."POST Users"."request"."headers"."authorization"}
+
+// レスポンスのステータスコードを参照
+setVarFromHeader statusCode \${"Sample Collection"."POST Users"."response"."status"}
+
+// レスポンスのボディから値を取得
+setBodyWithVar token \${"Sample Collection"."POST Users"."response"."body"."token"}
+
+// 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
 addHeader test scriptadd
 removeHeader removeHeader
@@ -59,8 +68,8 @@ setBody setBodyWithScript
   `
             },
             {
-                id: 'req_sample_post',
-                name: 'サンプル POST',
+                id: 'req_sample_post_1',
+                name: 'サンプル POST 1',
                 method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=1',
                 headers: {},
@@ -69,15 +78,44 @@ setBody setBodyWithScript
                 auth: { type: 'none' },
                 bodyType: "raw",
                 preRequestScript: `
-// args[0] に URL 文字列が入る
+// リクエスト/レスポンス実行結果の参照例
+// 前のリクエストのレスポンスから値を取得して使用
+
+// 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
 addHeader test scriptadd
+addHeader authorization scriptadd-authorization
 removeHeader removeHeader
-setBody setBodyWithScript
+setBody setBodyWithScript1
 //setUrlWithVar apiBaseUrl
 //addHeaderWithVar Authorization authtoken
 //setBodyWithVar requestPayload
+  `
+            },
+            {
+                id: 'req_sample_post_2',
+                name: 'サンプル POST 2',
+                method: 'POST',
+                url: 'https://reply.tukutano.jp/items?page=2',
+                headers: {},
+                params: {},
+                body: "test body text",
+                auth: { type: 'none' },
+                bodyType: "raw",
+                preRequestScript: `
+// リクエスト/レスポンス実行結果の参照例
+// 前のリクエストのレスポンスから値を取得して使用
+addHeaderWithVar Authorization \${"Sample Collection"."サンプル POST 1"."response"."headers"."authorization"}
+setBodyWithVar userData \${"Sample Collection"."サンプル POST 1"."response"."body"}
 
+// 既存のプリリクエストスクリプト
+setUrl https://reply.tukutano.jp/items?page=9
+addHeader test scriptadd
+removeHeader removeHeader
+setBody setBodyWithScript2
+//setUrlWithVar apiBaseUrl
+//addHeaderWithVar Authorization authtoken
+//setBodyWithVar requestPayload
   `
             }
         ]
@@ -104,8 +142,8 @@ jsonHasProperty users
 jsonArrayLengthEquals users 5
 jsonValueEquals data.id 1234
 bodyContains success
-headerExists Content-Type
-  `;
+headerExists Content - Type
+                `;
 
 
 
@@ -132,7 +170,7 @@ export const sampleScenarios = [
                 preRequestScript: `
 addHeader test scriptadd1
 setBody setBodyWithScript1
-  `
+                `
             },
             {
                 id: 'req_sample_POST2',
@@ -146,7 +184,7 @@ setBody setBodyWithScript1
                 bodyType: "json",
                 preRequestScript: `
 addHeader test scriptadd2
-  `
+                `
             },
             {
                 id: 'req_sample_POST3',
@@ -161,7 +199,7 @@ addHeader test scriptadd2
                 preRequestScript: `
 addHeader test scriptadd3
 setBody setBodyWithScript3
-  `
+                `
             }
         ]
     },
@@ -184,7 +222,7 @@ setBody setBodyWithScript3
 addHeader test scriptadd1
 // bodyをセットしてもGETリクエストのため送信されない事に注意する
 setBody setBodyWithScript1
-  `
+                `
             },
             {
                 id: 'req_sample_get2_2',
@@ -199,7 +237,7 @@ setBody setBodyWithScript1
                 preRequestScript: `
 // key＝test、value=scriptadd2
 addHeader test scriptadd2
-  `
+                `
             },
             {
                 id: 'req_sample_get2_3',
@@ -215,7 +253,7 @@ addHeader test scriptadd2
 addHeader test scriptadd2
 // bodyをセットしてもGETリクエストのため送信されない事に注意する
 setBody setBodyWithScript3
-  `
+                `
             }
         ]
     }

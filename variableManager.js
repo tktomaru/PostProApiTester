@@ -93,7 +93,7 @@ export async function initializeVariablesManagement() {
                     const envVarsForThis = sampleEnvironmentVariables[env.id] || {};
                     // state.variables.environment を一旦空にしてから、サンプルをセット
                     // ※ここでは、複数のサンプル環境がある場合に `state.variables.environment` を上書きしてしまわないよう、
-                    //   “現在の環境を最後のサンプルに合わせる” 形だと都合が悪いならば、初期状態として全サンプルを別管理しておく方法もあります。
+                    //   "現在の環境を最後のサンプルに合わせる" 形だと都合が悪いならば、初期状態として全サンプルを別管理しておく方法もあります。
                     //   ここでは「最後に処理した env.id のものが state.currentEnvironment が null の状態でも反映される」というサンプルとして示しています。
                     state.variables.environment = { ...envVarsForThis };
                     await chrome.storage.local.set({ [`env_${env.id}`]: state.variables.environment });
@@ -167,7 +167,7 @@ export function renderEnvironmentSelector() {
     // 既存の option をクリア
     select.innerHTML = '';
 
-    // 「No Environment」 を先頭に追加
+    // "No Environment" を先頭に追加
     const noEnvOption = document.createElement('option');
     noEnvOption.value = '';
     noEnvOption.textContent = 'No Environment';
@@ -270,7 +270,7 @@ export function updateCollectionVarSelector() {
     // 既存の option をクリア
     select.innerHTML = '';
 
-    // 「Select Collection」を先頭に追加
+    // "Select Collection"を先頭に追加
     const defaultOption = document.createElement('option');
     defaultOption.value = '';
     defaultOption.textContent = 'Select Collection';
@@ -295,7 +295,7 @@ export function updateCollectionVarSelector() {
  *   - state.variables.environment: { [key]: { value, description } }
  *   - state.variables.collection: { [collectionId]: { [key]: { value, description } } }
  * 
- * 「グローバル変数」「環境変数」「コレクション変数」をそれぞれ描画します。
+ * "グローバル変数" "環境変数" "コレクション変数"をそれぞれ描画します。
  * 内部で renderVariables(scope) を呼び出す想定とします。
  */
 export function renderAllVariables() {
@@ -546,19 +546,106 @@ export function addVariableRow(scope) {
     row.querySelector('.var-key').focus();
 }
 
-export function getVariable(key) {
-    // Priority: Environment > Collection > Global
-    if (state.variables.environment[key]) {
-        const val = state.variables.environment[key];
-        return typeof val === 'object' ? val.value : val;
+/**
+ * getVariable
+ * 変数名から値を取得する
+ * 例: getVariable('apiBaseUrl') → 'https://api.example.com'
+ * 例: getVariable('${"Sample Collection"."サンプル POST 1"."response"."headers"."authorization"}') → 'Bearer xxx...'
+ */
+export function getVariable(varName) {
+    // 新しい変数参照形式（${...}）の処理
+    if (varName.startsWith('${') && varName.endsWith('}')) {
+        try {
+            // ${...} の中身を取得
+            const path = varName.slice(2, -1);
+            // パスを分割（例: "Sample Collection"."サンプル POST 1"."response"."headers"."authorization"）
+            const parts = path.split('"."').map(p => p.replace(/^"/, '').replace(/"$/, ''));
+
+            // コレクション名、リクエスト名、レスポンス/リクエスト、プロパティパスを取得
+            const [collectionName, requestName, type, ...propertyPath] = parts;
+
+            // コレクションを検索
+            const collection = state.collections.find(c => c.name === collectionName);
+            if (!collection) {
+                throw new Error(`コレクション「${collectionName}」が見つかりません`);
+            }
+
+            // リクエストを検索
+            const request = collection.requests.find(r => r.name === requestName);
+            if (!request) {
+                throw new Error(`リクエスト「${requestName}」が見つかりません`);
+            }
+
+            // レスポンスまたはリクエストの実行結果を取得
+            const execution = type === 'response' ? request.lastResponseExecution : request.lastRequestExecution;
+            if (!execution) {
+                throw new Error(`${type}の実行結果がありません`);
+            }
+
+            // プロパティパスに従って値を取得
+            let value = execution;
+            for (const prop of propertyPath) {
+                if (value && typeof value === 'object') {
+                    // ヘッダーの場合は大文字小文字を区別せずに検索
+                    if (prop === 'headers') {
+                        const headerKey = propertyPath[propertyPath.indexOf(prop) + 1];
+                        if (headerKey) {
+                            const headerKeyLower = headerKey.toLowerCase();
+                            const headerValue = Object.entries(value[prop]).find(([k]) => k.toLowerCase() === headerKeyLower)?.[1];
+                            if (headerValue !== undefined) {
+                                value = headerValue;
+                                break;
+                            }
+                        }
+                    }
+                    // 通常のプロパティアクセス
+                    if (prop in value) {
+                        value = value[prop];
+                    } else {
+                        throw new Error(`プロパティ「${prop}」が見つかりません`);
+                    }
+                } else {
+                    throw new Error(`プロパティ「${prop}」が見つかりません`);
+                }
+            }
+
+            return value;
+        } catch (error) {
+            console.error('変数参照エラー:', error);
+            throw error;
+        }
     }
-    if (state.currentCollection && state.variables.collection[state.currentCollection]?.[key]) {
-        const val = state.variables.collection[state.currentCollection][key];
-        return typeof val === 'object' ? val.value : val;
+
+    // 既存の変数参照形式（{{...}}）の処理
+    if (varName.startsWith('{{') && varName.endsWith('}}')) {
+        const key = varName.slice(2, -2);
+        // 1. 環境変数から探す
+        if (state.variables.environment && state.variables.environment[key]) {
+            return state.variables.environment[key].value;
+        }
+        // 2. グローバル変数から探す
+        if (state.variables.global && state.variables.global[key]) {
+            return state.variables.global[key].value;
+        }
+        // 3. コレクション変数から探す
+        if (state.currentCollection && state.variables.collection && state.variables.collection[state.currentCollection] && state.variables.collection[state.currentCollection][key]) {
+            return state.variables.collection[state.currentCollection][key].value;
+        }
+        return undefined;
     }
-    if (state.variables.global[key]) {
-        const val = state.variables.global[key];
-        return typeof val === 'object' ? val.value : val;
+
+    // 通常の変数名の場合
+    // 1. 環境変数から探す
+    if (state.variables.environment && state.variables.environment[varName]) {
+        return state.variables.environment[varName].value;
+    }
+    // 2. グローバル変数から探す
+    if (state.variables.global && state.variables.global[varName]) {
+        return state.variables.global[varName].value;
+    }
+    // 3. コレクション変数から探す
+    if (state.currentCollection && state.variables.collection && state.variables.collection[state.currentCollection] && state.variables.collection[state.currentCollection][varName]) {
+        return state.variables.collection[state.currentCollection][varName].value;
     }
     return undefined;
 }

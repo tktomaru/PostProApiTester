@@ -16,11 +16,42 @@ export const state = {
         headers: {},
         params: {},
         body: null,
-        auth: { type: 'none' }
+        auth: { type: 'none' },
+        folder: '',
+        description: '',
+        bodyType: 'none',
+        preRequestScript: '',
+        lastRequestExecution: null, // 最新のリクエスト実行結果を保持
+        lastResponseExecution: null // 最新のレスポンス実行結果を保持
     },
 
     // 全コレクション一覧
     // 各コレクションは { id, name, description, requests: [...] } という形を想定
+    // 各リクエストは { 
+    //   id, name, method, url, headers, params, body, auth, 
+    //   folder, description, bodyType, preRequestScript,
+    //   lastRequestExecution: { 
+    //     timestamp: string,
+    //     method: string,
+    //     url: string,
+    //     headers: object,
+    //     params: object,
+    //     body: any,
+    //     auth: object,
+    //     folder: string,
+    //     description: string,
+    //     bodyType: string,
+    //     preRequestScript: string
+    //   },
+    //   lastResponseExecution: { 
+    //     status: number,
+    //     duration: number,
+    //     size: number,
+    //     timestamp: string,
+    //     headers: object,
+    //     body: any
+    //   }
+    // } の形
     collections: [],
 
     // リクエスト履歴
