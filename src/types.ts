@@ -99,6 +99,10 @@ export interface AppState {
     collection: Record<string, Record<string, VariableData>>;
     environment: Record<string, VariableData>;
   };
+  sidebarState?: {
+    expandedCollections: Set<string>;
+    expandedScenarios: Set<string>;
+  };
 }
 
 export interface RequestExecution {

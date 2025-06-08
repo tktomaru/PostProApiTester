@@ -8,6 +8,7 @@ import {
     saveCurrentCollectionToStorage,
     saveScenariosToStorage,
     saveCurrentScenarioToStorage,
+    saveSidebarStateToStorage,
     state
 } from './state';
 import { sampleCollections } from './defaultData';
@@ -280,10 +281,14 @@ export function renderCollectionsTree(): void {
 
         container.appendChild(colDiv);
 
-        // ② リクエスト一覧（最初は非表示）
+        // ② リクエスト一覧（開閉状態を復元）
         const ul = document.createElement('ul');
         ul.className = 'request-list';
-        ul.style.display = 'none'; // デフォルトで非表示
+        const isExpanded = state.sidebarState?.expandedCollections.has(col.id) || false;
+        ul.style.display = isExpanded ? 'block' : 'none';
+        if (isExpanded) {
+            toggleIcon.textContent = '▼';
+        }
 
         if (col.requests && col.requests.length > 0) {
             col.requests.forEach((req) => {
@@ -335,10 +340,14 @@ export function renderCollectionsTree(): void {
         container.appendChild(ul);
 
         // ③ コレクション行クリックで「リクエスト一覧を開閉」
-        colDiv.addEventListener('click', () => {
+        colDiv.addEventListener('click', async () => {
             if (ul.style.display === 'none') {
                 ul.style.display = 'block';
                 toggleIcon.textContent = '▼';
+                // 開閉状態を保存
+                state.sidebarState?.expandedCollections.add(col.id);
+                await saveSidebarStateToStorage();
+                
                 // クリックされたコレクションを選択状態に
                 document.querySelectorAll('.collection-item').forEach(item => {
                     const element = item as HTMLElement;
@@ -355,6 +364,9 @@ export function renderCollectionsTree(): void {
             } else {
                 ul.style.display = 'none';
                 toggleIcon.textContent = '▶';
+                // 開閉状態を保存
+                state.sidebarState?.expandedCollections.delete(col.id);
+                await saveSidebarStateToStorage();
             }
         });
     });
@@ -422,10 +434,14 @@ export function renderScenariosTree(): void {
 
         container.appendChild(scenarioDiv);
 
-        // ② リクエスト一覧（最初は非表示）
+        // ② リクエスト一覧（開閉状態を復元）
         const ul = document.createElement('ul');
         ul.className = 'request-list';
-        ul.style.display = 'none'; // デフォルトで非表示
+        const isExpanded = state.sidebarState?.expandedScenarios.has(scenario.id) || false;
+        ul.style.display = isExpanded ? 'block' : 'none';
+        if (isExpanded) {
+            toggleIcon.textContent = '▼';
+        }
 
         if (scenario.requests && scenario.requests.length > 0) {
             scenario.requests.forEach((req) => {
@@ -477,10 +493,14 @@ export function renderScenariosTree(): void {
         container.appendChild(ul);
 
         // ③ シナリオ行クリックで「リクエスト一覧を開閉」
-        scenarioDiv.addEventListener('click', () => {
+        scenarioDiv.addEventListener('click', async () => {
             if (ul.style.display === 'none') {
                 ul.style.display = 'block';
                 toggleIcon.textContent = '▼';
+                // 開閉状態を保存
+                state.sidebarState?.expandedScenarios.add(scenario.id);
+                await saveSidebarStateToStorage();
+                
                 // クリックされたシナリオを選択状態に
                 document.querySelectorAll('.scenario-item').forEach(item => {
                     const element = item as HTMLElement;
@@ -491,6 +511,9 @@ export function renderScenariosTree(): void {
             } else {
                 ul.style.display = 'none';
                 toggleIcon.textContent = '▶';
+                // 開閉状態を保存
+                state.sidebarState?.expandedScenarios.delete(scenario.id);
+                await saveSidebarStateToStorage();
             }
         });
     });

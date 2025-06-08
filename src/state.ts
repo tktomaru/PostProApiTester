@@ -56,6 +56,12 @@ export const state: AppState = {
     scenarios: [],
     
     currentScenario: null, // 今編集中 or 実行対象のシナリオID
+    
+    // サイドバーの開閉状態
+    sidebarState: {
+        expandedCollections: new Set<string>(),
+        expandedScenarios: new Set<string>()
+    }
 };
 
 // Additional state properties not in AppState interface
@@ -127,6 +133,9 @@ export async function loadAllStoredData(): Promise<void> {
         if (result.scenarios) {
             state.scenarios = result.scenarios;
         }
+
+        // サイドバー状態を復元
+        await loadSidebarStateFromStorage();
 
         console.log('Stored data loaded:', {
             collectionsCount: state.collections.length,
@@ -249,4 +258,38 @@ export async function saveCurrentRequestToStorage(request: RequestData): Promise
 export async function toggleInterceptorState(active: boolean): Promise<void> {
     extendedState.isInterceptorActive = active;
     await chrome.storage.local.set({ isInterceptorActive: active });
+}
+
+/**
+ * サイドバーの開閉状態を保存
+ */
+export async function saveSidebarStateToStorage(): Promise<void> {
+    try {
+        if (state.sidebarState) {
+            const sidebarState = {
+                expandedCollections: Array.from(state.sidebarState.expandedCollections),
+                expandedScenarios: Array.from(state.sidebarState.expandedScenarios)
+            };
+            await chrome.storage.local.set({ sidebarState });
+        }
+    } catch (error) {
+        console.error('Error saving sidebar state:', error);
+    }
+}
+
+/**
+ * サイドバーの開閉状態を復元
+ */
+export async function loadSidebarStateFromStorage(): Promise<void> {
+    try {
+        const stored = await chrome.storage.local.get(['sidebarState']);
+        if (stored.sidebarState) {
+            state.sidebarState = {
+                expandedCollections: new Set(stored.sidebarState.expandedCollections || []),
+                expandedScenarios: new Set(stored.sidebarState.expandedScenarios || [])
+            };
+        }
+    } catch (error) {
+        console.error('Error loading sidebar state:', error);
+    }
 }
