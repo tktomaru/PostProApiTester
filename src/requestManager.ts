@@ -935,9 +935,21 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
 
         try {
             switch (command) {
+                case 'setBody':
+                    if (!argsString) {
+                        showError('setBody requires a body content');
+                        continue;
+                    }
+                    requestObj.body = argsString;
+                    // Content-Typeが設定されていない場合はapplication/jsonを設定
+                    if (!requestObj.headers['Content-Type'] && !requestObj.headers['content-type']) {
+                        requestObj.headers['Content-Type'] = 'application/json';
+                    }
+                    break;
+
                 case 'removeHeader':
                     if (!argsString) {
-                        console.warn('removeHeader requires a header name');
+                        showError('removeHeader requires a header name');
                         continue;
                     }
                     // ヘッダー名の大文字小文字を区別せずに削除
