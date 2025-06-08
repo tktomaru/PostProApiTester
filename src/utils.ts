@@ -177,7 +177,8 @@ export function setupEventListeners(): void {
     // Send ボタン
     const sendBtn = document.getElementById('sendBtn');
     if (sendBtn) {
-        sendBtn.addEventListener('click', async () => {
+        sendBtn.addEventListener('click', async (e: Event) => {
+            e.preventDefault();
             let requestObj = state.currentRequest;
             if (!requestObj) return;
             

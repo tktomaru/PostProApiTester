@@ -152,8 +152,8 @@ export async function saveCollectionsToStorage(): Promise<void> {
 
     const stored = await chrome.storage.local.get(['collections']);
     state.collections.splice(0, state.collections.length, ...stored.collections);
-    // 画面にレンダリング
-    renderCollectionsTree();
+    // リクエスト実行結果の保存時はUI更新不要
+    // renderCollectionsTree();
     // コレクション変数セレクタも更新
     updateCollectionVarSelector();
 }
