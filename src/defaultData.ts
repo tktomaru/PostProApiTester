@@ -122,6 +122,95 @@ removeHeader removeHeader
   `
             }
         ]
+    },
+    {
+        id: 'col_integration_tests',
+        name: 'Integration Tests (Echo API)',
+        description: 'reply.tukutano.jpを使用した結合テスト用コレクション',
+        requests: [
+            {
+                id: 'req_echo_get',
+                name: 'GET Echo Test',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/api/users',
+                headers: { 
+                    'Accept': 'application/json',
+                    'X-Test-Header': 'test-value',
+                    'User-Agent': 'API-Tester'
+                },
+                params: { 
+                    page: '1',
+                    limit: '10'
+                },
+                body: null,
+                auth: { type: 'none' },
+                bodyType: "none",
+                preRequestScript: '',
+                testScript: `// reply.tukutano.jpエコーサイト用の結合テスト
+status 200
+echoRequestMethodEquals GET
+echoRequestHeaderEquals Accept application/json
+echoRequestHeaderEquals X-Test-Header test-value
+echoRequestUrlContains /api/users
+echoRequestUrlContains page=1
+echoRequestUrlContains limit=10`
+            },
+            {
+                id: 'req_echo_post',
+                name: 'POST Echo Test',
+                method: 'POST',
+                url: 'https://reply.tukutano.jp/api/auth/login',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-API-Key': 'test-api-key'
+                },
+                params: {},
+                body: JSON.stringify({
+                    username: "testuser",
+                    password: "testpass123",
+                    remember: true
+                }),
+                auth: { type: 'none' },
+                bodyType: "json",
+                preRequestScript: '',
+                testScript: `// POSTリクエストの結合テスト
+status 200
+echoRequestMethodEquals POST
+echoRequestHeaderEquals Content-Type application/json
+echoRequestHeaderEquals X-API-Key test-api-key
+echoRequestBodyEquals {"username":"testuser","password":"testpass123","remember":true}
+echoRequestUrlContains /api/auth/login`
+            },
+            {
+                id: 'req_echo_auth_test',
+                name: 'Bearer Auth Echo Test',
+                method: 'PUT',
+                url: 'https://reply.tukutano.jp/api/users/123',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                params: {},
+                body: JSON.stringify({
+                    name: "Updated User",
+                    email: "updated@example.com"
+                }),
+                auth: { 
+                    type: 'bearer', 
+                    token: 'test-bearer-token-12345' 
+                },
+                bodyType: "json",
+                preRequestScript: '',
+                testScript: `// Bearer認証付きリクエストの結合テスト
+status 200
+echoRequestMethodEquals PUT
+echoRequestHeaderEquals Authorization Bearer test-bearer-token-12345
+echoRequestHeaderEquals Content-Type application/json
+echoRequestBodyEquals {"name":"Updated User","email":"updated@example.com"}
+echoRequestUrlContains /api/users/123`
+            }
+        ]
     }
 ];
 
@@ -255,6 +344,106 @@ addHeader test scriptadd2
 // bodyをセットしてもGETリクエストのため送信されない事に注意する
 setBody setBodyWithScript3
                 `
+            }
+        ]
+    },
+    {
+        id: 'scenario_integration_tests',
+        name: 'Integration Test Flow (Echo API)',
+        requests: [
+            {
+                id: 'req_scenario_echo_auth',
+                name: 'Authentication Test',
+                method: 'POST',
+                url: 'https://reply.tukutano.jp/api/auth/login',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                params: {},
+                body: JSON.stringify({
+                    username: "testuser",
+                    password: "secret123"
+                }),
+                auth: { type: 'none' },
+                bodyType: "json",
+                preRequestScript: `// 認証リクエストの前処理
+addHeader X-Request-Source integration-test`,
+                testScript: `// 認証リクエストの検証
+status 200
+echoRequestMethodEquals POST
+echoRequestHeaderEquals Content-Type application/json
+echoRequestHeaderEquals X-Request-Source integration-test
+echoRequestBodyEquals {"username":"testuser","password":"secret123"}
+echoRequestUrlContains /api/auth/login`
+            },
+            {
+                id: 'req_scenario_echo_data',
+                name: 'Data Retrieval Test',
+                method: 'GET',
+                url: 'https://reply.tukutano.jp/api/users/profile',
+                headers: { 
+                    'Accept': 'application/json',
+                    'X-Test-Flow': 'integration'
+                },
+                params: { 
+                    include: 'details',
+                    format: 'json'
+                },
+                body: null,
+                auth: { 
+                    type: 'bearer', 
+                    token: 'mock-auth-token-from-previous-step' 
+                },
+                bodyType: "none",
+                preRequestScript: `// 前のステップの結果を利用（模擬）
+// 実際のAPIでは前のレスポンスからトークンを取得
+addHeader X-Previous-Step completed`,
+                testScript: `// データ取得リクエストの検証
+status 200
+echoRequestMethodEquals GET
+echoRequestHeaderEquals Authorization Bearer mock-auth-token-from-previous-step
+echoRequestHeaderEquals X-Test-Flow integration
+echoRequestHeaderEquals X-Previous-Step completed
+echoRequestUrlContains /api/users/profile
+echoRequestUrlContains include=details
+echoRequestUrlContains format=json`
+            },
+            {
+                id: 'req_scenario_echo_update',
+                name: 'Data Update Test',
+                method: 'PUT',
+                url: 'https://reply.tukutano.jp/api/users/profile',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Test-Flow': 'integration'
+                },
+                params: {},
+                body: JSON.stringify({
+                    name: "Updated Test User",
+                    email: "updated@test.com",
+                    preferences: {
+                        theme: "dark",
+                        notifications: true
+                    }
+                }),
+                auth: { 
+                    type: 'bearer', 
+                    token: 'mock-auth-token-from-previous-step' 
+                },
+                bodyType: "json",
+                preRequestScript: `// 更新リクエストの前処理
+addHeader X-Update-Source integration-flow`,
+                testScript: `// データ更新リクエストの検証
+status 200
+echoRequestMethodEquals PUT
+echoRequestHeaderEquals Authorization Bearer mock-auth-token-from-previous-step
+echoRequestHeaderEquals Content-Type application/json
+echoRequestHeaderEquals X-Test-Flow integration
+echoRequestHeaderEquals X-Update-Source integration-flow
+echoRequestBodyEquals {"name":"Updated Test User","email":"updated@test.com","preferences":{"theme":"dark","notifications":true}}
+echoRequestUrlContains /api/users/profile`
             }
         ]
     }

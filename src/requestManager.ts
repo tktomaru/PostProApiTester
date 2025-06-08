@@ -1022,6 +1022,137 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
             return { passed: true };
         }
 
+        case 'echoRequestHeaderEquals': {
+            // reply.tukutano.jpのようなエコーサイト用: リクエストヘッダーがレスポンスに正しく反映されているかチェック
+            const headerName = args[0];
+            const expectedValue = args.slice(1).join(' ');
+            
+            // レスポンスボディからリクエストヘッダー情報を取得
+            try {
+                let responseBody = responseData.body;
+                
+                // レスポンスボディが文字列の場合はJSONパースを試行
+                if (typeof responseBody === 'string') {
+                    try {
+                        responseBody = JSON.parse(responseBody);
+                    } catch (e) {
+                        return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
+                    }
+                }
+                
+                if (typeof responseBody === 'object' && responseBody.headers) {
+                    const echoedHeaders = responseBody.headers;
+                    // ヘッダー名を小文字で検索（reply.tukutano.jpは小文字で返す）
+                    const headerKeyLower = headerName.toLowerCase();
+                    const actualValue = echoedHeaders[headerKeyLower];
+                    
+                    if (actualValue === undefined) {
+                        return { passed: false, error: `エコーされたリクエストヘッダー "${headerName}" が見つかりません` };
+                    }
+                    if (actualValue !== expectedValue) {
+                        return { passed: false, error: `エコーされたヘッダー "${headerName}" の値が期待値と異なります (期待: ${expectedValue}, 実際: ${actualValue})` };
+                    }
+                    return { passed: true };
+                } else {
+                    return { passed: false, error: 'レスポンスボディにheaders情報が含まれていません' };
+                }
+            } catch (error) {
+                return { passed: false, error: `レスポンスボディの解析に失敗しました: ${error}` };
+            }
+        }
+
+        case 'echoRequestMethodEquals': {
+            // reply.tukutano.jpのようなエコーサイト用: リクエストメソッドがレスポンスに正しく反映されているかチェック
+            const expectedMethod = args[0];
+            
+            try {
+                let responseBody = responseData.body;
+                
+                // レスポンスボディが文字列の場合はJSONパースを試行
+                if (typeof responseBody === 'string') {
+                    try {
+                        responseBody = JSON.parse(responseBody);
+                    } catch (e) {
+                        return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
+                    }
+                }
+                
+                if (typeof responseBody === 'object' && responseBody.method) {
+                    const actualMethod = responseBody.method;
+                    if (actualMethod !== expectedMethod) {
+                        return { passed: false, error: `エコーされたメソッド "${actualMethod}" が期待値 "${expectedMethod}" と異なります` };
+                    }
+                    return { passed: true };
+                } else {
+                    return { passed: false, error: 'レスポンスボディにmethod情報が含まれていません' };
+                }
+            } catch (error) {
+                return { passed: false, error: `レスポンスボディの解析に失敗しました: ${error}` };
+            }
+        }
+
+        case 'echoRequestBodyEquals': {
+            // reply.tukutano.jpのようなエコーサイト用: リクエストボディがレスポンスに正しく反映されているかチェック
+            const expectedBody = args.join(' ');
+            
+            try {
+                let responseBody = responseData.body;
+                
+                // レスポンスボディが文字列の場合はJSONパースを試行
+                if (typeof responseBody === 'string') {
+                    try {
+                        responseBody = JSON.parse(responseBody);
+                    } catch (e) {
+                        return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
+                    }
+                }
+                
+                if (typeof responseBody === 'object' && responseBody.body !== undefined) {
+                    // reply.tukutano.jpはbodyを文字列として返す
+                    const actualBody = responseBody.body;
+                        
+                    if (actualBody !== expectedBody) {
+                        return { passed: false, error: `エコーされたボディが期待値と異なります\n期待: ${expectedBody}\n実際: ${actualBody}` };
+                    }
+                    return { passed: true };
+                } else {
+                    return { passed: false, error: 'レスポンスボディにbody情報が含まれていません' };
+                }
+            } catch (error) {
+                return { passed: false, error: `レスポンスボディの解析に失敗しました: ${error}` };
+            }
+        }
+
+        case 'echoRequestUrlContains': {
+            // reply.tukutano.jpのようなエコーサイト用: リクエストURLがレスポンスに正しく反映されているかチェック
+            const expectedUrlPart = args.join(' ');
+            
+            try {
+                let responseBody = responseData.body;
+                
+                // レスポンスボディが文字列の場合はJSONパースを試行
+                if (typeof responseBody === 'string') {
+                    try {
+                        responseBody = JSON.parse(responseBody);
+                    } catch (e) {
+                        return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
+                    }
+                }
+                
+                if (typeof responseBody === 'object' && responseBody.url) {
+                    const actualUrl = responseBody.url;
+                    if (!actualUrl.includes(expectedUrlPart)) {
+                        return { passed: false, error: `エコーされたURL "${actualUrl}" に "${expectedUrlPart}" が含まれていません` };
+                    }
+                    return { passed: true };
+                } else {
+                    return { passed: false, error: 'レスポンスボディにURL情報が含まれていません' };
+                }
+            } catch (error) {
+                return { passed: false, error: `レスポンスボディの解析に失敗しました: ${error}` };
+            }
+        }
+
         default:
             return { passed: false, error: `Unknown test command: ${cmd}` };
     }
