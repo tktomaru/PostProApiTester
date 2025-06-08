@@ -18,8 +18,21 @@ export default defineConfig({
             }
         },
         watch: {
-            include: ['src/**/*.ts', 'src/**/*.tsx', 'src/**/*.js', 'src/**/*.jsx'],
+            include: [
+                'src/**/*.ts',
+                'src/**/*.tsx',
+                'src/**/*.js',
+                'src/**/*.jsx',
+                '*.html',
+                '*.css'
+            ],
             exclude: ['node_modules/**', 'dist/**']
+        }
+    },
+    server: {
+        watch: {
+            usePolling: true,
+            interval: 100
         }
     }
 }); 

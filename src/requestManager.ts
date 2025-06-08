@@ -17,7 +17,7 @@ import {
     formatBytes
 } from './utils';
 
-import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues, getValueByPath } from './utils';
+import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues } from './utils';
 import { getVariable, replaceVariables, deepReplaceVariables, renderVariables, setVariable } from './variableManager';
 import { saveToHistory as saveToHistoryFn } from './historyManager';
 

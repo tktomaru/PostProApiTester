@@ -47,7 +47,7 @@ export function renderHistory(): void {
  */
 export async function saveToHistory(request: RequestData, response: ResponseData): Promise<void> {
     const historyItem: HistoryItem = {
-        id: Date.now(),
+        id: Date.now().toString(),
         timestamp: new Date().toISOString(),
         request: {
             id: request.id,
@@ -57,7 +57,9 @@ export async function saveToHistory(request: RequestData, response: ResponseData
             headers: request.headers,
             params: request.params,
             body: request.body,
-            auth: request.auth
+            bodyType: request.bodyType,
+            auth: request.auth,
+            preRequestScript: request.preRequestScript
         },
         response: {
             status: response.status,
@@ -83,7 +85,7 @@ export async function saveToHistory(request: RequestData, response: ResponseData
  * loadHistoryItem
  *  クリックされた履歴アイテムのリクエストを復元し、エディタにロードする
  */
-export async function loadHistoryItem(historyId: number): Promise<void> {
+export async function loadHistoryItem(historyId: string): Promise<void> {
     const item = state.history.find(h => h.id === historyId);
     if (!item || !item.request) return;
 

@@ -2,7 +2,6 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // 汎用ユーティリティ関数群、タブ切り替え、イベント登録、一部の小さなヘルパーをまとめる
 
-import type { RequestData, ResponseData } from './types';
 import { state, saveCollectionsToStorage } from './state';
 import { displayResponse, saveCurrentRequest, sendRequest } from './requestManager';
 import { createNewCollection } from './collectionManager';
@@ -242,9 +241,6 @@ export function setupEventListeners(): void {
         });
     }
 
-
-
-    
     // コレクション管理（New Collection）
     const createCollectionBtn = document.getElementById('createCollectionBtn');
     if (createCollectionBtn) {

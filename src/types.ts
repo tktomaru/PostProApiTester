@@ -8,9 +8,14 @@ export interface RequestData {
   headers: Record<string, string>;
   params: Record<string, string>;
   body: string | Record<string, string> | null;
+  bodyType: string;
   auth: AuthConfig;
-  bodyType?: string;
-  preRequestScript?: string;
+  preRequestScript: string;
+  timestamp?: number;
+  status?: number;
+  responseHeaders?: Record<string, string>;
+  duration?: number;
+  error?: string;
   folder?: string;
   description?: string;
   lastRequestExecution?: RequestExecution;
@@ -55,7 +60,7 @@ export interface ResponseData {
 }
 
 export interface HistoryItem {
-  id: number;
+  id: string;
   timestamp: string;
   request: RequestData;
   response: ResponseData;
@@ -123,6 +128,10 @@ export interface InterceptedRequest {
   url: string;
   method: string;
   headers: Record<string, string>;
-  body?: string;
-  timestamp: string;
+  body?: string | Record<string, string> | null;
+  timestamp: number;
+  status?: number;
+  responseHeaders?: Record<string, string>;
+  duration?: number;
+  error?: string;
 }

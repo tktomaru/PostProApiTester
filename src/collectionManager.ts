@@ -9,7 +9,7 @@ import {
     state
 } from './state';
 import { sampleCollections } from './defaultData';
-import { escapeHtml, showSuccess } from './utils';
+import { showSuccess } from './utils';
 import { updateCollectionVarSelector, renderVariables } from './variableManager';
 import { addRequestToScenario } from './scenarioManager';
 import { loadRequestIntoEditor } from './requestManager';

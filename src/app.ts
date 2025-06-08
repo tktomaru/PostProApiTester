@@ -1,7 +1,6 @@
 // サイドバーのリサイズ機能
 function initSidebarResize(): void {
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
-    const mainContent = document.querySelector('.main-content') as HTMLElement;
     let isResizing = false;
     let startX: number;
     let startWidth: number;

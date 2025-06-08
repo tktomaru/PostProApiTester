@@ -127,7 +127,7 @@ declare global {
         }, false);
 
         // Listen for messages from popup/background
-        chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+        chrome.runtime.onMessage.addListener((message: any, _: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
             switch (message.action) {
                 case 'getPageRequests':
                     sendResponse({

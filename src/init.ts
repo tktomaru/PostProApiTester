@@ -11,8 +11,7 @@ import {
     setupTabSwitching,
     renderAuthDetails,
     addKeyValueRow,
-    showError,
-    showSuccess
+    showError
 } from './utils';
 
 import {
@@ -21,16 +20,10 @@ import {
     initializeTestScript
 } from './importExport';
 
-import {
-    initializeVariablesManagement,
-    renderEnvironmentSelector,
-    updateCollectionVarSelector,
-    renderAllVariables
-} from './variableManager';
-
 import { initializeCollections } from './collectionManager';
 import { renderHistory } from './historyManager';
 import { newScenario, runScenario, initializeScenarios } from './scenarioManager';
+import { initializeVariablesManagement } from './variableManager';
 import { initializeSettingsUI, initializeSettingsModal } from './settings';
 
 // Authentication handlers

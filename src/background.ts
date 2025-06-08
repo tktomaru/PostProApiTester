@@ -3,11 +3,12 @@
 // Background script for Chrome extension
 // Handles network interception and long-running tasks
 
-import type { InterceptedRequest } from './types';
+import type { RequestData, InterceptedRequest } from './types';
 
 interface InterceptorFilters {
+    urls: string[];
+    types: string[];
     methods: string[];
-    domain: string;
 }
 
 interface OAuth2Config {
@@ -20,35 +21,26 @@ interface OAuth2Config {
 }
 
 interface PerformanceMetrics {
-    requestCount: number;
-    averageResponseTime: number;
+    totalRequests: number;
+    successCount: number;
     errorCount: number;
+    averageResponseTime: number;
 }
 
-interface RequestData {
-    id: string;
-    url: string;
-    method: string;
-    timestamp: number;
-    headers: Record<string, string>;
-    body: any;
-    status: number | null;
-    responseHeaders: Record<string, string>;
-    duration: number | null;
-    error?: string;
-}
+// インターセプトされたリクエストを保存するMap
+const interceptedRequests = new Map<string, InterceptedRequest>();
 
 // IIFEパターンを使用して、グローバルスコープを汚染しないようにする
 (function () {
     let isInterceptorActive = false;
     let interceptorFilters: InterceptorFilters = {
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
-        domain: ''
+        urls: [],
+        types: [],
+        methods: ['GET', 'POST', 'PUT', 'DELETE']
     };
-    let interceptedRequests = new Map<string, RequestData>();
 
     // Listen for messages from popup
-    chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    chrome.runtime.onMessage.addListener((message: any, _: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
         switch (message.action) {
             case 'startInterceptor':
                 startNetworkInterceptor(message.filters);
@@ -131,16 +123,12 @@ interface RequestData {
     function handleBeforeRequest(details: chrome.webRequest.OnBeforeRequestDetails): chrome.webRequest.BlockingResponse | undefined {
         if (!shouldInterceptRequest(details)) return undefined;
 
-        const requestData: RequestData = {
-            id: details.requestId,
+        const requestData: InterceptedRequest = {
             url: details.url,
             method: details.method,
-            timestamp: Date.now(),
             headers: {},
-            body: null,
-            status: null,
-            responseHeaders: {},
-            duration: null
+            timestamp: Date.now(),
+            body: null
         };
 
         // Extract request body if present
@@ -153,7 +141,11 @@ interface RequestData {
                 ).join('');
             } else if (details.requestBody.formData) {
                 // Form data
-                requestData.body = details.requestBody.formData;
+                const formData: Record<string, string> = {};
+                Object.entries(details.requestBody.formData).forEach(([key, values]) => {
+                    formData[key] = values.join(',');
+                });
+                requestData.body = formData;
             }
         }
 
@@ -181,13 +173,13 @@ interface RequestData {
         const requestData = interceptedRequests.get(details.requestId);
         if (!requestData) return undefined;
 
-        // Store response headers and status
         requestData.status = details.statusCode;
+        requestData.responseHeaders = {};
 
         if (details.responseHeaders) {
             details.responseHeaders.forEach((header: chrome.webRequest.HttpHeader) => {
                 if (header.name && header.value) {
-                    requestData.responseHeaders[header.name] = header.value;
+                    requestData.responseHeaders![header.name] = header.value;
                 }
             });
         }
@@ -200,26 +192,28 @@ interface RequestData {
         const requestData = interceptedRequests.get(details.requestId);
         if (!requestData) return;
 
-        // Calculate duration
         requestData.duration = Date.now() - requestData.timestamp;
         requestData.status = details.statusCode;
 
-        // Update performance metrics
-        updatePerformanceMetrics(requestData);
+        // Convert InterceptedRequest to RequestData for updatePerformanceMetrics
+        const requestDataForMetrics: RequestData = {
+            id: details.requestId,
+            name: `Intercepted ${requestData.method} Request`,
+            method: requestData.method,
+            url: requestData.url,
+            headers: requestData.headers,
+            params: {},
+            body: requestData.body || null,
+            bodyType: 'none',
+            auth: { type: 'none' },
+            preRequestScript: '',
+            timestamp: requestData.timestamp,
+            status: requestData.status,
+            responseHeaders: requestData.responseHeaders,
+            duration: requestData.duration
+        };
 
-        // Send to popup if it's open
-        sendToPopup({
-            action: 'requestIntercepted',
-            request: requestData
-        });
-
-        // Clean up old requests (keep only last 100)
-        if (interceptedRequests.size > 100) {
-            const oldestKey = interceptedRequests.keys().next().value;
-            if (oldestKey) {
-                interceptedRequests.delete(oldestKey);
-            }
-        }
+        updatePerformanceMetrics(requestDataForMetrics);
     }
 
     function handleRequestError(details: chrome.webRequest.OnErrorOccurredDetails): void {
@@ -230,16 +224,26 @@ interface RequestData {
         requestData.status = 0;
         requestData.error = details.error;
 
-        // Update performance metrics
-        updatePerformanceMetrics(requestData);
+        // Convert InterceptedRequest to RequestData for updatePerformanceMetrics
+        const requestDataForMetrics: RequestData = {
+            id: details.requestId,
+            name: `Intercepted ${requestData.method} Request`,
+            method: requestData.method,
+            url: requestData.url,
+            headers: requestData.headers,
+            params: {},
+            body: requestData.body || null,
+            bodyType: 'none',
+            auth: { type: 'none' },
+            preRequestScript: '',
+            timestamp: requestData.timestamp,
+            status: requestData.status,
+            responseHeaders: requestData.responseHeaders,
+            duration: requestData.duration,
+            error: requestData.error
+        };
 
-        // Send to popup if it's open
-        sendToPopup({
-            action: 'requestIntercepted',
-            request: requestData
-        });
-
-        interceptedRequests.delete(details.requestId);
+        updatePerformanceMetrics(requestDataForMetrics);
     }
 
     function shouldInterceptRequest(details: chrome.webRequest.OnBeforeRequestDetails): boolean {
@@ -250,10 +254,10 @@ interface RequestData {
         if (!interceptorFilters.methods.includes(details.method)) return false;
 
         // Apply domain filter if set
-        if (interceptorFilters.domain) {
+        if (interceptorFilters.urls.length > 0) {
             try {
                 const url = new URL(details.url);
-                if (!url.hostname.includes(interceptorFilters.domain)) return false;
+                if (!interceptorFilters.urls.includes(url.hostname)) return false;
             } catch (e) {
                 return false;
             }
@@ -331,34 +335,8 @@ interface RequestData {
         });
     });
 
-    async function performCleanup(): Promise<void> {
-        try {
-            const result = await chrome.storage.local.get(['history', 'settings']);
-            const settings = result.settings || {};
-            const maxHistoryItems = settings.maxHistoryItems || 100;
-
-            if (result.history && result.history.length > maxHistoryItems) {
-                const trimmedHistory = result.history.slice(0, maxHistoryItems);
-                await chrome.storage.local.set({ history: trimmedHistory });
-                console.log(`Cleaned up history: ${result.history.length} -> ${trimmedHistory.length} items`);
-            }
-
-            // Clear old intercepted requests
-            if (interceptedRequests.size > 50) {
-                const requestsToKeep = Array.from(interceptedRequests.entries())
-                    .slice(-50);
-                interceptedRequests.clear();
-                requestsToKeep.forEach(([key, value]) => {
-                    interceptedRequests.set(key, value);
-                });
-            }
-        } catch (error) {
-            console.error('Cleanup error:', error);
-        }
-    }
-
     // Handle tab updates for context-aware features
-    chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+    chrome.tabs.onUpdated.addListener((_: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
         if (changeInfo.status === 'complete' && tab.url) {
             console.log('Tab updated:', tab.url);
         }
@@ -390,7 +368,7 @@ interface RequestData {
     });
 
     // Export intercepted data
-    chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    chrome.runtime.onMessage.addListener((message: any, _: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
         if (message.action === 'exportInterceptedData') {
             const data = Array.from(interceptedRequests.values());
             sendResponse({ data: data });
@@ -502,7 +480,7 @@ interface RequestData {
     }
 
     // Handle OAuth2 requests from popup
-    chrome.runtime.onMessage.addListener(async (message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    chrome.runtime.onMessage.addListener(async (message: any, _: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
         if (message.action === 'oauth2Authorize') {
             try {
                 const authCode = await handleOAuth2Flow(message.config);
@@ -527,26 +505,29 @@ interface RequestData {
 
     // Performance monitoring
     let performanceMetrics: PerformanceMetrics = {
-        requestCount: 0,
-        averageResponseTime: 0,
-        errorCount: 0
+        totalRequests: 0,
+        successCount: 0,
+        errorCount: 0,
+        averageResponseTime: 0
     };
 
     function updatePerformanceMetrics(requestData: RequestData): void {
-        performanceMetrics.requestCount++;
+        performanceMetrics.totalRequests++;
 
         if (requestData.duration) {
-            const totalTime = performanceMetrics.averageResponseTime * (performanceMetrics.requestCount - 1);
-            performanceMetrics.averageResponseTime = (totalTime + requestData.duration) / performanceMetrics.requestCount;
+            const totalTime = performanceMetrics.averageResponseTime * (performanceMetrics.totalRequests - 1);
+            performanceMetrics.averageResponseTime = (totalTime + requestData.duration) / performanceMetrics.totalRequests;
         }
 
         if ((requestData.status && requestData.status >= 400) || requestData.error) {
             performanceMetrics.errorCount++;
+        } else {
+            performanceMetrics.successCount++;
         }
     }
 
     // Export performance data
-    chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    chrome.runtime.onMessage.addListener((message: any, _: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
         if (message.action === 'getPerformanceMetrics') {
             sendResponse(performanceMetrics);
             return true;
@@ -554,9 +535,10 @@ interface RequestData {
 
         if (message.action === 'resetPerformanceMetrics') {
             performanceMetrics = {
-                requestCount: 0,
-                averageResponseTime: 0,
-                errorCount: 0
+                totalRequests: 0,
+                successCount: 0,
+                errorCount: 0,
+                averageResponseTime: 0
             };
             sendResponse({ success: true });
             return true;

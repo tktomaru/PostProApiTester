@@ -2,8 +2,7 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // グローバル変数と、chrome.storage への読み書きロジックをまとめる
 
-import type { AppState, Collection, HistoryItem, Environment, Scenario, RequestData, RequestExecution, ResponseExecution } from './types';
-import { renderCollectionsTree } from './collectionManager';
+import type { AppState, RequestData } from './types';
 import { updateCollectionVarSelector } from './variableManager';
 import { renderScenarioList } from './scenarioManager';
 

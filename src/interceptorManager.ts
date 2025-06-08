@@ -3,7 +3,7 @@
 // インターセプタ（ネットワークキャプチャ）の開始・停止・受信表示をまとめる
 
 import type { RequestData } from './types';
-import { showSuccess, showError, escapeHtml } from './utils';
+import { showSuccess, escapeHtml } from './utils';
 import { loadRequestIntoEditor } from './requestManager';
 
 interface InterceptorFilters {
