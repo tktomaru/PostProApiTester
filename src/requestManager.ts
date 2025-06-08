@@ -788,6 +788,162 @@ export function displayResponse(responseData: ProcessedResponse, format: string 
 }
 
 /**
+ * formatXml
+ *  XML文字列をインデント付きで整形する
+ */
+function formatXml(xml: string): string {
+    try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xml, 'application/xml');
+        
+        if (xmlDoc.querySelector('parsererror')) {
+            return xml;
+        }
+        
+        const serializer = new XMLSerializer();
+        const formatted = serializer.serializeToString(xmlDoc);
+        
+        // 基本的なインデント処理
+        return formatted.replace(/></g, '>\n<')
+            .replace(/^\s*\n/gm, '')
+            .split('\n')
+            .map((line) => {
+                const depth = (line.match(/</g) || []).length - (line.match(/\//g) || []).length;
+                return '  '.repeat(Math.max(0, depth)) + line.trim();
+            })
+            .join('\n');
+    } catch (e) {
+        return xml;
+    }
+}
+
+/**
+ * formatHtml
+ *  HTML文字列をインデント付きで整形する
+ */
+function formatHtml(html: string): string {
+    try {
+        return html.replace(/></g, '>\n<')
+            .replace(/^\s*\n/gm, '')
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map((line, index, arr) => {
+                const prevLine = arr[index - 1];
+                const depth = prevLine ? (prevLine.match(/</g) || []).length - (prevLine.match(/\//g) || []).length : 0;
+                return '  '.repeat(Math.max(0, depth)) + line;
+            })
+            .join('\n');
+    } catch (e) {
+        return html;
+    }
+}
+
+/**
+ * formatCss
+ *  CSS文字列をインデント付きで整形する
+ */
+function formatCss(css: string): string {
+    try {
+        return css.replace(/\{/g, ' {\n')
+            .replace(/\}/g, '\n}\n')
+            .replace(/;/g, ';\n')
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => {
+                if (line.includes('{') && !line.includes('}')) {
+                    return line;
+                } else if (line === '}') {
+                    return line;
+                } else {
+                    return '  ' + line;
+                }
+            })
+            .join('\n');
+    } catch (e) {
+        return css;
+    }
+}
+
+/**
+ * formatJavaScript
+ *  JavaScript文字列をインデント付きで整形する（基本的な処理）
+ */
+function formatJavaScript(js: string): string {
+    try {
+        return js.replace(/\{/g, ' {\n')
+            .replace(/\}/g, '\n}\n')
+            .replace(/;/g, ';\n')
+            .replace(/,/g, ',\n')
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map((line, index, arr) => {
+                const openBraces = (line.match(/\{/g) || []).length;
+                const closeBraces = (line.match(/\}/g) || []).length;
+                const prevLines = arr.slice(0, index);
+                const depth = prevLines.reduce((acc, l) => {
+                    return acc + (l.match(/\{/g) || []).length - (l.match(/\}/g) || []).length;
+                }, 0);
+                
+                if (closeBraces > 0 && openBraces === 0) {
+                    return '  '.repeat(Math.max(0, depth - closeBraces)) + line;
+                } else {
+                    return '  '.repeat(Math.max(0, depth)) + line;
+                }
+            })
+            .join('\n');
+    } catch (e) {
+        return js;
+    }
+}
+
+/**
+ * detectContentType
+ *  Content-Typeヘッダーとレスポンス内容から実際のコンテンツタイプを推測
+ */
+function detectContentType(contentType: string, bodyText: string): string {
+    const lowerContentType = contentType.toLowerCase();
+    
+    if (lowerContentType.includes('json')) {
+        return 'json';
+    }
+    if (lowerContentType.includes('xml')) {
+        return 'xml';
+    }
+    if (lowerContentType.includes('html')) {
+        return 'html';
+    }
+    if (lowerContentType.includes('css')) {
+        return 'css';
+    }
+    if (lowerContentType.includes('javascript') || lowerContentType.includes('text/js')) {
+        return 'javascript';
+    }
+    
+    // Content-Typeがtext/plainやその他の場合、内容から推測
+    const trimmedBody = bodyText.trim();
+    if (trimmedBody.startsWith('{') || trimmedBody.startsWith('[')) {
+        try {
+            JSON.parse(trimmedBody);
+            return 'json';
+        } catch (e) {
+            // JSONパースに失敗した場合は継続
+        }
+    }
+    if (trimmedBody.startsWith('<') && (trimmedBody.includes('<?xml') || trimmedBody.includes('<'))) {
+        if (trimmedBody.includes('<!DOCTYPE html') || trimmedBody.includes('<html')) {
+            return 'html';
+        } else {
+            return 'xml';
+        }
+    }
+    
+    return 'text';
+}
+
+/**
  * displayResponseBody
  *  Bodyタブ内に Pretty / Raw / Preview のいずれかでコンテンツを表示
  */
@@ -795,29 +951,64 @@ export function displayResponseBody(responseData: ProcessedResponse, format: str
     const bodyContainer = document.getElementById('responseBody') as HTMLElement;
     let content = '';
     const contentType = responseData.headers['content-type'] || '';
+    const detectedType = detectContentType(contentType, responseData.bodyText);
 
     switch (format) {
         case 'pretty':
-            if (contentType.includes('application/json') && responseData.body && typeof responseData.body === 'object') {
-                content = JSON.stringify(responseData.body, null, 2);
-            } else {
-                content = responseData.bodyText;
+            switch (detectedType) {
+                case 'json':
+                    try {
+                        if (typeof responseData.body === 'object') {
+                            content = JSON.stringify(responseData.body, null, 2);
+                        } else {
+                            const parsed = JSON.parse(responseData.bodyText);
+                            content = JSON.stringify(parsed, null, 2);
+                        }
+                    } catch (e) {
+                        content = responseData.bodyText;
+                    }
+                    break;
+                case 'xml':
+                    content = formatXml(responseData.bodyText);
+                    break;
+                case 'html':
+                    content = formatHtml(responseData.bodyText);
+                    break;
+                case 'css':
+                    content = formatCss(responseData.bodyText);
+                    break;
+                case 'javascript':
+                    content = formatJavaScript(responseData.bodyText);
+                    break;
+                default:
+                    content = responseData.bodyText;
+                    break;
             }
             break;
         case 'raw':
             content = responseData.bodyText;
             break;
         case 'preview':
-            if (contentType.includes('text/html')) {
+            if (detectedType === 'html') {
                 bodyContainer.innerHTML = `<iframe srcdoc="${escapeHtml(responseData.bodyText)}" style="width:100%;height:300px;border:1px solid #ccc;"></iframe>`;
                 return;
+            } else if (detectedType === 'json') {
+                try {
+                    const jsonData = typeof responseData.body === 'object' ? responseData.body : JSON.parse(responseData.bodyText);
+                    content = `<pre style="background:#f5f5f5;padding:10px;border-radius:4px;overflow:auto;">${JSON.stringify(jsonData, null, 2)}</pre>`;
+                    bodyContainer.innerHTML = content;
+                    return;
+                } catch (e) {
+                    content = responseData.bodyText;
+                }
             } else {
                 content = responseData.bodyText;
             }
             break;
     }
 
-    bodyContainer.textContent = content;
+    // syntax highlighting用のクラスを追加
+    bodyContainer.innerHTML = `<pre class="response-content response-${detectedType}">${escapeHtml(content)}</pre>`;
 }
 
 /**

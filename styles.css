@@ -2039,3 +2039,162 @@ transition: all 0.2s ease;
 .menu-btn:hover {
     background-color: #f0f0f0;
 }
+
+/* Enhanced Response Content Formatting */
+.response-content {
+    margin: 0;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #e1e5e9;
+    border-radius: 4px;
+    overflow: auto;
+    max-height: 400px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre;
+    word-wrap: break-word;
+}
+
+.response-json {
+    color: #333;
+}
+
+.response-xml {
+    color: #1a5490;
+}
+
+.response-html {
+    color: #d63384;
+}
+
+.response-css {
+    color: #6f42c1;
+}
+
+.response-javascript {
+    color: #fd7e14;
+}
+
+.response-text {
+    color: #495057;
+}
+
+/* Status indicators */
+.status-success {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.status-error {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+/* Test Results Enhancement */
+.test-summary {
+    display: flex;
+    gap: 16px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border: 1px solid #e1e5e9;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.test-passed {
+    color: #28a745;
+}
+
+.test-failed {
+    color: #dc3545;
+}
+
+.test-results {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.test-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.test-result.passed {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.test-result.failed {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.test-icon {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.test-name {
+    flex: 1;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 11px;
+}
+
+.test-error {
+    font-size: 11px;
+    color: #721c24;
+    margin-left: 8px;
+    font-style: italic;
+}
+
+/* No response state */
+.no-response {
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    padding: 40px;
+}
+
+/* Headers display enhancement */
+.headers-list {
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 12px;
+}
+
+.header-item {
+    padding: 4px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.header-item:last-child {
+    border-bottom: none;
+}
+
+.header-item strong {
+    color: #495057;
+    margin-right: 8px;
+}
+
+/* Cookies display */
+.cookies-list {
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 12px;
+}
+
+.cookie-item {
+    padding: 4px 0;
+    border-bottom: 1px solid #f0f0f0;
+    word-break: break-all;
+}
+
+.cookie-item:last-child {
+    border-bottom: none;
+}
