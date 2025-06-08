@@ -42,8 +42,13 @@ function setupVariableEventListeners(): void {
     addEnvVarBtn?.addEventListener('click', () => addVariableRow('environment'));
     addCollectionVarBtn?.addEventListener('click', () => addVariableRow('collection'));
 
-    collectionVarSelect?.addEventListener('change', () => {
-        state.currentCollection = collectionVarSelect.value;
+    collectionVarSelect?.addEventListener('change', async () => {
+        const selectedCollectionId = collectionVarSelect.value;
+        (state as any).selectedCollectionForVars = selectedCollectionId;
+        console.log('Collection changed to:', selectedCollectionId);
+        console.log('Collection variables data:', (state as any).variables.collection);
+        console.log('Selected collection variables:', (state as any).variables.collection[selectedCollectionId]);
+        
         renderVariables('collection');
     });
 }
@@ -330,14 +335,16 @@ export function renderVariables(scope: string): void {
     } else if (scope === 'collection') {
         container = document.getElementById('collectionVariablesContainer');
         // コレクションが未選択の場合は空メッセージを表示
-        if (!state.currentCollection) {
+        const selectedCollectionId = (state as any).selectedCollectionForVars;
+        if (!selectedCollectionId) {
             if (container) {
                 container.innerHTML = '<p class="empty-message">Select a collection to manage variables</p>';
             }
-            console.log("renderVariables is return currentCollection");
+            console.log("renderVariables is return selectedCollectionForVars");
             return;
         }
-        data = (state as any).variables.collection || {};
+        data = (state as any).variables.collection[selectedCollectionId] || {};
+        console.log(`renderVariables collection: selectedCollectionId=${selectedCollectionId}, data=`, data);
     } else {
         console.log("renderVariables is return");
         return;
@@ -464,7 +471,8 @@ export function variableExists(scope: string, key: string): boolean {
         case 'environment':
             return key in (state as any).variables.environment;
         case 'collection':
-            return state.currentCollection && (state as any).variables.collection[state.currentCollection] && key in (state as any).variables.collection[state.currentCollection];
+            const selectedCollectionId = (state as any).selectedCollectionForVars;
+            return selectedCollectionId && (state as any).variables.collection[selectedCollectionId] && key in (state as any).variables.collection[selectedCollectionId];
     }
     return false;
 }
@@ -490,11 +498,18 @@ export async function saveVariable(scope: string, key: string, value: string, de
             await saveEnvDataToStorage(state.currentEnvironment);
             break;
         case 'collection':
-            if (!state.currentCollection) return;
-            if (!(state as any).variables.collection[state.currentCollection]) {
-                (state as any).variables.collection[state.currentCollection] = {};
+            const selectedCollectionId = (state as any).selectedCollectionForVars;
+            if (!selectedCollectionId) {
+                console.error('No collection selected for saving variable');
+                return;
             }
-            (state as any).variables.collection[state.currentCollection][key] = varData;
+            if (!(state as any).variables.collection[selectedCollectionId]) {
+                (state as any).variables.collection[selectedCollectionId] = {};
+            }
+            (state as any).variables.collection[selectedCollectionId][key] = varData;
+            console.log('Saving collection variable:', key, varData, 'to collection:', selectedCollectionId);
+            console.log('Collection variables after save:', (state as any).variables.collection[selectedCollectionId]);
+            console.log('All collection variables:', (state as any).variables.collection);
             await saveVariablesToStorage();
             break;
     }
@@ -520,8 +535,9 @@ export async function deleteVariable(scope: string, key: string): Promise<void> 
             renderVariables('environment');
             break;
         case 'collection':
-            if (!state.currentCollection) return;
-            delete (state as any).variables.collection[state.currentCollection][key];
+            const selectedCollectionId = (state as any).selectedCollectionForVars;
+            if (!selectedCollectionId) return;
+            delete (state as any).variables.collection[selectedCollectionId][key];
             await saveVariablesToStorage();
             renderVariables('collection');
             break;
@@ -536,8 +552,7 @@ export function addVariableRow(scope: string): void {
         showError('Please select an environment first');
         return;
     }
-    const collectionVarSelect = document.getElementById('collectionVarSelect') as HTMLSelectElement;
-    if (scope === 'collection' && !collectionVarSelect?.value) {
+    if (scope === 'collection' && !(state as any).selectedCollectionForVars) {
         showError('Please select a collection first');
         return;
     }
