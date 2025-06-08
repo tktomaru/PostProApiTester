@@ -90,6 +90,7 @@ interface XhrResponse {
     headers: Record<string, string>;
     text(): Promise<string>;
     json(): Promise<any>;
+    duration?: number;
 }
 
 interface ProcessedResponse extends ResponseData {
@@ -452,6 +453,33 @@ export async function sendRequest(requestObj: RequestData, forScenario: boolean 
 
         const { method, headers, bodyData, url } = opts;
 
+        // Cookieヘッダーがある場合はchrome.cookies APIを使用
+        const hasCookieHeader = Object.keys(headers).some(key => 
+            key.toLowerCase() === 'cookie'
+        );
+
+        if (hasCookieHeader) {
+            console.log('🍪 Cookie header detected, using chrome.cookies API');
+            // chrome.cookies APIを使用してリクエストを送信
+            const cookieResponse = await sendRequestWithCookieSupport({
+                method,
+                url,
+                headers,
+                body: bodyData
+            });
+            
+            const parsed = await processResponse(cookieResponse, cookieResponse.duration || 0);
+            
+            if (!forScenario) {
+                displayResponse(parsed);
+            }
+
+            const testResults = await executeTestScript(parsed, requestObj.testScript);
+            await saveToHistory(processedRequest, parsed, testResults);
+
+            return { response: parsed, testResults };
+        }
+
         // 4. XMLHttpRequest で送信（タイムアウト付き）
         const startTime = Date.now();
 
@@ -673,6 +701,72 @@ export function buildFetchOptions(request: RequestData): FetchOptions | null {
 
     return { method, headers, bodyData, url };
 }
+
+/**
+ * sendRequestWithCookieSupport
+ *  chrome.cookies APIを使用してCookieヘッダー付きリクエストを送信
+ */
+async function sendRequestWithCookieSupport(options: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    body: string | FormData | URLSearchParams | null;
+}): Promise<XhrResponse> {
+    console.log('🍪 sendRequestWithCookieSupport called with:', options);
+    
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        const messageData = {
+            action: 'sendHttpRequest',
+            options: {
+                method: options.method,
+                url: options.url,
+                headers: options.headers,
+                body: typeof options.body === 'string' ? options.body : 
+                      options.body?.toString() || null
+            }
+        };
+        
+        console.log('Sending message to background script for Cookie handling:', messageData);
+        
+        // Background Scriptにクッキー付きHTTPリクエストを要求
+        chrome.runtime.sendMessage(messageData, (response) => {
+            console.log('Received response from background script:', response);
+            
+            if (chrome.runtime.lastError) {
+                console.error('Chrome runtime error:', chrome.runtime.lastError.message);
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+            }
+            
+            if (response.success) {
+                const duration = Date.now() - startTime;
+                const xhrResponse: XhrResponse = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers,
+                    text: async () => response.body,
+                    json: async () => {
+                        try {
+                            return JSON.parse(response.body);
+                        } catch {
+                            return {};
+                        }
+                    },
+                    duration: duration
+                };
+                console.log('Constructed Cookie XhrResponse:', xhrResponse);
+                resolve(xhrResponse);
+            } else {
+                console.error('Background script returned error:', response.error);
+                reject(new Error(response.error || 'Cookie request failed'));
+            }
+        });
+    });
+}
+
+
 
 /**
  * addAuthenticationHeaders

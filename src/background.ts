@@ -56,12 +56,207 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
                 sendResponse({ active: isInterceptorActive });
                 break;
 
+            case 'sendHttpRequest':
+                handleHttpRequest(message.options, sendResponse);
+                return true; // 非同期レスポンス
+                break;
+
+            case 'sendRequestWithHeaderInjection':
+                handleRequestWithHeaderInjection(message.options, sendResponse);
+                return true; // 非同期レスポンス
+                break;
+
             default:
                 sendResponse({ error: 'Unknown action' });
         }
 
         return true; // Keep message channel open for async response
     });
+
+    // ユーティリティ: Cookie ヘッダー文字列をパースしてセット
+    async function setCookiesFromHeader(url: string, cookieHeader: string): Promise<void> {
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname;
+        const pairs = cookieHeader.split(';').map(s => s.trim());
+        
+        console.log('Setting cookies for domain:', domain, 'Pairs:', pairs);
+        
+        for (const pair of pairs) {
+            const [name, ...rest] = pair.split('=');
+            const value = rest.join('=');
+            
+            if (name && value) {
+                try {
+                    await chrome.cookies.set({
+                        url,
+                        name: name.trim(),
+                        value: value.trim(),
+                        domain,
+                        path: "/",
+                        secure: urlObj.protocol === "https:",
+                        sameSite: "lax"
+                    });
+                    console.log(`Set cookie: ${name}=${value} for domain: ${domain}`);
+                } catch (error) {
+                    console.error(`Failed to set cookie ${name}:`, error);
+                }
+            }
+        }
+    }
+
+    // HTTP Request handler for Cookie headers
+    async function handleHttpRequest(options: any, sendResponse: (response?: any) => void): Promise<void> {
+        try {
+            const { method, url, headers, body } = options;
+            console.log('🍪 handleHttpRequest with headers:', headers);
+            
+            // ① Cookie ヘッダーを本物の Cookie としてセット
+            if (headers.Cookie || headers.cookie) {
+                const cookieHeader = headers.Cookie || headers.cookie;
+                console.log('Found Cookie header:', cookieHeader);
+                await setCookiesFromHeader(url, cookieHeader);
+            }
+            
+            // ② fetch で送信（credentials: include でブラウザが Cookie ヘッダーを自動付加）
+            const fetchHeaders: Record<string, string> = {};
+            Object.entries(headers).forEach(([k, v]) => {
+                if (k.toLowerCase() !== 'cookie') {
+                    fetchHeaders[k] = v as string;
+                }
+            });
+            
+            console.log('Fetch headers (without Cookie):', fetchHeaders);
+            
+            const fetchOptions: RequestInit = {
+                method: method,
+                headers: fetchHeaders,
+                credentials: 'include', // ブラウザが自動的にCookieヘッダーを付加
+                body: body || undefined
+            };
+            
+            console.log('Fetch options:', fetchOptions);
+            const response = await fetch(url, fetchOptions);
+            const responseBody = await response.text();
+            const responseHeaders: Record<string, string> = {};
+            
+            // レスポンスヘッダーを収集
+            response.headers.forEach((value, key) => {
+                responseHeaders[key] = value;
+            });
+            
+            console.log('Response received:', { status: response.status, headers: responseHeaders });
+            
+            sendResponse({
+                success: true,
+                status: response.status,
+                statusText: response.statusText,
+                headers: responseHeaders,
+                body: responseBody
+            });
+        } catch (error: any) {
+            console.error('HTTP Request error:', error);
+            sendResponse({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    // Header injection using webRequest API
+    let headerInjectionSettings = new Map<string, Record<string, string>>();
+    
+    // webRequest APIでヘッダー注入を行う関数
+    function setupHeaderInjection() {
+        chrome.webRequest.onBeforeSendHeaders.addListener(
+            (details) => {
+                console.log('webRequest onBeforeSendHeaders:', details.url);
+                const headersToInject = headerInjectionSettings.get(details.url);
+                if (headersToInject && details.requestHeaders) {
+                    console.log('🚀 Injecting headers for:', details.url, headersToInject);
+                    
+                    // 元のヘッダーをコピー
+                    const headers = [...details.requestHeaders];
+                    
+                    // Cookie → X-Cookie-Data 変換含めて注入
+                    Object.entries(headersToInject).forEach(([key, value]) => {
+                        if (key.toLowerCase() === 'cookie') {
+                            console.log(`Converting Cookie header to X-Cookie-Data: ${value}`);
+                            headers.push({ name: 'X-Cookie-Data', value });
+                        } else {
+                            const idx = headers.findIndex(h => h.name?.toLowerCase() === key.toLowerCase());
+                            if (idx >= 0) {
+                                headers[idx].value = value;
+                            } else {
+                                headers.push({ name: key, value });
+                            }
+                        }
+                    });
+                    
+                    // 一度 inject したら削除
+                    headerInjectionSettings.delete(details.url);
+                    console.log('Final headers:', headers);
+                    return { requestHeaders: headers };
+                }
+                // マッチしない場合は何も返さない
+            },
+            { urls: ['<all_urls>'] },
+            ['blocking', 'requestHeaders']
+        );
+    }
+    
+    // 初期化時にヘッダー注入を設定
+    setupHeaderInjection();
+    
+    async function handleRequestWithHeaderInjection(options: any, sendResponse: (response?: any) => void): Promise<void> {
+        try {
+            const { method, url, headers, body } = options;
+            console.log('🔥 handleRequestWithHeaderInjection:', url, headers);
+
+            // URL をキーに一度だけ inject 指定
+            headerInjectionSettings.set(url, headers);
+            console.log('Set injection settings for URL:', url, 'Headers:', headers);
+            console.log('Current injection settings:', Array.from(headerInjectionSettings.entries()));
+
+            // 少し待って fetch（空ヘッダーで送信）
+            setTimeout(async () => {
+                try {
+                    console.log('→ fetching (with injected headers) to:', url);
+                    const resp = await fetch(url, { 
+                        method, 
+                        headers: {}, // 空のヘッダーで送信（webRequestで注入される）
+                        body: body || undefined 
+                    });
+                    const text = await resp.text();
+                    const respHeaders: Record<string, string> = {};
+                    resp.headers.forEach((v, k) => respHeaders[k] = v);
+
+                    console.log('Response received:', { status: resp.status, headers: respHeaders });
+                    sendResponse({ 
+                        success: true, 
+                        status: resp.status, 
+                        statusText: resp.statusText,
+                        headers: respHeaders, 
+                        body: text 
+                    });
+                } catch (err: any) {
+                    console.error('✖ fetch error:', err);
+                    // エラー時は設定をクリーンアップ
+                    headerInjectionSettings.delete(url);
+                    sendResponse({ 
+                        success: false, 
+                        error: err.message 
+                    });
+                }
+            }, 100);
+
+        } catch (error: any) {
+            console.error('handleRequestWithHeaderInjection error:', error);
+            sendResponse({
+                success: false,
+                error: error.message
+            });
+        }
+    }
 
     function startNetworkInterceptor(filters?: InterceptorFilters): void {
         if (isInterceptorActive) return;

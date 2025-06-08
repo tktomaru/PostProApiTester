@@ -75,7 +75,10 @@ setBody setBodyWithScript
                 name: 'サンプル POST 1',
                 method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=1',
-                headers: {},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cookie': 'sessionId=abc123def456; userId=12345; theme=dark; language=ja'
+                },
                 params: {},
                 body: "test body text",
                 auth: { type: 'none' },
@@ -100,7 +103,10 @@ setBody setBodyWithScript2
                 name: 'サンプル POST 2',
                 method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=2',
-                headers: {},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cookie': 'authToken=xyz789ghi012; csrfToken=csrf_abc123; preferences={"notifications":true}'
+                },
                 params: {},
                 body: "test body text",
                 auth: { type: 'none' },
@@ -163,7 +169,8 @@ echoRequestUrlContains limit=10`
                 headers: { 
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'X-API-Key': 'test-api-key'
+                    'X-API-Key': 'test-api-key',
+                    'Cookie': 'loginSession=sess_abc123xyz; rememberMe=true; lastActivity=1640995200'
                 },
                 params: {},
                 body: JSON.stringify({
@@ -179,6 +186,7 @@ status 200
 echoRequestMethodEquals POST
 echoRequestHeaderEquals Content-Type application/json
 echoRequestHeaderEquals X-API-Key test-api-key
+echoRequestHeaderEquals cookie loginSession=sess_abc123xyz; rememberMe=true; lastActivity=1640995200
 echoRequestBodyEquals {"username":"testuser","password":"testpass123","remember":true}
 echoRequestUrlContains /api/auth/login`
             },
@@ -189,7 +197,8 @@ echoRequestUrlContains /api/auth/login`
                 url: 'https://reply.tukutano.jp/api/users/123',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'Cookie': 'userToken=bearer_token_sample; sessionTimeout=3600; secureFlag=true'
                 },
                 params: {},
                 body: JSON.stringify({
@@ -207,6 +216,7 @@ status 200
 echoRequestMethodEquals PUT
 echoRequestHeaderEquals Authorization Bearer test-bearer-token-12345
 echoRequestHeaderEquals Content-Type application/json
+echoRequestHeaderEquals cookie userToken=bearer_token_sample; sessionTimeout=3600; secureFlag=true
 echoRequestBodyEquals {"name":"Updated User","email":"updated@example.com"}
 echoRequestUrlContains /api/users/123`
             }
@@ -358,7 +368,8 @@ setBody setBodyWithScript3
                 url: 'https://reply.tukutano.jp/api/auth/login',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'Cookie': 'deviceId=dev123abc; trackingConsent=accepted; locale=ja-JP'
                 },
                 params: {},
                 body: JSON.stringify({
@@ -374,6 +385,7 @@ status 200
 echoRequestMethodEquals POST
 echoRequestHeaderEquals Content-Type application/json
 echoRequestHeaderEquals X-Request-Source integration-test
+echoRequestHeaderEquals cookie deviceId=dev123abc; trackingConsent=accepted; locale=ja-JP
 echoRequestBodyEquals {"username":"testuser","password":"secret123"}
 echoRequestUrlContains /api/auth/login`
             },
@@ -417,7 +429,8 @@ echoRequestUrlContains format=json`
                 headers: { 
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'X-Test-Flow': 'integration'
+                    'X-Test-Flow': 'integration',
+                    'Cookie': 'updateSession=upd789xyz; editMode=true; lastEdit=1640995800'
                 },
                 params: {},
                 body: JSON.stringify({
@@ -442,6 +455,7 @@ echoRequestHeaderEquals Authorization Bearer mock-auth-token-from-previous-step
 echoRequestHeaderEquals Content-Type application/json
 echoRequestHeaderEquals X-Test-Flow integration
 echoRequestHeaderEquals X-Update-Source integration-flow
+echoRequestHeaderEquals cookie updateSession=upd789xyz; editMode=true; lastEdit=1640995800
 echoRequestBodyEquals {"name":"Updated Test User","email":"updated@test.com","preferences":{"theme":"dark","notifications":true}}
 echoRequestUrlContains /api/users/profile`
             }

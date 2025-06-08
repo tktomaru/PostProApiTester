@@ -181,8 +181,44 @@ export function setupEventListeners(): void {
             let requestObj = state.currentRequest;
             if (!requestObj) return;
             
+            // フォームから最新の値を収集してrequestObjを更新
+            const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
+            const nameInput = document.getElementById('nameInput') as HTMLInputElement;
+            const urlInput = document.getElementById('urlInput') as HTMLInputElement;
+            
+            requestObj.method = methodSelect?.value || requestObj.method;
+            requestObj.name = nameInput?.value?.trim() || requestObj.name;
+            requestObj.url = urlInput?.value?.trim() || requestObj.url;
+
+            // ヘッダーを収集
+            const headerRows = document.querySelectorAll('#headersContainer .key-value-row');
+            const newHeaders: Record<string, string> = {};
+            headerRows.forEach(row => {
+                const rowElement = row as HTMLElement;
+                const keyInput = rowElement.querySelector('.key-input') as HTMLInputElement;
+                const valueInput = rowElement.querySelector('.value-input') as HTMLInputElement;
+                const key = keyInput?.value?.trim();
+                const value = valueInput?.value?.trim();
+                if (key) newHeaders[key] = value || '';
+            });
+            requestObj.headers = newHeaders;
+
+            // パラメータを収集
+            const paramRows = document.querySelectorAll('#paramsContainer .key-value-row');
+            const newParams: Record<string, string> = {};
+            paramRows.forEach(row => {
+                const rowElement = row as HTMLElement;
+                const keyInput = rowElement.querySelector('.key-input') as HTMLInputElement;
+                const valueInput = rowElement.querySelector('.value-input') as HTMLInputElement;
+                const key = keyInput?.value?.trim();
+                const value = valueInput?.value?.trim();
+                if (key) newParams[key] = value || '';
+            });
+            requestObj.params = newParams;
+            
             // bodyType の選択状況を反映し、requestObj.body を適宜セット
             const bodyType = (document.querySelector('input[name="bodyType"]:checked') as HTMLInputElement)?.value || 'none';
+            requestObj.bodyType = bodyType;
             requestObj.body = null;
 
             switch (bodyType) {
@@ -199,6 +235,12 @@ export function setupEventListeners(): void {
                     break;
                 default:
                     break;
+            }
+
+            // プリリクエストスクリプトも更新
+            const preRequestScript = document.getElementById('preRequestScript') as HTMLTextAreaElement;
+            if (preRequestScript) {
+                requestObj.preRequestScript = preRequestScript.value;
             }
 
             sendRequest(requestObj);
