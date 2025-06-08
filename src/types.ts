@@ -122,6 +122,7 @@ export interface ResponseExecution {
   timestamp: string;
   headers: Record<string, string>;
   body: any;
+  testResults?: TestResult[];
   [key: string]: any;  // 動的なプロパティアクセスをサポート
 }
 

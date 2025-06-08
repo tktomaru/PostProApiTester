@@ -332,6 +332,11 @@ export function loadRequestIntoEditor(request: RequestData): void {
                 bodyText: bodyText
             };
             displayResponse(responseData);
+            
+            // 保存されたテスト結果を表示
+            if (request.lastResponseExecution.testResults) {
+                displayTestResults(request.lastResponseExecution.testResults);
+            }
         }
     } else {
         // レスポンス履歴がない場合は表示をクリア
@@ -346,10 +351,10 @@ export function loadRequestIntoEditor(request: RequestData): void {
  * executeTestScript
  *  Tests タブに書かれたスクリプトを実行し、結果を表示
  */
-export async function executeTestScript(responseData: ProcessedResponse): Promise<void> {
+export async function executeTestScript(responseData: ProcessedResponse): Promise<TestResult[]> {
     const testScriptElement = document.getElementById('testScript') as HTMLTextAreaElement;
     const raw = testScriptElement?.value;
-    if (!raw?.trim()) return;
+    if (!raw?.trim()) return [];
 
     // 改行で分割し、空行や先頭が // のコメント行を除外
     const lines = raw
@@ -365,14 +370,17 @@ export async function executeTestScript(responseData: ProcessedResponse): Promis
             results.push({ name: line, passed: result.passed, error: result.error });
         }
         displayTestResults(results);
+        return results;
     } catch (error: any) {
         console.error('Test script 実行エラー:', error);
-        results.push({
+        const errorResult = {
             name: 'Script Execution Error',
             passed: false,
             error: error.message
-        });
+        };
+        results.push(errorResult);
         displayTestResults(results);
+        return results;
     }
 }
 
@@ -497,7 +505,7 @@ export async function sendRequest(requestObj: RequestData): Promise<XhrResponse 
         displayResponse(parsed);
 
         // 6. テストスクリプト実行
-        await executeTestScript(parsed);
+        const testResults = await executeTestScript(parsed);
 
         // 7. 履歴に保存
         await saveToHistory(processedRequest, parsed);
@@ -518,7 +526,8 @@ export async function sendRequest(requestObj: RequestData): Promise<XhrResponse 
                         size: parsed.size,
                         timestamp: new Date().toISOString(),
                         headers: parsed.headers,  // パース済みのヘッダーを保存
-                        body: parsed.body
+                        body: parsed.body,
+                        testResults: testResults
                     };
 
                     await saveCollectionsToStorage();
@@ -541,7 +550,8 @@ export async function sendRequest(requestObj: RequestData): Promise<XhrResponse 
                         size: parsed.size,
                         timestamp: new Date().toISOString(),
                         headers: parsed.headers,  // パース済みのヘッダーを保存
-                        body: parsed.body
+                        body: parsed.body,
+                        testResults: testResults
                     };
                 }
             }
@@ -557,7 +567,8 @@ export async function sendRequest(requestObj: RequestData): Promise<XhrResponse 
                 size: parsed.size,
                 timestamp: new Date().toISOString(),
                 headers: parsed.headers,  // パース済みのヘッダーを保存
-                body: parsed.body
+                body: parsed.body,
+                testResults: testResults
             };
         }
 
