@@ -12,7 +12,7 @@ import {
     state
 } from './state';
 import { sampleCollections } from './defaultData';
-import { showSuccess, switchMainTab } from './utils';
+import { showSuccess, showError, switchMainTab } from './utils';
 import { updateCollectionVarSelector, renderVariables } from './variableManager';
 import { addRequestToScenario } from './scenarioManager';
 import { loadRequestIntoEditor } from './requestManager';
@@ -320,6 +320,11 @@ export function renderCollectionsTree(): void {
                             action: () => copyRequest(req, col.id)
                         },
                         {
+                            text: 'リクエストを移動',
+                            icon: '📁',
+                            action: () => moveRequestFromCollection(req, col.id)
+                        },
+                        {
                             text: 'シナリオに追加',
                             icon: '🌱',
                             action: () => addRequestToScenario(req)
@@ -476,6 +481,11 @@ export function renderScenariosTree(): void {
                             text: 'リクエストをコピー',
                             icon: '📋',
                             action: () => copyRequestFromScenario(req, scenario.id)
+                        },
+                        {
+                            text: 'リクエストを移動',
+                            icon: '📁',
+                            action: () => moveRequestFromScenario(req, scenario.id)
                         },
                         {
                             text: 'リクエストを編集',
@@ -695,4 +705,88 @@ async function copyRequestFromScenario(request: RequestData, scenarioId: string)
     // 表示を更新
     renderScenariosTree();
     showSuccess(`"${request.name}" をシナリオ内でコピーしました`);
+}
+
+/**
+ * コレクション間でリクエストを移動
+ */
+async function moveRequestFromCollection(request: RequestData, sourceCollectionId: string): Promise<void> {
+    // 移動先のコレクションを選択
+    const targetCollections = state.collections.filter(c => c.id !== sourceCollectionId);
+    if (targetCollections.length === 0) {
+        showError('移動先のコレクションがありません。');
+        return;
+    }
+
+    const collectionNames = targetCollections.map(c => c.name);
+    const selectedCollectionName = prompt(
+        `"${request.name}" を移動するコレクションを選択してください:\n\n${collectionNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}\n\n番号を入力してください:`
+    );
+
+    if (!selectedCollectionName) return;
+    
+    const collectionIndex = parseInt(selectedCollectionName, 10) - 1;
+    if (isNaN(collectionIndex) || collectionIndex < 0 || collectionIndex >= targetCollections.length) {
+        showError('無効な番号です');
+        return;
+    }
+
+    const targetCollection = targetCollections[collectionIndex];
+    const sourceCollection = state.collections.find(c => c.id === sourceCollectionId);
+    
+    if (!sourceCollection) return;
+
+    // ソースコレクションからリクエストを削除
+    sourceCollection.requests = sourceCollection.requests.filter(r => r.id !== request.id);
+    
+    // ターゲットコレクションにリクエストを追加
+    targetCollection.requests.push(request);
+    
+    await saveCollectionsToStorage();
+
+    // 表示を更新
+    renderCollectionsTree();
+    showSuccess(`"${request.name}" を "${targetCollection.name}" に移動しました`);
+}
+
+/**
+ * シナリオ間でリクエストを移動
+ */
+async function moveRequestFromScenario(request: RequestData, sourceScenarioId: string): Promise<void> {
+    // 移動先のシナリオを選択
+    const targetScenarios = state.scenarios.filter(s => s.id !== sourceScenarioId);
+    if (targetScenarios.length === 0) {
+        showError('移動先のシナリオがありません。');
+        return;
+    }
+
+    const scenarioNames = targetScenarios.map(s => s.name);
+    const selectedScenarioName = prompt(
+        `"${request.name}" を移動するシナリオを選択してください:\n\n${scenarioNames.map((name, i) => `${i + 1}. ${name}`).join('\n')}\n\n番号を入力してください:`
+    );
+
+    if (!selectedScenarioName) return;
+    
+    const scenarioIndex = parseInt(selectedScenarioName, 10) - 1;
+    if (isNaN(scenarioIndex) || scenarioIndex < 0 || scenarioIndex >= targetScenarios.length) {
+        showError('無効な番号です');
+        return;
+    }
+
+    const targetScenario = targetScenarios[scenarioIndex];
+    const sourceScenario = state.scenarios.find(s => s.id === sourceScenarioId);
+    
+    if (!sourceScenario) return;
+
+    // ソースシナリオからリクエストを削除
+    sourceScenario.requests = sourceScenario.requests.filter(r => r.id !== request.id);
+    
+    // ターゲットシナリオにリクエストを追加
+    targetScenario.requests.push(request);
+    
+    await saveScenariosToStorage();
+
+    // 表示を更新
+    renderScenariosTree();
+    showSuccess(`"${request.name}" を "${targetScenario.name}" に移動しました`);
 }
