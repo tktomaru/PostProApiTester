@@ -90,6 +90,38 @@ export function loadRequestIntoEditor(request: RequestData): void {
     methodSelect.value = request.method;
     urlInput.value = request.url;
 
+    // URLの変更を監視してパラメータを更新
+    urlInput.addEventListener('input', () => {
+        try {
+            const url = new URL(urlInput.value);
+            const paramsContainer = document.getElementById('paramsContainer') as HTMLElement;
+            paramsContainer.innerHTML = '';
+            
+            // 既存のパラメータをクリア
+            if (state.currentRequest) {
+                state.currentRequest.params = {};
+            }
+
+            // URLのパラメータを追加
+            url.searchParams.forEach((value, key) => {
+                addKeyValueRow(paramsContainer, 'param');
+                const rows = paramsContainer.querySelectorAll('.key-value-row');
+                const lastRow = rows[rows.length - 1] as HTMLElement;
+                const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
+                const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
+                keyInput.value = key;
+                valueInput.value = value;
+
+                // state.currentRequestのパラメータも更新
+                if (state.currentRequest) {
+                    state.currentRequest.params[key] = value;
+                }
+            });
+        } catch (e) {
+            // URLが無効な場合は何もしない
+        }
+    });
+
     // ヘッダ描画
     const headersContainer = document.getElementById('headersContainer') as HTMLElement;
     headersContainer.innerHTML = '';
@@ -123,6 +155,34 @@ export function loadRequestIntoEditor(request: RequestData): void {
     } else {
         addKeyValueRow(paramsContainer, 'param');
     }
+
+    // パラメータの変更を監視してURLを更新
+    paramsContainer.addEventListener('input', () => {
+        try {
+            const url = new URL(urlInput.value);
+            const params = collectKeyValues('paramsContainer');
+            
+            // URLのパラメータをクリア
+            url.search = '';
+            
+            // 新しいパラメータを追加
+            Object.entries(params).forEach(([key, value]) => {
+                if (key && value) {
+                    url.searchParams.append(key, value);
+                }
+            });
+
+            // URLを更新
+            urlInput.value = url.toString();
+
+            // state.currentRequestのパラメータも更新
+            if (state.currentRequest) {
+                state.currentRequest.params = params;
+            }
+        } catch (e) {
+            // URLが無効な場合は何もしない
+        }
+    });
 
     // ボディ描画
     if (request.body) {
