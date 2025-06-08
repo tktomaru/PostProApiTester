@@ -368,6 +368,58 @@
     <!-- Notification Area -->
     <div id="notificationArea" class="notification-area"></div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>General Settings</h4>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="openDevTools">
+                            Automatically open Developer Tools
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            Request Timeout (ms):
+                            <input type="number" id="requestTimeout" min="1000" step="1000">
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="followRedirects">
+                            Follow Redirects
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="validateSSL">
+                            Validate SSL Certificates
+                        </label>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4>History Settings</h4>
+                    <div class="setting-item">
+                        <label>
+                            Max History Items:
+                            <input type="number" id="maxHistoryItems" min="10" step="10">
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="resetSettings">Reset to Default</button>
+                <button class="btn btn-primary" id="saveSettings">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- バンドルされたスクリプトを読み込む -->
     <script type="module" src="dist/index.bundle.js"></script>
 </body>

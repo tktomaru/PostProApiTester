@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "API Tester Chrome Extension",
   "scripts": {
-    "build": "npx vite build",
-    "watch": "npx vite build --watch",
-    "dev": "vite"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "watch": "vite build --watch",
+    "preview": "vite preview"
   },
   "dependencies": {
     "jsonpath-plus": "^8.0.0"

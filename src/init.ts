@@ -31,6 +31,7 @@ import {
 import { initializeCollections } from './collectionManager';
 import { renderHistory } from './historyManager';
 import { newScenario, runScenario, initializeScenarios } from './scenarioManager';
+import { initializeSettingsUI, initializeSettingsModal } from './settings';
 
 // Authentication handlers
 function setupAuthHandlers(): void {
@@ -148,6 +149,17 @@ async function initializeApp(): Promise<void> {
         setupTabSwitching();
         setupModalHandlers();
 
+        // 開発者機能を自動で開くメッセージを受け取る
+        chrome.runtime.onMessage.addListener((message: any) => {
+            if (message.action === 'openDevTools') {
+                // 開発者機能のタブを開く
+                const devToolsTab = document.querySelector('[data-tab="interceptor"]') as HTMLElement;
+                if (devToolsTab) {
+                    devToolsTab.click();
+                }
+            }
+        });
+
         // ─────────────────────────────
         // 2. ストレージからデータをロードし、必要ならサンプル投入
 
@@ -193,4 +205,12 @@ async function initializeApp(): Promise<void> {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await initializeApp();
+    
+    // 設定機能の初期化
+    try {
+        initializeSettingsUI();
+        initializeSettingsModal();
+    } catch (error) {
+        console.error('設定の初期化に失敗しました:', error);
+    }
 });

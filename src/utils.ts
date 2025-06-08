@@ -241,13 +241,9 @@ export function setupEventListeners(): void {
             exportData();
         });
     }
-    
-    const settingsBtn = document.getElementById('settingsBtn');
-    if (settingsBtn) {
-        settingsBtn.addEventListener('click', () => {
-            showError('Settings panel not yet implemented');
-        });
-    }
+
+
+
     
     // コレクション管理（New Collection）
     const createCollectionBtn = document.getElementById('createCollectionBtn');

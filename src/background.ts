@@ -275,7 +275,8 @@ interface RequestData {
                 timeout: 30000,
                 followRedirects: true,
                 validateSSL: true,
-                maxHistoryItems: 100
+                maxHistoryItems: 100,
+                openDevTools: true
             },
             collections: [],
             history: [],
@@ -297,6 +298,11 @@ interface RequestData {
         // 新しいタブで index.html を開く
         chrome.tabs.create({
             url: chrome.runtime.getURL("index.html")
+        }, (newTab) => {
+            // 開発者ツールを自動で開く
+            if (newTab.id) {
+                chrome.tabs.sendMessage(newTab.id, { action: 'openDevTools' });
+            }
         });
     });
 
