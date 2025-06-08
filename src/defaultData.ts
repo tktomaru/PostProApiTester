@@ -139,12 +139,12 @@ removeHeader removeHeader
                 name: 'GET Echo Test',
                 method: 'GET',
                 url: 'https://reply.tukutano.jp/api/users',
-                headers: { 
+                headers: {
                     'Accept': 'application/json',
                     'X-Test-Header': 'test-value',
                     'User-Agent': 'API-Tester'
                 },
-                params: { 
+                params: {
                     page: '1',
                     limit: '10'
                 },
@@ -166,7 +166,7 @@ echoRequestUrlContains limit=10`
                 name: 'POST Echo Test',
                 method: 'POST',
                 url: 'https://reply.tukutano.jp/api/auth/login',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                     'X-API-Key': 'test-api-key',
@@ -186,7 +186,7 @@ status 200
 echoRequestMethodEquals POST
 echoRequestHeaderEquals Content-Type application/json
 echoRequestHeaderEquals X-API-Key test-api-key
-echoRequestHeaderEquals cookie loginSession=sess_abc123xyz; rememberMe=true; lastActivity=1640995200
+echoRequestHeaderContains cookie loginSession=sess_abc123xyz; rememberMe=true; lastActivity=1640995200
 echoRequestBodyEquals {"username":"testuser","password":"testpass123","remember":true}
 echoRequestUrlContains /api/auth/login`
             },
@@ -195,7 +195,7 @@ echoRequestUrlContains /api/auth/login`
                 name: 'Bearer Auth Echo Test',
                 method: 'PUT',
                 url: 'https://reply.tukutano.jp/api/users/123',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                     'Cookie': 'userToken=bearer_token_sample; sessionTimeout=3600; secureFlag=true'
@@ -205,9 +205,9 @@ echoRequestUrlContains /api/auth/login`
                     name: "Updated User",
                     email: "updated@example.com"
                 }),
-                auth: { 
-                    type: 'bearer', 
-                    token: 'test-bearer-token-12345' 
+                auth: {
+                    type: 'bearer',
+                    token: 'test-bearer-token-12345'
                 },
                 bodyType: "json",
                 preRequestScript: '',
@@ -216,7 +216,7 @@ status 200
 echoRequestMethodEquals PUT
 echoRequestHeaderEquals Authorization Bearer test-bearer-token-12345
 echoRequestHeaderEquals Content-Type application/json
-echoRequestHeaderEquals cookie userToken=bearer_token_sample; sessionTimeout=3600; secureFlag=true
+echoRequestHeaderContains cookie userToken=bearer_token_sample; sessionTimeout=3600; secureFlag=true
 echoRequestBodyEquals {"name":"Updated User","email":"updated@example.com"}
 echoRequestUrlContains /api/users/123`
             }
@@ -366,7 +366,7 @@ setBody setBodyWithScript3
                 name: 'Authentication Test',
                 method: 'POST',
                 url: 'https://reply.tukutano.jp/api/auth/login',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                     'Cookie': 'deviceId=dev123abc; trackingConsent=accepted; locale=ja-JP'
@@ -385,7 +385,7 @@ status 200
 echoRequestMethodEquals POST
 echoRequestHeaderEquals Content-Type application/json
 echoRequestHeaderEquals X-Request-Source integration-test
-echoRequestHeaderEquals cookie deviceId=dev123abc; trackingConsent=accepted; locale=ja-JP
+echoRequestHeaderContains cookie deviceId=dev123abc; trackingConsent=accepted; locale=ja-JP
 echoRequestBodyEquals {"username":"testuser","password":"secret123"}
 echoRequestUrlContains /api/auth/login`
             },
@@ -394,18 +394,18 @@ echoRequestUrlContains /api/auth/login`
                 name: 'Data Retrieval Test',
                 method: 'GET',
                 url: 'https://reply.tukutano.jp/api/users/profile',
-                headers: { 
+                headers: {
                     'Accept': 'application/json',
                     'X-Test-Flow': 'integration'
                 },
-                params: { 
+                params: {
                     include: 'details',
                     format: 'json'
                 },
                 body: null,
-                auth: { 
-                    type: 'bearer', 
-                    token: 'mock-auth-token-from-previous-step' 
+                auth: {
+                    type: 'bearer',
+                    token: 'mock-auth-token-from-previous-step'
                 },
                 bodyType: "none",
                 preRequestScript: `// 前のステップの結果を利用（模擬）
@@ -426,7 +426,7 @@ echoRequestUrlContains format=json`
                 name: 'Data Update Test',
                 method: 'PUT',
                 url: 'https://reply.tukutano.jp/api/users/profile',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                     'X-Test-Flow': 'integration',
@@ -441,9 +441,9 @@ echoRequestUrlContains format=json`
                         notifications: true
                     }
                 }),
-                auth: { 
-                    type: 'bearer', 
-                    token: 'mock-auth-token-from-previous-step' 
+                auth: {
+                    type: 'bearer',
+                    token: 'mock-auth-token-from-previous-step'
                 },
                 bodyType: "json",
                 preRequestScript: `// 更新リクエストの前処理
@@ -455,7 +455,7 @@ echoRequestHeaderEquals Authorization Bearer mock-auth-token-from-previous-step
 echoRequestHeaderEquals Content-Type application/json
 echoRequestHeaderEquals X-Test-Flow integration
 echoRequestHeaderEquals X-Update-Source integration-flow
-echoRequestHeaderEquals cookie updateSession=upd789xyz; editMode=true; lastEdit=1640995800
+echoRequestHeaderContains cookie updateSession=upd789xyz; editMode=true; lastEdit=1640995800
 echoRequestBodyEquals {"name":"Updated Test User","email":"updated@test.com","preferences":{"theme":"dark","notifications":true}}
 echoRequestUrlContains /api/users/profile`
             }

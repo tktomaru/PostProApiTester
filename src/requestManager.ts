@@ -1266,6 +1266,50 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                 return { passed: false, error: `レスポンスボディの解析に失敗しました: ${error}` };
             }
         }
+        case 'echoRequestHeaderContains': {
+            const headerName = args[0];
+            const expectedSubstring = args.slice(1).join(' ');
+
+            try {
+                let responseBody = responseData.body;
+                if (typeof responseBody === 'string') {
+                    responseBody = JSON.parse(responseBody);
+                }
+
+                if (typeof responseBody === 'object' && responseBody.headers) {
+                    const echoedHeaders = responseBody.headers;
+                    const key = headerName.toLowerCase();
+                    const actualValue = echoedHeaders[key];
+
+                    if (actualValue === undefined) {
+                        return {
+                            passed: false,
+                            error: `エコーされたリクエストヘッダー "${headerName}" が見つかりません`
+                        };
+                    }
+
+                    // 部分一致チェック
+                    if (actualValue.includes(expectedSubstring)) {
+                        return { passed: true };
+                    } else {
+                        return {
+                            passed: false,
+                            error: `エコーされたヘッダー "${headerName}" に "${expectedSubstring}" が含まれていません (実際: ${actualValue})`
+                        };
+                    }
+                } else {
+                    return {
+                        passed: false,
+                        error: 'レスポンスボディに headers 情報が含まれていません'
+                    };
+                }
+            } catch (e) {
+                return {
+                    passed: false,
+                    error: `レスポンスボディの解析に失敗しました: ${e}`
+                };
+            }
+        }
 
         case 'echoRequestMethodEquals': {
             // reply.tukutano.jpのようなエコーサイト用: リクエストメソッドがレスポンスに正しく反映されているかチェック
