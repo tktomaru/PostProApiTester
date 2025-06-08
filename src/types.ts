@@ -32,6 +32,7 @@ export interface AuthConfig {
 export interface Collection {
   id: string;
   name: string;
+  description?: string;
   requests: RequestData[];
   variables?: Record<string, string>;
 }
@@ -69,6 +70,7 @@ export interface TestResult {
 export interface Environment {
   id: string;
   name: string;
+  created: string;
   variables: Record<string, VariableData>;
 }
 
