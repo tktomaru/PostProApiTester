@@ -315,6 +315,11 @@ export function renderCollectionsTree(): void {
                     const rect = (e.target as HTMLElement).getBoundingClientRect();
                     showContextMenu(rect.left, rect.top, [
                         {
+                            text: 'リクエストをコピー',
+                            icon: '📋',
+                            action: () => copyRequest(req, col.id)
+                        },
+                        {
                             text: 'シナリオに追加',
                             icon: '🌱',
                             action: () => addRequestToScenario(req)
@@ -467,6 +472,11 @@ export function renderScenariosTree(): void {
                     e.stopPropagation();
                     const rect = (e.target as HTMLElement).getBoundingClientRect();
                     showContextMenu(rect.left, rect.top, [
+                        {
+                            text: 'リクエストをコピー',
+                            icon: '📋',
+                            action: () => copyRequestFromScenario(req, scenario.id)
+                        },
                         {
                             text: 'リクエストを編集',
                             icon: '✏️',
@@ -631,4 +641,58 @@ function showContextMenu(x: number, y: number, items: MenuItem[]): void {
         }
     };
     document.addEventListener('click', closeMenu);
+}
+
+/**
+ * リクエストをコピーして同じコレクションに追加
+ */
+async function copyRequest(request: RequestData, collectionId: string): Promise<void> {
+    const collection = state.collections.find(c => c.id === collectionId);
+    if (!collection) return;
+
+    // リクエストのディープコピーを作成
+    const copiedRequest: RequestData = {
+        ...JSON.parse(JSON.stringify(request)),
+        id: generateId(),
+        name: `${request.name} (Copy)`
+    };
+
+    // 履歴関連のプロパティは削除
+    delete (copiedRequest as any).lastRequestExecution;
+    delete (copiedRequest as any).lastResponseExecution;
+
+    // コレクションに追加
+    collection.requests.push(copiedRequest);
+    await saveCollectionsToStorage();
+
+    // 表示を更新
+    renderCollectionsTree();
+    showSuccess(`"${request.name}" をコピーしました`);
+}
+
+/**
+ * シナリオ内でリクエストを複製
+ */
+async function copyRequestFromScenario(request: RequestData, scenarioId: string): Promise<void> {
+    const scenario = state.scenarios.find(s => s.id === scenarioId);
+    if (!scenario) return;
+
+    // リクエストのディープコピーを作成
+    const copiedRequest: RequestData = {
+        ...JSON.parse(JSON.stringify(request)),
+        id: generateId(),
+        name: `${request.name} (Copy)`
+    };
+
+    // 履歴関連のプロパティは削除
+    delete (copiedRequest as any).lastRequestExecution;
+    delete (copiedRequest as any).lastResponseExecution;
+
+    // シナリオに追加
+    scenario.requests.push(copiedRequest);
+    await saveScenariosToStorage();
+
+    // 表示を更新
+    renderScenariosTree();
+    showSuccess(`"${request.name}" をシナリオ内でコピーしました`);
 }
