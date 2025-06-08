@@ -69,37 +69,45 @@ export async function selectCollection(collectionId: string): Promise<void> {
 }
 
 /**
+ * ユニークなIDを生成する
+ */
+function generateId(): string {
+    return `req_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+}
+
+/**
  * addRequestToCollection
  *  新しいリクエストをコレクションに追加し、Storage に保存 → 再レンダリング
  */
 export async function addRequestToCollection(collectionId: string): Promise<void> {
-    const name = prompt('Enter request name:');
-    if (!name) return;
-
-    const collection = state.collections.find(c => c.id == collectionId);
+    const collection = state.collections.find(c => c.id === collectionId);
     if (!collection) return;
 
-    if (!collection.requests) {
-        collection.requests = [];
-    }
+    const name = prompt('リクエスト名を入力してください:');
+    if (!name) return;
 
     const newRequest: RequestData = {
-        id: `req_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+        id: generateId(),
         name: name,
         method: 'GET',
         url: '',
         headers: {},
         params: {},
         body: null,
-        bodyType: "none",
         auth: { type: 'none' },
-        preRequestScript: "",
+        preRequestScript: '',
+        bodyType: 'none'
     };
 
     collection.requests.push(newRequest);
     await saveCollectionsToStorage();
 
-    loadCollectionRequest(newRequest);
+    // 表示を更新
+    renderCollectionsTree();
+    
+    // 新しく追加したリクエストを選択状態にする
+    state.currentRequest = newRequest;
+    loadRequestIntoEditor(newRequest);
 }
 
 /**
