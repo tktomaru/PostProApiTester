@@ -13,6 +13,9 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
+    "@types/chrome": "^0.0.326",
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3",
     "vite": "^5.0.0"
   }
 }

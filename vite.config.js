@@ -8,11 +8,11 @@ export default defineConfig({
     build: {
         rollupOptions: {
             input: {
-                app: resolve(__dirname, 'app.js'),
-                background: resolve(__dirname, 'background.js'),
-                content: resolve(__dirname, 'content.js'),
-                injected: resolve(__dirname, 'injected.js'),
-                index: resolve(__dirname, 'index.js')
+                app: resolve(__dirname, 'src/app.ts'),
+                background: resolve(__dirname, 'src/background.ts'),
+                content: resolve(__dirname, 'src/content.ts'),
+                injected: resolve(__dirname, 'src/injected.ts'),
+                index: resolve(__dirname, 'src/index.ts')
             },
             output: {
                 entryFileNames: '[name].bundle.js',
@@ -29,9 +29,14 @@ export default defineConfig({
         }),
         commonjs()
     ],
+    resolve: {
+        alias: {
+            '@': resolve(__dirname, 'src')
+        }
+    },
     watch: {
         include: [
-            '*.js',
+            'src/**/*.ts',
             '*.html',
             '*.css'
         ],
