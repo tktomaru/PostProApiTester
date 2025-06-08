@@ -102,8 +102,11 @@ body {
 
 /* メインコンテンツエリア */
 .main-content {
+    flex: 1;
+    padding: 20px;
     overflow-y: auto;
-    overflow-x: visible;
+    position: relative;
+    z-index: 1;
 }
 
 /* ──────────────────────────────────────────────
@@ -1120,6 +1123,12 @@ transition: all 0.2s ease;
     white-space: pre-wrap;
     word-break: break-all;
     max-height: calc(100vh - 300px);
+}
+
+/* 内側の pre（.response-content）のスクロールをオフに */
+.response-body-content .response-content {
+    overflow: visible !important;
+    max-height: none !important;
 }
 
 /* Collections */
