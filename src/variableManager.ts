@@ -403,7 +403,7 @@ export function createVariableRow(scope: string, key: string = '', value: string
         if (!newKey) {
             if (originalKey) {
                 await deleteVariable(scope, originalKey);
-                row.remove();
+                // deleteVariable内でrenderVariablesが呼ばれるのでここでは何もしない
             }
             return;
         }
@@ -417,11 +417,26 @@ export function createVariableRow(scope: string, key: string = '', value: string
         }
         await saveVariable(scope, newKey, newValue, newDesc);
         row.dataset.originalKey = newKey;
+        
+        // 成功メッセージを表示（オプション）
+        console.log(`Variable "${newKey}" saved successfully`);
+    };
+
+    // debounce機能付きの保存
+    let saveTimeout: NodeJS.Timeout | null = null;
+    const debouncedSave = () => {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(updateVariable, 500);
     };
 
     keyInput.addEventListener('blur', updateVariable);
     valueInput.addEventListener('blur', updateVariable);
     descInput.addEventListener('blur', updateVariable);
+    
+    // リアルタイム保存（デバウンス付き）
+    keyInput.addEventListener('input', debouncedSave);
+    valueInput.addEventListener('input', debouncedSave);
+    descInput.addEventListener('input', debouncedSave);
 
     deleteBtn.addEventListener('click', async () => {
         const keyToDelete = row.dataset.originalKey || keyInput.value.trim();
@@ -465,8 +480,14 @@ export async function saveVariable(scope: string, key: string, value: string, de
             await saveVariablesToStorage();
             break;
         case 'environment':
+            if (!state.currentEnvironment) {
+                console.error('No environment selected for saving variable');
+                return;
+            }
             (state as any).variables.environment[key] = varData;
-            await saveEnvDataToStorage(key);
+            console.log('Saving environment variable:', key, varData, 'to environment:', state.currentEnvironment);
+            console.log('Current environment variables:', (state as any).variables.environment);
+            await saveEnvDataToStorage(state.currentEnvironment);
             break;
         case 'collection':
             if (!state.currentCollection) return;
@@ -477,6 +498,9 @@ export async function saveVariable(scope: string, key: string, value: string, de
             await saveVariablesToStorage();
             break;
     }
+    
+    // 変数保存後、画面を再描画
+    console.log(`Variable saved: ${scope}.${key} = ${value}`);
 }
 
 /**
