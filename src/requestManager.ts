@@ -1602,21 +1602,9 @@ export function displayTestResults(results: TestResult[]): void {
     const passed = results.filter(r => r.passed).length;
     const failed = results.filter(r => !r.passed).length;
 
-    let html = `
-        <div class="test-summary">
-            <span class="test-passed">✓ ${passed} passed</span>
-            <span class="test-failed">✗ ${failed} failed</span>
-        </div>
-        <div class="test-results">
-    `;
+    let html = `<div class="test-summary"><span class="test-passed">✓ ${passed} passed</span><span class="test-failed">✗ ${failed} failed</span></div><div class="test-results">`;
     results.forEach(result => {
-        html += `
-            <div class="test-result ${result.passed ? 'passed' : 'failed'}">
-                <span class="test-icon">${result.passed ? '✓' : '✗'}</span>
-                <span class="test-name">${escapeHtml(result.name)}</span>
-                ${result.error ? `<span class="test-error">${escapeHtml(result.error)}</span>` : ''}
-            </div>
-        `;
+        html += `<div class="test-result ${result.passed ? 'passed' : 'failed'}"><span class="test-icon">${result.passed ? '✓' : '✗'}</span><span class="test-name">${escapeHtml(result.name)}</span>${result.error ? `<span class="test-error">${escapeHtml(result.error)}</span>` : ''}</div>`;
     });
     html += '</div>';
     testsContainer.innerHTML = html;
