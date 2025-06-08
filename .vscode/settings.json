@@ -62,7 +62,8 @@
     "**/nginx/html": true,
     "**/yarn.lock": true,
     "**/docs": true,
-    "**/package-lock.json": true
+    "**/package-lock.json": true,
+    "**/dist": true
   },
   "search.useIgnoreFiles": false,
   "window.zoomLevel": 1,
