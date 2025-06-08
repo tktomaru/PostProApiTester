@@ -630,59 +630,26 @@ export function buildFetchOptions(request: RequestData): FetchOptions | null {
     // 2. 認証ヘッダーを追加
     addAuthenticationHeaders(headers, request.auth);
 
-    // 3. URLにパラメータを追加
+    // 3. URLにパラメータを追加（processVariablesで既に追加済みなので、ここでは何もしない）
     let url = request.url;
-    if (request.params && Object.keys(request.params).length > 0) {
-        const urlObj = new URL(url);
-        Object.entries(request.params).forEach(([key, value]) => {
-            if (key && value) {
-                urlObj.searchParams.append(key, value);
-            }
-        });
-        url = urlObj.toString();
-    }
 
-    // 4. GET/HEAD 以外の場合のみ body を構築する
-    if (true) {
-        // bodyType の選択状況を取得
-        const bodyType = request.bodyType;
-
+    // 4. ボディデータの処理
+    if (request.body && method !== 'GET' && method !== 'HEAD') {
+        const bodyType = request.bodyType || 'none';
         switch (bodyType) {
             case 'json': {
-                // JSON 検証
-                const rawText = (request.body as string)?.trim();
-                if (rawText) {
-                    try {
-                        JSON.parse(rawText);
-                        // 正常にパースできれば bodyData に文字列をセット
-                        bodyData = rawText;
-                        if (!headers['Content-Type'] && !headers['content-type']) {
-                            headers['Content-Type'] = 'application/json';
-                        }
-                    } catch (e) {
-                        // パース失敗ならエラー表示して中断
-                        showError('不正な JSON です');
-                        return null;
-                    }
-                }
+                bodyData = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
+                headers['Content-Type'] = 'application/json';
                 break;
             }
 
-            case 'raw': {
-                // そのまま文字列を送る
-                bodyData = (request.body as string) || '';
-                break;
-            }
-
-            case 'form-data': {
-                // FormData を作成
+            case 'formdata': {
                 const formData = new FormData();
                 const formFields = collectKeyValues('formDataContainer');
                 Object.entries(formFields).forEach(([key, value]) => {
                     formData.append(key, value);
                 });
                 bodyData = formData;
-                delete headers['Content-Type'];
                 break;
             }
 
@@ -1642,36 +1609,51 @@ export function displayTestResults(results: TestResult[]): void {
  */
 export function processVariables(request: RequestData): RequestData {
     const processed = JSON.parse(JSON.stringify(request));
+    
+    // URLの変数置換を最初に行う
     processed.url = replaceVariables(processed.url);
-    processed.headers = deepReplaceVariables(processed.headers);
-    processed.params = deepReplaceVariables(processed.params);
-    if (processed.body) {
-        if (typeof processed.body === 'string') {
-            processed.body = replaceVariables(processed.body);
-        } else {
-            processed.body = deepReplaceVariables(processed.body);
-        }
-    }
-
+    
     // URLの有効性チェック
     if (!processed.url || !processed.url.trim()) {
         throw new Error('URL is required');
     }
 
+    // URLが変数置換後も変数を含む場合はエラー
+    if (processed.url.includes('{') || processed.url.includes('}')) {
+        throw new Error(`Invalid URL: ${processed.url} - Variables not resolved`);
+    }
+
     try {
         const url = new URL(processed.url);
+        
+        // パラメータの変数置換
+        processed.params = deepReplaceVariables(processed.params);
         Object.entries(processed.params).forEach(([key, value]) => {
             url.searchParams.set(key, String(value));
         });
+
+        // APIキーの処理
         if (processed.auth.type === 'apikey' && processed.auth.addTo === 'query') {
             if (processed.auth.key && processed.auth.value) {
                 url.searchParams.set(processed.auth.key, processed.auth.value);
             }
         }
+        
         processed.url = url.toString();
+        
+        // その他のプロパティの変数置換
+        processed.headers = deepReplaceVariables(processed.headers);
+        if (processed.body) {
+            if (typeof processed.body === 'string') {
+                processed.body = replaceVariables(processed.body);
+            } else {
+                processed.body = deepReplaceVariables(processed.body);
+            }
+        }
     } catch (error) {
         throw new Error(`Invalid URL: ${processed.url}`);
     }
+    
     return processed;
 }
 

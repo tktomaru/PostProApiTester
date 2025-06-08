@@ -722,6 +722,13 @@ export function replaceVariables(text: string): string {
         return value !== undefined ? value : match;
     });
 
+    // {petId}形式の置換
+    text = text.replace(/\{([^}]+)\}/g, (match, varName) => {
+        const trimmedName = varName.trim();
+        const value = getVariable(trimmedName);
+        return value !== undefined ? value : match;
+    });
+
     return text;
 }
 
