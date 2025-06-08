@@ -986,12 +986,12 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
 
                 case 'addHeaderWithVar':
                     if (!argsString) {
-                        console.warn('addHeaderWithVar requires a header name and variable name');
+                        showError('addHeaderWithVar requires a header name and variable name');
                         continue;
                     }
                     const headerVarNameEndIndex = argsString.indexOf(' ');
                     if (headerVarNameEndIndex === -1) {
-                        console.warn('addHeaderWithVar requires both header name and variable name');
+                        showError('addHeaderWithVar requires both header name and variable name');
                         continue;
                     }
                     const headerVarName = argsString.substring(0, headerVarNameEndIndex);
@@ -1002,31 +1002,37 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         const varPath = headerVarValue.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
                         const collection = state.collections.find(c => c.name === varPath[0]);
                         if (!collection) {
-                            throw new Error(`コレクション「${varPath[0]}」が見つかりません`);
+                            showError(`コレクション「${varPath[0]}」が見つかりません`);
+                            continue;
                         }
                         const request = collection.requests.find(r => r.name === varPath[1]);
                         if (!request) {
-                            throw new Error(`リクエスト「${varPath[1]}」が見つかりません`);
+                            showError(`リクエスト「${varPath[1]}」が見つかりません`);
+                            continue;
                         }
                         if (!request.lastResponseExecution) {
-                            throw new Error('request の実行結果が存在しません');
+                            showError('request の実行結果が存在しません');
+                            continue;
                         }
                         
                         let value = request.lastResponseExecution;
                         for (let i = 2; i < varPath.length; i++) {
                             if (value === undefined) {
-                                throw new Error(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
+                                showError(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
+                                continue;
                             }
                             value = value[varPath[i]];
                         }
                         if (value === undefined) {
-                            throw new Error(`変数「${headerVarValue}」の値が取得できません`);
+                            showError(`変数「${headerVarValue}」の値が取得できません`);
+                            continue;
                         }
                         requestObj.headers[headerVarName] = String(value);
                     } else {
                         const headerVarResult = getVariable(headerVarValue);
                         if (headerVarResult === undefined) {
-                            throw new Error(`変数「${headerVarValue}」が変数ではありません`);
+                            showError(`変数「${headerVarValue}」が変数ではありません`);
+                            continue;
                         }
                         requestObj.headers[headerVarName] = headerVarResult;
                     }
@@ -1034,7 +1040,7 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
 
                 case 'setBodyWithVar':
                     if (!argsString) {
-                        console.warn('setBodyWithVar requires a variable name');
+                        showError('setBodyWithVar requires a variable name');
                         continue;
                     }
                     console.log("argsString", argsString);
@@ -1044,31 +1050,37 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         const varPath = argsString.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
                         const collection = state.collections.find(c => c.name === varPath[0]);
                         if (!collection) {
-                            throw new Error(`コレクション「${varPath[0]}」が見つかりません`);
+                            showError(`コレクション「${varPath[0]}」が見つかりません`);
+                            continue;
                         }
                         const request = collection.requests.find(r => r.name === varPath[1]);
                         if (!request) {
-                            throw new Error(`リクエスト「${varPath[1]}」が見つかりません`);
+                            showError(`リクエスト「${varPath[1]}」が見つかりません`);
+                            continue;
                         }
                         if (!request.lastResponseExecution) {
-                            throw new Error('request の実行結果が存在しません');
+                            showError('request の実行結果が存在しません');
+                            continue;
                         }
                         
                         let value = request.lastResponseExecution;
                         for (let i = 2; i < varPath.length; i++) {
                             if (value === undefined) {
-                                throw new Error(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
+                                showError(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
+                                continue;
                             }
                             value = value[varPath[i]];
                         }
                         if (value === undefined) {
-                            throw new Error(`変数「${argsString}」の値が取得できません`);
+                            showError(`変数「${argsString}」の値が取得できません`);
+                            continue;
                         }
                         requestObj.body = String(value);
                     } else {
                         const bodyValue = getVariable(argsString);
                         if (bodyValue === undefined) {
-                            throw new Error(`変数「${argsString}」が変数ではありません`);
+                            showError(`変数「${argsString}」が変数ではありません`);
+                            continue;
                         }
                         requestObj.body = bodyValue;
                     }
@@ -1079,6 +1091,7 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
             }
         } catch (error: any) {
             console.error('Pre-request script 実行エラー:', error);
+            showError(`Pre-request script 実行エラー: ${error.message}`);
             throw error;
         }
     }
