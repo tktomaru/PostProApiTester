@@ -583,13 +583,18 @@ export function buildFetchOptions(request: RequestData): FetchOptions | null {
     if (request.body && method !== 'GET' && method !== 'HEAD') {
         const bodyType = request.bodyType || 'none';
         switch (bodyType) {
+            case 'raw': {
+                bodyData = request.body.toString();
+                break;
+            }
+
             case 'json': {
                 bodyData = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
                 headers['Content-Type'] = 'application/json';
                 break;
             }
 
-            case 'formdata': {
+            case 'form-data': {
                 const formData = new FormData();
                 const formFields = collectKeyValues('formDataContainer');
                 Object.entries(formFields).forEach(([key, value]) => {
