@@ -14,6 +14,13 @@ import { updateCollectionVarSelector, renderVariables } from './variableManager'
 import { addRequestToScenario } from './scenarioManager';
 import { loadRequestIntoEditor } from './requestManager';
 
+// コンテキストメニューの型定義
+interface MenuItem {
+    text: string;
+    icon: string;
+    action: () => void;
+}
+
 /**
  * initializeCollections：起動時にコレクション一覧をロードし、必要ならサンプルを投入する
  */
@@ -180,13 +187,13 @@ async function deleteCollection(collectionId: string): Promise<void> {
  * deleteRequestFromCollection
  *  collectionId 内の requestIndex 番目を削除して再保存 → 再描画
  */
-async function deleteRequestFromCollection(collectionId: string, requestIndex: number): Promise<void> {
+async function deleteRequestFromCollection(collectionId: string, requestId: string): Promise<void> {
     if (!confirm('本当にこのリクエストを削除しますか？')) return;
 
     const col = state.collections.find(c => c.id == collectionId);
-    if (!col || !col.requests || requestIndex < 0 || requestIndex >= col.requests.length) return;
+    if (!col || !col.requests || !col.requests.some(r => r.id === requestId)) return;
 
-    col.requests.splice(requestIndex, 1);
+    col.requests = col.requests.filter(r => r.id !== requestId);
     await saveCollectionsToStorage();
 
     // 削除後のツリーを再描画
@@ -201,7 +208,7 @@ async function deleteRequestFromCollection(collectionId: string, requestIndex: n
 export function renderCollectionsTree(): void {
     const container = document.getElementById('collectionsTree');
     if (!container) return;
-    
+
     container.innerHTML = ''; // まずクリア
 
     state.collections.forEach((col) => {
@@ -228,28 +235,27 @@ export function renderCollectionsTree(): void {
         nameSpan.textContent = col.name;
         colDiv.appendChild(nameSpan);
 
-        // ◆ Add to Request ボタン追加
-        const addToCollectionBtn = document.createElement('span');
-        addToCollectionBtn.className = 'request-collection-request-create-btn';
-        addToCollectionBtn.textContent = '🌱';
-        addToCollectionBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
-            if (state.currentCollection) {
-                addRequestToCollection(state.currentCollection);
-            }
+        // 三点リーダーメニュー
+        const menuBtn = document.createElement('span');
+        menuBtn.className = 'menu-btn';
+        menuBtn.textContent = '⋮';
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rect = menuBtn.getBoundingClientRect();
+            showContextMenu(rect.left, rect.top, [
+                {
+                    text: 'リクエストを追加',
+                    icon: '🌱',
+                    action: () => addRequestToCollection(col.id)
+                },
+                {
+                    text: 'コレクションを削除',
+                    icon: '🗑️',
+                    action: () => deleteCollection(col.id)
+                }
+            ]);
         });
-        colDiv.appendChild(addToCollectionBtn);
-
-        // 追加：削除ボタン（🗑️）
-        const deleteBtn = document.createElement('span');
-        deleteBtn.className = 'collection-delete-btn';
-        deleteBtn.textContent = '🗑️';
-        // 削除イベント（クリック）
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();  // 親要素の toggle を阻止
-            deleteCollection(col.id);
-        });
-        colDiv.appendChild(deleteBtn);
+        colDiv.appendChild(menuBtn);
 
         container.appendChild(colDiv);
 
@@ -259,53 +265,40 @@ export function renderCollectionsTree(): void {
         ul.style.display = 'none'; // デフォルトで非表示
 
         if (col.requests && col.requests.length > 0) {
-            col.requests.forEach((req, idx) => {
+            col.requests.forEach((req) => {
                 const li = document.createElement('li');
                 li.className = 'request-item';
-                li.dataset.id = req.id;
+                li.innerHTML = `
+                    <span class="method-badge method-${req.method}">${req.method}</span>
+                    <span class="request-name">${req.name}</span>
+                    <span class="menu-btn">⋮</span>
+                `;
 
-                // メソッドバッジ
-                const methodBadge = document.createElement('span');
-                methodBadge.className = `method-badge method-${req.method}`;
-                methodBadge.textContent = req.method;
-                li.appendChild(methodBadge);
-
-                // リクエスト名
-                const reqName = document.createElement('span');
-                reqName.className = 'request-name';
-                reqName.textContent = req.name;
-                li.appendChild(reqName);
-
-                // 「🗑️」削除ボタンを作成
-                const deleteBtn = document.createElement('span');
-                deleteBtn.className = 'request-delete-btn';
-                deleteBtn.textContent = '🗑️';
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
-                    deleteRequestFromCollection(col.id, idx);
-                });
-                li.appendChild(deleteBtn);
-
-                // ◆ Add to Scenario ボタン追加
-                const addToScenarioBtn = document.createElement('span');
-                addToScenarioBtn.className = 'request-scenario-create-btn';
-                addToScenarioBtn.textContent = '🌱';
-                addToScenarioBtn.addEventListener('click', (e) => {
-                    e.stopPropagation(); // リクエスト行のクリック（ロード）を阻止
-                    const currentCollection = state.collections.find(s => s.id === state.currentCollection);
-                    if (currentCollection && currentCollection.requests) {
-                        const idx2 = currentCollection.requests.findIndex(r => r.id === req.id);
-                        if (idx2 !== -1) {
-                            addRequestToScenario(currentCollection.requests[idx2]);
-                        }
+                // リクエスト選択時の処理
+                li.addEventListener('click', (e) => {
+                    if (!(e.target as HTMLElement).classList.contains('menu-btn')) {
+                        e.stopPropagation();
+                        loadCollectionRequest(req);
                     }
                 });
-                li.appendChild(addToScenarioBtn);
 
-                // クリック時にリクエストをロード
-                li.addEventListener('click', (e) => {
-                    e.stopPropagation(); // 上位のコレクションクリックと衝突しないように
-                    loadCollectionRequest(req);
+                // メニューボタンのクリックイベント
+                const reqMenuBtn = li.querySelector('.menu-btn');
+                reqMenuBtn?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const rect = (e.target as HTMLElement).getBoundingClientRect();
+                    showContextMenu(rect.left, rect.top, [
+                        {
+                            text: 'シナリオに追加',
+                            icon: '🌱',
+                            action: () => addRequestToScenario(req)
+                        },
+                        {
+                            text: 'リクエストを削除',
+                            icon: '🗑️',
+                            action: () => deleteRequestFromCollection(col.id, req.id)
+                        }
+                    ]);
                 });
 
                 ul.appendChild(li);
@@ -344,4 +337,47 @@ export function renderCollectionsTree(): void {
             }
         });
     });
+}
+
+/**
+ * showContextMenu
+ * 指定された位置にコンテキストメニューを表示する
+ */
+function showContextMenu(x: number, y: number, items: MenuItem[]): void {
+    // 既存のメニューを削除
+    const existingMenu = document.querySelector('.context-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+
+    // メニュー要素を作成
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    // メニュー項目を追加
+    items.forEach(item => {
+        const menuItem = document.createElement('div');
+        menuItem.className = 'context-menu-item';
+        menuItem.innerHTML = `<span class="menu-icon">${item.icon}</span>${item.text}`;
+        menuItem.addEventListener('click', () => {
+            item.action();
+            menu.remove();
+        });
+        menu.appendChild(menuItem);
+    });
+
+    // メニューを表示
+    document.body.appendChild(menu);
+
+    // メニュー外クリックで閉じる
+    const closeMenu = (e: MouseEvent) => {
+        if (!menu.contains(e.target as Node)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    document.addEventListener('click', closeMenu);
 }

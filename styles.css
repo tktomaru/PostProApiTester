@@ -69,16 +69,13 @@ body {
      サイドバー
   ----------------------------------- */
 .sidebar {
-    width: 280px;
-    min-width: 200px;
-    max-width: 500px;
+    width: 300px;
     background-color: #f8f9fa;
-    border-right: 1px solid #e0e0e0;
+    border-right: 1px solid #dee2e6;
+    height: 100vh;
     overflow-y: auto;
-    padding: 0.5rem;
-    box-sizing: border-box;
-    resize: horizontal;
     position: relative;
+    z-index: 1000;
 }
 
 /* リサイズハンドル */
@@ -101,9 +98,10 @@ body {
 /* メインコンテンツエリア */
 .main-content {
     flex: 1;
-    min-width: 0;
-    overflow: auto;
-    padding: 1rem;
+    padding: 20px;
+    overflow-y: auto;
+    position: relative;
+    z-index: 1;
 }
 
 /* サイドバー上部の「＋ コレクション作成」ボタン */
@@ -203,99 +201,94 @@ body {
   ────────────────────────────────────────────── */
 .request-list {
     list-style: none;
-    padding-left: 1.8rem;
-    /* インデント */
-    margin-top: 0.2rem;
-    margin-bottom: 0.4rem;
+    padding: 0;
+    margin: 0;
+    padding-left: 20px;
 }
 
 .request-item {
-    position: relative;
-    /* 追加：削除ボタンを絶対配置できるように */
     display: flex;
     align-items: center;
-    cursor: pointer;
-    padding: 0.3rem 0.6rem;
+    padding: 4px 8px;
+    margin: 2px 0;
     border-radius: 4px;
-    transition: background-color 0.2s ease;
-    margin-bottom: 0.1rem;
-}
-
-/* ──────────────────────────────────────
-   リクエスト追加ボタン（アイコン）のスタイル
-──────────────────────────────────────── */
-.request-collection-request-create-btn {
-    position: absolute;
-    /* 削除ボタンが right:8px なので、その右隣に配置するため 32px に設定 */
-    right: 32px;
-    font-size: 0.9rem;
     cursor: pointer;
-    color: #28a745;
-    /* 例：追加は緑で目立たせる */
-    padding: 2px;
-    border-radius: 3px;
-    transition: background-color 0.2s ease;
-}
-
-.request-collection-request-create-btn:hover {
-    background-color: rgba(255, 0, 0, 0.1);
-}
-
-/* アクティブなコレクション配下のリクエスト行なら色を少し濃く */
-.collection-item.active .request-collection-request-create-btn {
-    color: #d00;
-}
-
-/* ──────────────────────────────────────
-   シナリオ追加ボタン（アイコン）のスタイル
-──────────────────────────────────────── */
-.request-scenario-create-btn {
-    position: absolute;
-    /* 削除ボタンが right:8px なので、その右隣に配置するため 32px に設定 */
-    right: 32px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    color: #28a745;
-    /* 例：追加は緑で目立たせる */
-    padding: 2px;
-    border-radius: 3px;
-    transition: background-color 0.2s ease;
-}
-
-.request-scenario-create-btn:hover {
-    background-color: rgba(255, 0, 0, 0.1);
-}
-
-/* アクティブなコレクション配下のリクエスト行なら色を少し濃く */
-.collection-item.active .request-scenario-crreate-btn {
-    color: #d00;
-}
-
-/* ──────────────────────────────────────
-   リクエスト削除ボタン（ゴミ箱アイコン）のスタイル
-──────────────────────────────────────── */
-.request-delete-btn {
-    position: absolute;
-    right: 8px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    color: #a00;
-    padding: 2px;
-    border-radius: 3px;
-    transition: background-color 0.2s ease;
-}
-
-.request-delete-btn:hover {
-    background-color: rgba(255, 0, 0, 0.1);
-}
-
-/* アクティブなコレクション配下のリクエスト行なら色を少し濃く */
-.collection-item.active .request-delete-btn {
-    color: #d00;
+    transition: background-color 0.2s;
+    position: relative;
 }
 
 .request-item:hover {
-    background-color: #e9ecef;
+    background-color: #f0f0f0;
+}
+
+.request-item .method-badge {
+    margin-right: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.request-item .request-name {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+}
+
+.request-item .menu-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 16px;
+    color: #666;
+}
+
+.request-item:hover .menu-btn {
+    opacity: 1;
+}
+
+.request-item .menu-btn:hover {
+    background-color: #e0e0e0;
+}
+
+/* メソッドバッジの色 */
+.method-GET {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.method-POST {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.method-PUT {
+    background-color: #fff3e0;
+    color: #f57c00;
+}
+
+.method-DELETE {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.method-PATCH {
+    background-color: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.method-HEAD {
+    background-color: #e0f7fa;
+    color: #00838f;
+}
+
+.method-OPTIONS {
+    background-color: #fce4ec;
+    color: #c2185b;
 }
 
 /* リクエストが空の場合のメッセージ */
@@ -303,45 +296,6 @@ body {
     color: #888;
     font-size: 0.85rem;
     padding-left: 0;
-}
-
-/* メソッドバッジ */
-.method-badge {
-    display: inline-block;
-    font-size: 0.75rem;
-    font-weight: bold;
-    padding: 0.15rem 0.4rem;
-    border-radius: 3px;
-    margin-right: 0.5rem;
-    white-space: nowrap;
-    color: #fff;
-}
-
-/* メソッド別バッジ色 */
-.method-GET {
-    background-color: #288feb;
-}
-
-.method-POST {
-    background-color: #3f7f13;
-}
-
-.method-PUT {
-    background-color: #fb8c00;
-}
-
-.method-DELETE {
-    background-color: #e02e3e;
-}
-
-/* 必要に応じて PATCH, HEAD など追加 */
-
-/* リクエスト名 */
-.request-item .request-name {
-    flex-grow: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* Buttons */
@@ -1971,4 +1925,49 @@ transition: all 0.2s ease;
 
 .close-btn:hover {
     color: #495057;
+}
+
+/* コンテキストメニュー */
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    padding: 4px 0;
+    min-width: 150px;
+    z-index: 2000;
+}
+
+.context-menu-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+    background-color: #f5f5f5;
+}
+
+.menu-icon {
+    font-size: 14px;
+    width: 20px;
+    text-align: center;
+}
+
+/* メニューボタン */
+.menu-btn {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    font-size: 16px;
+    color: #666;
+}
+
+.menu-btn:hover {
+    background-color: #f0f0f0;
 }
