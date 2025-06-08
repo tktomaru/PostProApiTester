@@ -1049,11 +1049,7 @@ export function displayResponseHeaders(headers: Record<string, string>): void {
     let html = '<div class="headers-list">';
 
     Object.entries(headers).forEach(([key, value]) => {
-        html += `
-            <div class="header-item">
-                <strong>${escapeHtml(key)}:</strong> ${escapeHtml(value)}
-            </div>
-        `;
+        html += `<div class="header-item"><span class="header-key">${escapeHtml(key)}</span><span class="header-value">${escapeHtml(value)}</span></div>`;
     });
     html += '</div>';
     headersContainer.innerHTML = html;
