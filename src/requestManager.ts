@@ -1041,12 +1041,25 @@ export function displayResponseHeaders(headers: Record<string, string>): void {
 export function displayResponseCookies(headers: Record<string, string | string[]>): void {
     const cookiesContainer = document.getElementById('response-cookies') as HTMLElement;
 
-    // 'set-cookie' または 'cookie' ヘッダーを優先的に取得
-    let raw = headers['set-cookie'] ?? headers['cookie'];
+    // set-cookie と cookie の両方を取得
+    const setCookieRaw = headers['set-cookie'];
+    const cookieRaw = headers['cookie'];
 
-    if (raw) {
-        // 単一文字列でも配列でも扱えるように正規化
-        const cookies = Array.isArray(raw) ? raw : [raw];
+    // 配列／文字列いずれにも対応して一つのリストにまとめる
+    const cookies: string[] = [];
+    if (setCookieRaw) {
+        Array.isArray(setCookieRaw)
+            ? cookies.push(...setCookieRaw)
+            : cookies.push(setCookieRaw);
+    }
+    if (cookieRaw) {
+        Array.isArray(cookieRaw)
+            ? cookies.push(...cookieRaw)
+            : cookies.push(cookieRaw);
+    }
+
+    // 表示
+    if (cookies.length > 0) {
         let html = '<div class="cookies-list">';
         cookies.forEach(cookie => {
             html += `<div class="cookie-item">${escapeHtml(cookie)}</div>`;
@@ -1269,21 +1282,19 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                 return { passed: false, error: `レスポンスボディの解析に失敗しました: ${error}` };
             }
         }
+
         case 'echoRequestHeaderContains': {
             const headerName = args[0];
-            const expectedSubstring = args.slice(1).join(' ');
-
+            const expectedValue = args.slice(1).join(' ');
             try {
                 let responseBody = responseData.body;
                 if (typeof responseBody === 'string') {
                     responseBody = JSON.parse(responseBody);
                 }
-
                 if (typeof responseBody === 'object' && responseBody.headers) {
                     const echoedHeaders = responseBody.headers;
                     const key = headerName.toLowerCase();
                     const actualValue = echoedHeaders[key];
-
                     if (actualValue === undefined) {
                         return {
                             passed: false,
@@ -1291,13 +1302,38 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                         };
                     }
 
-                    // 部分一致チェック
-                    if (actualValue.includes(expectedSubstring)) {
+                    // Cookie ヘッダーは順序を無視して key=value ペアの存在をチェック
+                    if (key === 'cookie') {
+                        // 実際のヘッダ値をペアに分割
+                        const actualPairs = actualValue
+                            .split(';')
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0);
+                        // 期待値も同様に分割
+                        const expectedPairs = expectedValue
+                            .split(';')
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0);
+
+                        // 期待ペアがすべて actualPairs に含まれているかチェック
+                        const missing = expectedPairs.filter(p => !actualPairs.includes(p));
+                        if (missing.length === 0) {
+                            return { passed: true };
+                        } else {
+                            return {
+                                passed: false,
+                                error: `Cookie ヘッダーに以下のペアが含まれていません: ${missing.join(', ')} (実際: ${actualValue})`
+                            };
+                        }
+                    }
+
+                    // それ以外は部分一致チェック
+                    if (actualValue.includes(expectedValue)) {
                         return { passed: true };
                     } else {
                         return {
                             passed: false,
-                            error: `エコーされたヘッダー "${headerName}" に "${expectedSubstring}" が含まれていません (実際: ${actualValue})`
+                            error: `エコーされたヘッダー "${headerName}" に "${expectedValue}" が含まれていません (実際: ${actualValue})`
                         };
                     }
                 } else {
