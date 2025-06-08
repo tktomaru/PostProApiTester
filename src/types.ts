@@ -58,6 +58,7 @@ export interface ResponseData {
   size: number;
   body: any;
   bodyText: string;
+  testResults?: TestResult[];
 }
 
 export interface HistoryItem {
@@ -65,6 +66,7 @@ export interface HistoryItem {
   timestamp: string;
   request: RequestData;
   response: ResponseData;
+  testScript?: string;
 }
 
 export interface TestResult {

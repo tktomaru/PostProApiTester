@@ -6,6 +6,7 @@ import type { RequestData, ResponseData, HistoryItem } from './types';
 import { saveHistoryToStorage, state } from './state';
 import { escapeHtml, showSuccess } from './utils';
 import { loadRequestIntoEditor } from './requestManager';
+import { switchMainTab } from './utils';
 
 /**
  * renderHistory
@@ -45,7 +46,7 @@ export function renderHistory(): void {
  * saveToHistory
  *  リクエストとレスポンスを履歴配列に追加して保存し、renderHistory を呼び出す
  */
-export async function saveToHistory(request: RequestData, response: ResponseData): Promise<void> {
+export async function saveToHistory(request: RequestData, response: ResponseData, testResults: any[] = []): Promise<void> {
     const historyItem: HistoryItem = {
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
@@ -59,7 +60,8 @@ export async function saveToHistory(request: RequestData, response: ResponseData
             body: request.body,
             bodyType: request.bodyType,
             auth: request.auth,
-            preRequestScript: request.preRequestScript
+            preRequestScript: request.preRequestScript,
+            testScript: request.testScript
         },
         response: {
             status: response.status,
@@ -68,7 +70,8 @@ export async function saveToHistory(request: RequestData, response: ResponseData
             body: response.body,
             bodyText: response.bodyText,
             duration: response.duration,
-            size: response.size
+            size: response.size,
+            testResults: testResults
         }
     };
 
@@ -89,8 +92,26 @@ export async function loadHistoryItem(historyId: string): Promise<void> {
     const item = state.history.find(h => h.id === historyId);
     if (!item || !item.request) return;
 
-    loadRequestIntoEditor(item.request);
-    showSuccess('Request loaded from history');
+    // 履歴のリクエストオブジェクトにレスポンス情報を追加
+    const requestWithResponse = {
+        ...item.request,
+        lastResponseExecution: item.response ? {
+            status: item.response.status,
+            duration: item.response.duration,
+            size: item.response.size,
+            timestamp: item.timestamp,
+            headers: item.response.headers,
+            body: item.response.body,
+            testResults: (item.response as any).testResults || []
+        } : undefined
+    };
+
+    loadRequestIntoEditor(requestWithResponse);
+    
+    // Requestタブに自動切り替え
+    switchMainTab('request');
+    
+    showSuccess('Request and response loaded from history');
 }
 
 /**

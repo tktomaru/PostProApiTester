@@ -537,7 +537,7 @@ export async function sendRequest(requestObj: RequestData, forScenario: boolean 
         const testResults = await executeTestScript(parsed, requestObj.testScript);
 
         // 7. 履歴に保存
-        await saveToHistory(processedRequest, parsed);
+        await saveToHistory(processedRequest, parsed, testResults);
 
         // 8. コレクションのリクエストに最新の実行結果を保存
         if (state.currentCollection) {
@@ -1661,8 +1661,8 @@ export function processVariables(request: RequestData): RequestData {
  * saveToHistory
  *  historyManager へ委譲
  */
-export async function saveToHistory(request: RequestData, responseData: ProcessedResponse): Promise<void> {
-    await saveToHistoryFn(request, responseData);
+export async function saveToHistory(request: RequestData, responseData: ProcessedResponse, testResults: any[] = []): Promise<void> {
+    await saveToHistoryFn(request, responseData, testResults);
 }
 
 /**
