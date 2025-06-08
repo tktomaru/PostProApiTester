@@ -25,6 +25,7 @@ interface FetchOptions {
     method: string;
     headers: Record<string, string>;
     bodyData: string | FormData | URLSearchParams | null;
+    url: string;
 }
 
 interface XhrResponse {
@@ -343,10 +344,9 @@ export async function sendRequest(requestObj: RequestData): Promise<XhrResponse 
             return '';
         }
 
-        const { method, headers, bodyData } = opts;
+        const { method, headers, bodyData, url } = opts;
 
         // 4. XMLHttpRequest で送信（タイムアウト付き）
-        const url = processedRequest.url;
         const startTime = Date.now();
 
         const responseData = await new Promise<{ response: XhrResponse; duration: number }>((resolve, reject) => {
@@ -495,7 +495,19 @@ export function buildFetchOptions(request: RequestData): FetchOptions | null {
     // 2. 認証ヘッダーを追加
     addAuthenticationHeaders(headers, request.auth);
 
-    // 3. GET/HEAD 以外の場合のみ body を構築する
+    // 3. URLにパラメータを追加
+    let url = request.url;
+    if (request.params && Object.keys(request.params).length > 0) {
+        const urlObj = new URL(url);
+        Object.entries(request.params).forEach(([key, value]) => {
+            if (key && value) {
+                urlObj.searchParams.append(key, value);
+            }
+        });
+        url = urlObj.toString();
+    }
+
+    // 4. GET/HEAD 以外の場合のみ body を構築する
     if (true) {
         // bodyType の選択状況を取得
         const bodyType = request.bodyType;
@@ -557,7 +569,7 @@ export function buildFetchOptions(request: RequestData): FetchOptions | null {
         }
     }
 
-    return { method, headers, bodyData };
+    return { method, headers, bodyData, url };
 }
 
 /**
