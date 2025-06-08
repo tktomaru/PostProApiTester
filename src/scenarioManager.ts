@@ -1,6 +1,6 @@
 // scenarioManager.ts
 
-import type { Scenario, RequestData } from './types';
+import type { Scenario, RequestData, TestResult } from './types';
 import { state, saveScenariosToStorage } from './state';
 import { loadRequestIntoEditor, sendRequest } from './requestManager';
 import { showSuccess, showError } from './utils';
@@ -334,17 +334,50 @@ export async function runScenario(): Promise<void> {
         resultContainer.appendChild(resultDiv);
 
         try {
-            // 実際に fetch などでリクエストを送信する
-            const response = await sendRequest(req);
-            if (typeof response === 'string') {
-                resultDiv.textContent = `[${i + 1}] ${req.name} → ERROR: ${response}`;
+            // シナリオ専用の送信関数を使用
+            const result = await sendRequest(req, true);
+            if (typeof result === 'string') {
+                resultDiv.textContent = `[${i + 1}] ${req.name} → ERROR: ${result}`;
                 continue;
             }
-            const text = await response.text();
-            resultDiv.textContent = `[${i + 1}] ${req.name} → ${response.status} ${response.statusText}`;
-            const pre = document.createElement('pre');
-            pre.textContent = text;
-            resultDiv.appendChild(pre);
+            
+            if ('response' in result && 'testResults' in result) {
+                const { response, testResults } = result;
+                resultDiv.textContent = `[${i + 1}] ${req.name} → ${response.status} ${response.statusText}`;
+                
+                // レスポンスボディを表示
+                const pre = document.createElement('pre');
+                pre.textContent = response.bodyText;
+                pre.style.maxHeight = '200px';
+                pre.style.overflow = 'auto';
+                resultDiv.appendChild(pre);
+                
+                // テスト結果を表示
+                if (testResults && testResults.length > 0) {
+                    const testDiv = document.createElement('div');
+                    testDiv.style.marginTop = '8px';
+                    const passed = testResults.filter((t: TestResult) => t.passed).length;
+                    const failed = testResults.filter((t: TestResult) => !t.passed).length;
+                    
+                    testDiv.innerHTML = `<strong>Tests: ${passed} passed, ${failed} failed</strong>`;
+                    if (failed > 0) {
+                        const failedTests = testResults.filter((t: TestResult) => !t.passed);
+                        const failedList = document.createElement('ul');
+                        failedList.style.color = '#dc3545';
+                        failedList.style.fontSize = '12px';
+                        failedTests.forEach((test: TestResult) => {
+                            const li = document.createElement('li');
+                            li.textContent = `${test.name}: ${test.error || 'Failed'}`;
+                            failedList.appendChild(li);
+                        });
+                        testDiv.appendChild(failedList);
+                    }
+                    resultDiv.appendChild(testDiv);
+                }
+            } else {
+                // XhrResponseの場合の処理
+                resultDiv.textContent = `[${i + 1}] ${req.name} → ${result.status} ${result.statusText}`;
+            }
 
             // 任意で「続行 or 停止」のダイアログを挿入可能
             // 例： if (!confirm('Continue to next request?')) break;

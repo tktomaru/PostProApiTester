@@ -351,10 +351,29 @@ export function loadRequestIntoEditor(request: RequestData): void {
  * executeTestScript
  *  Tests タブに書かれたスクリプトを実行し、結果を表示
  */
-export async function executeTestScript(responseData: ProcessedResponse): Promise<TestResult[]> {
-    const testScriptElement = document.getElementById('testScript') as HTMLTextAreaElement;
-    const raw = testScriptElement?.value;
-    if (!raw?.trim()) return [];
+export async function executeTestScript(responseData: ProcessedResponse, testScript?: string): Promise<TestResult[]> {
+    // テスト結果表示エリアをクリア
+    const testsContainer = document.getElementById('response-tests') as HTMLElement;
+    if (testsContainer) {
+        testsContainer.innerHTML = '<div class="no-response">Tests are running...</div>';
+    }
+
+    // テストスクリプトが引数で渡された場合はそれを使用、そうでなければエディタから取得
+    let raw: string;
+    if (testScript !== undefined) {
+        raw = testScript;
+    } else {
+        const testScriptElement = document.getElementById('testScript') as HTMLTextAreaElement;
+        raw = testScriptElement?.value || '';
+    }
+    
+    console.log('実行するテストスクリプト:', raw);
+    if (!raw?.trim()) {
+        if (testsContainer) {
+            testsContainer.innerHTML = '<div class="no-response">No tests to execute</div>';
+        }
+        return [];
+    }
 
     // 改行で分割し、空行や先頭が // のコメント行を除外
     const lines = raw
@@ -362,11 +381,16 @@ export async function executeTestScript(responseData: ProcessedResponse): Promis
         .map(line => line.trim())
         .filter(line => line !== '' && !line.startsWith('//'));
 
+    console.log('実行するテストコマンド一覧:', lines);
+    console.log('レスポンスデータ:', responseData);
+
     const results: TestResult[] = [];
     try {
         for (const line of lines) {
+            console.log('実行中のテストコマンド:', line);
             // runTestCommand は、単一行のテストコマンドを評価し { passed, error } を返す想定
             const result = runTestCommand(line, responseData);
+            console.log('テストコマンド結果:', result);
             results.push({ name: line, passed: result.passed, error: result.error });
         }
         displayTestResults(results);
@@ -387,8 +411,9 @@ export async function executeTestScript(responseData: ProcessedResponse): Promis
 /**
  * sendRequest
  *  引数 requestObj を使って XHR 送信を行うバージョン
+ *  forScenario が true の場合は、UIを更新せずにレスポンスとテスト結果を返す
  */
-export async function sendRequest(requestObj: RequestData): Promise<XhrResponse | string> {
+export async function sendRequest(requestObj: RequestData, forScenario: boolean = false): Promise<XhrResponse | string | { response: ProcessedResponse; testResults: TestResult[] }> {
     try {
         showLoading(true);
 
@@ -502,10 +527,14 @@ export async function sendRequest(requestObj: RequestData): Promise<XhrResponse 
         // 5. processResponse と displayResponse を使って結果を表示
         const { response, duration } = responseData;
         const parsed = await processResponse(response, duration);
-        displayResponse(parsed);
+        
+        // forScenarioがfalseの場合のみUIを更新
+        if (!forScenario) {
+            displayResponse(parsed);
+        }
 
-        // 6. テストスクリプト実行
-        const testResults = await executeTestScript(parsed);
+        // 6. テストスクリプト実行（リクエストオブジェクトにテストスクリプトがあればそれを使用）
+        const testResults = await executeTestScript(parsed, requestObj.testScript);
 
         // 7. 履歴に保存
         await saveToHistory(processedRequest, parsed);
@@ -1766,6 +1795,15 @@ export async function saveCurrentRequest(): Promise<void> {
             req.auth.value = authValue.value;
             req.auth.addTo = authAddTo.value as 'query' | 'header';
         }
+
+        // プリリクエストスクリプトとテストスクリプト
+        const preRequestScriptTextarea = document.getElementById('preRequestScript') as HTMLTextAreaElement;
+        const testScriptTextarea = document.getElementById('testScript') as HTMLTextAreaElement;
+        req.preRequestScript = preRequestScriptTextarea?.value || '';
+        req.testScript = testScriptTextarea?.value || '';
+        
+        console.log('保存するリクエスト:', req);
+        console.log('保存するテストスクリプト:', req.testScript);
 
         // ② どこに保存するか判定する
         if (state.currentCollection) {
