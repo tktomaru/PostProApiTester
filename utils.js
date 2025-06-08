@@ -3,11 +3,11 @@
 // 汎用ユーティリティ関数群、タブ切り替え、イベント登録、一部の小さなヘルパーをまとめる
 // state.js を動的にインポートしてstate.currentRequest を取得
 import { state, saveCollectionsToStorage } from './state.js';
-import { displayResponse, saveCurrentRequest } from './requestManager.js';
+import { displayResponse, saveCurrentRequest, sendRequest } from './requestManager.js';
 import { createNewCollection } from './collectionManager.js';
-import { clearHistory } from './historyManager.js';
-import { startInterceptor } from './interceptorManager.js';
-import { stopInterceptor } from './interceptorManager.js';
+import { clearHistory, filterHistory } from './historyManager.js';
+import { startInterceptor, stopInterceptor } from './interceptorManager.js';
+import { openImportModal, exportData } from './importExport.js';
 /**
  * escapeHtml
  *  XSS 対策用にテキストをエスケープして安全に innerHTML に渡す
@@ -193,9 +193,6 @@ export function setupEventListeners() {
     }
     // Send ボタン
     document.getElementById('sendBtn').addEventListener('click', async () => {
-        const { sendRequest } = await import('./requestManager.js');
-
-
         let requestObj = state.currentRequest;
         // ① bodyType の選択状況を反映し、requestObj.body を適宜セット
         const bodyType = document.querySelector('input[name="bodyType"]:checked')?.value || 'none';
@@ -233,10 +230,10 @@ export function setupEventListeners() {
     });
     // インポート・エクスポート・設定
     document.getElementById('importBtn').addEventListener('click', () => {
-        import('./importExport.js').then(mod => mod.openImportModal());
+        openImportModal();
     });
     document.getElementById('exportBtn').addEventListener('click', () => {
-        import('./importExport.js').then(mod => mod.exportData());
+        exportData();
     });
     document.getElementById('settingsBtn').addEventListener('click', () => {
         showError('Settings panel not yet implemented');
@@ -247,7 +244,7 @@ export function setupEventListeners() {
     });
     // 履歴（検索・クリア）
     document.getElementById('historySearch').addEventListener('input', () => {
-        import('./historyManager.js').then(mod => mod.filterHistory());
+        filterHistory();
     });
     document.getElementById('clearHistoryBtn').addEventListener('click', async () => {
         clearHistory();

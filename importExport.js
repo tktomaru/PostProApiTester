@@ -11,7 +11,7 @@ import {
 } from './state.js';
 import { renderCollectionsTree } from './collectionManager.js';
 import { renderEnvironmentSelector, renderAllVariables, updateCollectionVarSelector } from './variableManager.js';
-import { showSuccess, showError } from './utils.js';
+import { showSuccess, showError, renderAuthDetails, updateAuthData } from './utils.js';
 import { sampleTestScript } from './defaultData.js';
 import { addKeyValueRow, handleBodyTypeChange } from './utils.js';
 import { renderScenarioList } from './scenarioManager.js';
@@ -617,7 +617,6 @@ export function importCurlCommand(request) {
     // 認証をセット
     if (request.auth && request.auth.type !== 'none') {
         document.getElementById('authType').value = request.auth.type;
-        const { renderAuthDetails, updateAuthData } = import('./utils.js');
         renderAuthDetails(request.auth.type);
         updateAuthData();
     }

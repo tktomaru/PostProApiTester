@@ -16,8 +16,9 @@ import {
     formatBytes
 } from './utils.js';
 
-import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues } from './utils.js';
-import { getVariable, replaceVariables, deepReplaceVariables, renderVariables } from './variableManager.js';
+import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues, getValueByPath } from './utils.js';
+import { getVariable, replaceVariables, deepReplaceVariables, renderVariables, setVariable } from './variableManager.js';
+import { saveToHistory as saveToHistoryFn } from './historyManager.js';
 
 /**
  * loadRequestIntoEditor
@@ -824,9 +825,7 @@ export function runTestCommand(commandString, responseData) {
             console.log("取得したAuthorizationヘッダ：varName=", varName);
             console.log("取得したAuthorizationヘッダ：headerValue=", headerValue);
             // 例: 非同期で環境変数に保存する関数を呼び出す（await は不要。非同期処理なのでエラーは catch）
-            import('./variableManager.js').then(({ setVariable }) => {
-                setVariable('environment', varName, headerValue).catch(console.error);
-            });
+            setVariable('environment', varName, headerValue).catch(console.error);
 
             // UI上の環境変数タブを再レンダリング
             renderVariables('environment');
@@ -1065,7 +1064,6 @@ function createTestPmObject(responseData, testResults) {
                         }
                     },
                     jsonBody: (path, value) => {
-                        const { getValueByPath } = import('./utils.js');
                         const actual = getValueByPath(responseData.body, path);
                         if (actual !== value) {
                             throw new Error(`Expected ${path} to be ${value}, got ${actual}`);
@@ -1129,7 +1127,6 @@ function createTestPmObject(responseData, testResults) {
         variables: {
             get: key => getVariable(key),
             set: async (key, value) => {
-                const { setVariable } = await import('./variableManager.js');
                 await setVariable('environment', key, value);
             }
         }
@@ -1202,8 +1199,7 @@ export function processVariables(request) {
  *  historyManager へ委譲
  */
 export async function saveToHistory(request, responseData) {
-    const { saveToHistory: saveFn } = await import('./historyManager.js');
-    await saveFn(request, responseData);
+    await saveToHistoryFn(request, responseData);
 }
 
 /**

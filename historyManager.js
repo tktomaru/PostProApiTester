@@ -3,8 +3,8 @@
 // 履歴の記録、表示、クリック時にリクエストを復元するロジック
 
 import { saveHistoryToStorage, state } from './state.js';
-import { escapeHtml } from './utils.js';
-import { showSuccess } from './utils.js';
+import { escapeHtml, showSuccess } from './utils.js';
+import { loadRequestIntoEditor } from './requestManager.js';
 
 /**
  * renderHistory
@@ -80,7 +80,6 @@ export async function loadHistoryItem(historyId) {
     const item = state.history.find(h => h.id == historyId);
     if (!item || !item.request) return;
 
-    const { loadRequestIntoEditor } = await import('./requestManager.js');
     loadRequestIntoEditor(item.request);
     showSuccess('Request loaded from history');
 }

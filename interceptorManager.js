@@ -3,6 +3,7 @@
 // インターセプタ（ネットワークキャプチャ）の開始・停止・受信表示をまとめる
 
 import { showSuccess, showError, escapeHtml } from './utils.js';
+import { loadRequestIntoEditor } from './requestManager.js';
 
 let _isActive = false;
 
@@ -112,7 +113,6 @@ export async function loadInterceptedRequest(request) {
         body: request.body || null,
         auth: { type: 'none' }
     };
-    const { loadRequestIntoEditor } = await import('./requestManager.js');
     loadRequestIntoEditor(convertedRequest);
     showSuccess('Request loaded from interceptor');
 }

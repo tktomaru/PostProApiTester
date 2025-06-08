@@ -9,11 +9,10 @@ import {
 } from './state.js';
 import { sampleCollections } from './defaultData.js';
 
-import { escapeHtml } from './utils.js';
-import { showSuccess } from './utils.js';
-import { updateCollectionVarSelector } from './variableManager.js';
-import { renderVariables } from './variableManager.js';
+import { escapeHtml, showSuccess } from './utils.js';
+import { updateCollectionVarSelector, renderVariables } from './variableManager.js';
 import { addRequestToScenario } from './scenarioManager.js';
+import { loadRequestIntoEditor } from './requestManager.js';
 
 /**
  * initializeCollections：起動時にコレクション一覧をロードし、必要ならサンプルを投入する
@@ -130,7 +129,6 @@ export async function editCollectionRequest(collectionId, requestIndex) {
  *  （実装は requestManager.js 側に移譲してもOK）
  */
 export async function loadCollectionRequest(request) {
-    const { loadRequestIntoEditor } = await import('./requestManager.js');
     loadRequestIntoEditor(request);
     showSuccess('Request loaded from collection');
 }
