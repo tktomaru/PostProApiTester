@@ -935,6 +935,14 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
 
         try {
             switch (command) {
+                case 'setUrl':
+                    if (!argsString) {
+                        console.warn('setUrl requires a URL');
+                        continue;
+                    }
+                    requestObj.url = argsString;
+                    break;
+
                 case 'setUrlWithVar':
                     if (!argsString) {
                         console.warn('setUrlWithVar requires a variable name');
