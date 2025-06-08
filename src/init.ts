@@ -135,6 +135,63 @@ function setupAddButtons(): void {
     });
 }
 
+/**
+ * 開発者ツールの使用を促すガイダンスを表示
+ */
+function showDevToolsGuidance(): void {
+    try {
+        // さりげない通知でガイダンスを表示
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 13px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease-out;
+        `;
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 16px;">🛠️</span>
+                <span>Press F12 for better debugging experience</span>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // アニメーション表示
+        setTimeout(() => {
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // 4秒後に自動的に削除
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 4000);
+        
+        console.log('Developer tools guidance shown');
+    } catch (error) {
+        console.warn('Failed to show developer tools guidance:', error);
+    }
+}
+
 async function initializeApp(): Promise<void> {
     try {
         // ─────────────────────────────
@@ -144,14 +201,17 @@ async function initializeApp(): Promise<void> {
         setupTabSwitching();
         setupModalHandlers();
 
-        // 開発者機能を自動で開くメッセージを受け取る
+        // Chrome拡張機能のランタイムメッセージを受け取る
         chrome.runtime.onMessage.addListener((message: any) => {
             if (message.action === 'openDevTools') {
-                // 開発者機能のタブを開く
+                // レガシー対応：インターセプターのタブを開く
                 const devToolsTab = document.querySelector('[data-tab="interceptor"]') as HTMLElement;
                 if (devToolsTab) {
                     devToolsTab.click();
                 }
+            } else if (message.action === 'openDevToolsF12') {
+                // 開発者ツールの使用ガイダンスを表示
+                showDevToolsGuidance();
             }
         });
 

@@ -307,9 +307,17 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
         chrome.tabs.create({
             url: chrome.runtime.getURL("index.html")
         }, (newTab) => {
-            // 開発者ツールを自動で開く
+            // 設定を確認してから開発者ツールを開く
             if (newTab.id) {
-                chrome.tabs.sendMessage(newTab.id, { action: 'openDevTools' });
+                chrome.storage.local.get(['settings'], (result) => {
+                    const settings = result.settings || {};
+                    if (settings.openDevTools !== false) { // デフォルトはtrue
+                        // ページが完全に読み込まれてからF12キーシミュレーションを実行
+                        setTimeout(() => {
+                            chrome.tabs.sendMessage(newTab.id!, { action: 'openDevToolsF12' });
+                        }, 1500);
+                    }
+                });
             }
         });
     });
