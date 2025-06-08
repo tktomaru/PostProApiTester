@@ -11,6 +11,7 @@ export interface RequestData {
   bodyType: string;
   auth: AuthConfig;
   preRequestScript: string;
+  testScript?: string;
   timestamp?: number;
   status?: number;
   responseHeaders?: Record<string, string>;

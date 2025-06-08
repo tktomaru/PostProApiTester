@@ -41,6 +41,42 @@ function getStatusText(status: number): string {
     return statusTexts[status] || 'Unknown';
 }
 
+/**
+ * clearResponseDisplay
+ * レスポンス表示エリアをクリアする
+ */
+function clearResponseDisplay(): void {
+    // ステータス情報をクリア
+    const statsContainer = document.getElementById('responseStats') as HTMLElement;
+    if (statsContainer) {
+        statsContainer.innerHTML = '<span class="no-response">No response yet</span>';
+    }
+
+    // レスポンスボディをクリア
+    const bodyContainer = document.getElementById('responseBody') as HTMLElement;
+    if (bodyContainer) {
+        bodyContainer.innerHTML = '<div class="no-response">Send a request to see the response</div>';
+    }
+
+    // レスポンスヘッダーをクリア
+    const headersContainer = document.getElementById('response-headers') as HTMLElement;
+    if (headersContainer) {
+        headersContainer.innerHTML = '<div class="no-response">No headers</div>';
+    }
+
+    // レスポンスクッキーをクリア
+    const cookiesContainer = document.getElementById('response-cookies') as HTMLElement;
+    if (cookiesContainer) {
+        cookiesContainer.innerHTML = '<div class="no-response">No cookies</div>';
+    }
+
+    // テスト結果をクリア
+    const testsContainer = document.getElementById('response-tests') as HTMLElement;
+    if (testsContainer) {
+        testsContainer.innerHTML = '<div class="no-response">No tests run</div>';
+    }
+}
+
 interface FetchOptions {
     method: string;
     headers: Record<string, string>;
@@ -81,6 +117,9 @@ interface ResponseExecution {
  *  state.currentRequest を反映する
  */
 export function loadRequestIntoEditor(request: RequestData): void {
+    console.log('loadRequestIntoEditor called with request:', request);
+    console.log('Request params from input:', request.params);
+    
     // state.currentRequest の値をまるごと置き換え
     state.currentRequest = JSON.parse(JSON.stringify(request));
     if (state.currentRequest) {
@@ -91,6 +130,8 @@ export function loadRequestIntoEditor(request: RequestData): void {
         state.currentRequest.body = request.body;
         state.currentRequest.auth = { ...request.auth };
     }
+    
+    console.log('After setting state.currentRequest.params:', state.currentRequest?.params);
     
     // ① リクエスト 名称 を表示する
     const nameDisplay = document.getElementById('request-name-display') as HTMLElement;
@@ -110,37 +151,6 @@ export function loadRequestIntoEditor(request: RequestData): void {
     methodSelect.value = request.method;
     urlInput.value = request.url;
 
-    // URLの変更を監視してパラメータを更新
-    urlInput.addEventListener('input', () => {
-        try {
-            const url = new URL(urlInput.value);
-            const paramsContainer = document.getElementById('paramsContainer') as HTMLElement;
-            paramsContainer.innerHTML = '';
-            
-            // 既存のパラメータをクリア
-            if (state.currentRequest) {
-                state.currentRequest.params = {};
-            }
-
-            // URLのパラメータを追加
-            url.searchParams.forEach((value, key) => {
-                addKeyValueRow(paramsContainer, 'param');
-                const rows = paramsContainer.querySelectorAll('.key-value-row');
-                const lastRow = rows[rows.length - 1] as HTMLElement;
-                const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
-                const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
-                keyInput.value = key;
-                valueInput.value = value;
-
-                // state.currentRequestのパラメータも更新
-                if (state.currentRequest) {
-                    state.currentRequest.params[key] = value;
-                }
-            });
-        } catch (e) {
-            // URLが無効な場合は何もしない
-        }
-    });
 
     // ヘッダ描画
     const headersContainer = document.getElementById('headersContainer') as HTMLElement;
@@ -162,47 +172,53 @@ export function loadRequestIntoEditor(request: RequestData): void {
     // パラメータ描画
     const paramsContainer = document.getElementById('paramsContainer') as HTMLElement;
     paramsContainer.innerHTML = '';
+    console.log('Loading request params:', request.params);
+    console.log('ParamsContainer element:', paramsContainer);
+    
     if (request.params && Object.keys(request.params).length > 0) {
-        Object.entries(request.params).forEach(([key, value]) => {
+        // 一度にすべての行を追加
+        const paramEntries = Object.entries(request.params);
+        paramEntries.forEach(() => {
             addKeyValueRow(paramsContainer, 'param');
-            const rows = paramsContainer.querySelectorAll('.key-value-row');
-            const lastRow = rows[rows.length - 1] as HTMLElement;
-            const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
-            const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
-            keyInput.value = key;
-            valueInput.value = value;
         });
-    } else {
-        addKeyValueRow(paramsContainer, 'param');
-    }
-
-    // パラメータの変更を監視してURLを更新
-    paramsContainer.addEventListener('input', () => {
-        try {
-            const url = new URL(urlInput.value);
-            const params = collectKeyValues('paramsContainer');
+        
+        // すべての行を追加した後に値を設定
+        setTimeout(() => {
+            const rows = paramsContainer.querySelectorAll('.key-value-row');
+            console.log(`Found ${rows.length} rows, expected ${paramEntries.length}`);
             
-            // URLのパラメータをクリア
-            url.search = '';
-            
-            // 新しいパラメータを追加
-            Object.entries(params).forEach(([key, value]) => {
-                if (key && value) {
-                    url.searchParams.append(key, value);
+            paramEntries.forEach(([key, value], index) => {
+                if (index < rows.length) {
+                    const row = rows[index] as HTMLElement;
+                    const keyInput = row.querySelector('.key-input') as HTMLInputElement;
+                    const valueInput = row.querySelector('.value-input') as HTMLInputElement;
+                    
+                    if (keyInput && valueInput) {
+                        keyInput.value = key;
+                        valueInput.value = value;
+                        console.log(`Set param ${index}: ${key} = ${value}`);
+                        
+                        // 手動でinputイベントを発火してstate.currentRequestを更新
+                        keyInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        valueInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    } else {
+                        console.error(`Could not find input elements in row ${index}`);
+                    }
+                } else {
+                    console.error(`Row ${index} not found`);
                 }
             });
-
-            // URLを更新
-            urlInput.value = url.toString();
-
-            // state.currentRequestのパラメータも更新
-            if (state.currentRequest) {
-                state.currentRequest.params = params;
-            }
-        } catch (e) {
-            // URLが無効な場合は何もしない
+        }, 50); // 50ms遅延でより確実に
+        
+        // state.currentRequestのparamsも更新
+        if (state.currentRequest) {
+            state.currentRequest.params = { ...request.params };
+            console.log('Updated state.currentRequest.params:', state.currentRequest.params);
         }
-    });
+    } else {
+        console.log('No params to load, adding empty row');
+        addKeyValueRow(paramsContainer, 'param');
+    }
 
     // ボディ描画
     if (request.body) {
@@ -269,83 +285,35 @@ export function loadRequestIntoEditor(request: RequestData): void {
         updateAuthData();
     }
 
-    // ① 「Pre-request Script」エディタに既存スクリプトをセット
-    const preReqTextarea = document.getElementById('preRequestScript') as HTMLTextAreaElement;
-    preReqTextarea.value = request.preRequestScript || '';
-
-    // ② 入力が変わったら state.currentRequest.preRequestScript を更新してストレージに保存
-    preReqTextarea.addEventListener('blur', async () => {
-        const newScript = preReqTextarea.value;
-        // state.currentRequest に上書き
-        if (state.currentRequest) {
-            state.currentRequest.preRequestScript = newScript;
-        }
-
-        // どのコレクションのどのリクエストかを特定するには、
-        // state.currentCollection と request.id を使って探す必要があります
-        const collection = state.collections.find(
-            c => c.id === state.currentCollection
-        );
-        if (collection) {
-            const targetReq = collection.requests.find(r => r.id === request.id);
-            if (targetReq) {
-                targetReq.preRequestScript = newScript;
-            }
-        }
-
-        // 保存しておく
-        await saveCollectionsToStorage();
-        showSuccess('Pre-request script を保存しました');
-    });
-
-    // ③ Body Type の radio ボタンをチェック
+    // ③ Body Type の設定（既存のbody描画の代わりに、より適切な方法で設定）
     const bodyType = request.bodyType || 'none';
     document.querySelectorAll('input[name="bodyType"]').forEach(radio => {
         const radioElement = radio as HTMLInputElement;
         radioElement.checked = radioElement.value === bodyType;
     });
-
-    // ④ Body 本文エリアを切り替えて表示する
-    const rawBody = document.getElementById('rawBody') as HTMLElement;
-    const jsonBodyParent = document.getElementById('jsonBody')?.parentElement as HTMLElement;
-    const formDataContainer = document.getElementById('formDataContainer') as HTMLElement;
     
-    switch (bodyType) {
-        case 'raw':
-            rawBody.style.display = 'block';
-            if (jsonBodyParent) jsonBodyParent.style.display = 'none';
-            formDataContainer.style.display = 'none';
-            break;
-        case 'json':
-            rawBody.style.display = 'none';
-            if (jsonBodyParent) jsonBodyParent.style.display = 'block';
-            formDataContainer.style.display = 'none';
-            break;
-        case 'form-data':
-            rawBody.style.display = 'none';
-            if (jsonBodyParent) jsonBodyParent.style.display = 'none';
-            formDataContainer.style.display = 'block';
-            break;
-        case 'urlencoded':
-            rawBody.style.display = 'none';
-            if (jsonBodyParent) jsonBodyParent.style.display = 'none';
-            formDataContainer.style.display = 'block';
-            break;
-        default:
-            // none
-            rawBody.style.display = 'none';
-            if (jsonBodyParent) jsonBodyParent.style.display = 'none';
-            formDataContainer.style.display = 'none';
-            break;
-    }
+    // Body Type に応じて表示を切り替え
+    handleBodyTypeChange({ target: { value: bodyType } } as any);
 
     // ⑤ Body の中身をセット
     const rawBodyTextarea = document.getElementById('rawBody') as HTMLTextAreaElement;
     const jsonBodyTextarea = document.getElementById('jsonBody') as HTMLTextAreaElement;
-    rawBodyTextarea.value = (request.body as string) || '';
-    jsonBodyTextarea.value = (request.body as string) || '';
+    if (rawBodyTextarea) rawBodyTextarea.value = (request.body as string) || '';
+    if (jsonBodyTextarea) jsonBodyTextarea.value = (request.body as string) || '';
 
-    // ⑥ 最新のリクエスト・レスポンス履歴を表示
+    // ⑥ Pre-requestスクリプトを設定
+    const preRequestScriptTextarea = document.getElementById('preRequestScript') as HTMLTextAreaElement;
+    if (preRequestScriptTextarea) {
+        preRequestScriptTextarea.value = request.preRequestScript || '';
+    }
+
+    // ⑦ テストスクリプトを設定
+    const testScriptTextarea = document.getElementById('testScript') as HTMLTextAreaElement;
+    if (testScriptTextarea) {
+        testScriptTextarea.value = request.testScript || '';
+    }
+
+    // ⑧ 最新のリクエスト・レスポンス履歴を表示または表示をクリア
     if (request.lastRequestExecution || request.lastResponseExecution) {
         // 最新のレスポンス情報がある場合、レスポンスタブに反映
         if (request.lastResponseExecution) {
@@ -365,6 +333,9 @@ export function loadRequestIntoEditor(request: RequestData): void {
             };
             displayResponse(responseData);
         }
+    } else {
+        // レスポンス履歴がない場合は表示をクリア
+        clearResponseDisplay();
     }
 
     // タブをリクエストタブに切り替え
@@ -1405,15 +1376,18 @@ export async function saveCurrentRequest(): Promise<void> {
 
         // パラメータ
         const paramRows = document.querySelectorAll('#paramsContainer .key-value-row');
+        console.log('saveCurrentRequest: Found param rows:', paramRows.length);
         const newParams: Record<string, string> = {};
-        paramRows.forEach(row => {
+        paramRows.forEach((row, index) => {
             const rowElement = row as HTMLElement;
             const keyInput = rowElement.querySelector('.key-input') as HTMLInputElement;
             const valueInput = rowElement.querySelector('.value-input') as HTMLInputElement;
             const key = keyInput.value.trim();
             const value = valueInput.value.trim();
+            console.log(`saveCurrentRequest: Row ${index}: ${key} = ${value}`);
             if (key) newParams[key] = value;
         });
+        console.log('saveCurrentRequest: New params object:', newParams);
         req.params = newParams;
 
         // ボディ

@@ -143,8 +143,18 @@ export async function loadCollectionRequest(request: RequestData): Promise<void>
     const collection = state.collections.find(c => c.requests?.some(r => r.id === request.id));
     if (collection) {
         await selectCollection(collection.id);
+        
+        // 最新のコレクションデータから該当のリクエストを取得
+        const latestRequest = collection.requests.find(r => r.id === request.id);
+        if (latestRequest) {
+            console.log('Loading latest request data:', latestRequest);
+            loadRequestIntoEditor(latestRequest);
+            showSuccess('Request loaded from collection');
+            return;
+        }
     }
 
+    // フォールバック: 渡されたrequestオブジェクトを使用
     loadRequestIntoEditor(request);
     showSuccess('Request loaded from collection');
 }
@@ -495,6 +505,19 @@ async function loadScenarioRequest(request: RequestData, scenarioId: string): Pr
     state.currentScenario = scenarioId;
     await saveCurrentScenarioToStorage();
     
+    // 最新のシナリオデータから該当のリクエストを取得
+    const scenario = state.scenarios.find(s => s.id === scenarioId);
+    if (scenario && scenario.requests) {
+        const latestRequest = scenario.requests.find(r => r.id === request.id);
+        if (latestRequest) {
+            console.log('Loading latest scenario request data:', latestRequest);
+            loadRequestIntoEditor(latestRequest);
+            showSuccess('Request loaded from scenario');
+            return;
+        }
+    }
+    
+    // フォールバック: 渡されたrequestオブジェクトを使用
     loadRequestIntoEditor(request);
     showSuccess('Request loaded from scenario');
 }
