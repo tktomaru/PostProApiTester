@@ -21,6 +21,26 @@ import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, re
 import { getVariable, replaceVariables, deepReplaceVariables, renderVariables, setVariable } from './variableManager';
 import { saveToHistory as saveToHistoryFn } from './historyManager';
 
+/**
+ * getStatusText
+ * HTTPステータスコードからstatusTextを取得する
+ */
+function getStatusText(status: number): string {
+    const statusTexts: Record<number, string> = {
+        200: 'OK',
+        201: 'Created',
+        204: 'No Content',
+        400: 'Bad Request',
+        401: 'Unauthorized',
+        403: 'Forbidden',
+        404: 'Not Found',
+        500: 'Internal Server Error',
+        502: 'Bad Gateway',
+        503: 'Service Unavailable'
+    };
+    return statusTexts[status] || 'Unknown';
+}
+
 interface FetchOptions {
     method: string;
     headers: Record<string, string>;
@@ -325,6 +345,28 @@ export function loadRequestIntoEditor(request: RequestData): void {
     rawBodyTextarea.value = (request.body as string) || '';
     jsonBodyTextarea.value = (request.body as string) || '';
 
+    // ⑥ 最新のリクエスト・レスポンス履歴を表示
+    if (request.lastRequestExecution || request.lastResponseExecution) {
+        // 最新のレスポンス情報がある場合、レスポンスタブに反映
+        if (request.lastResponseExecution) {
+            // ResponseExecutionからProcessedResponseに変換
+            const bodyText = typeof request.lastResponseExecution.body === 'string' 
+                ? request.lastResponseExecution.body 
+                : JSON.stringify(request.lastResponseExecution.body, null, 2);
+                
+            const responseData: ProcessedResponse = {
+                status: request.lastResponseExecution.status,
+                statusText: getStatusText(request.lastResponseExecution.status),
+                headers: request.lastResponseExecution.headers || {},
+                duration: request.lastResponseExecution.duration,
+                size: request.lastResponseExecution.size,
+                body: request.lastResponseExecution.body,
+                bodyText: bodyText
+            };
+            displayResponse(responseData);
+        }
+    }
+
     // タブをリクエストタブに切り替え
     switchMainTab('request');
 }
@@ -512,6 +554,28 @@ export async function sendRequest(requestObj: RequestData): Promise<XhrResponse 
                 }
             }
         }
+
+        // 8.5. 全シナリオのリクエストに最新の実行結果を保存（リクエストIDベース）
+        state.scenarios.forEach(async (scenario) => {
+            if (scenario.requests) {
+                const request = scenario.requests.find(r => r.id === requestObj.id);
+                if (request) {
+                    // リクエスト実行結果を保存
+                    (request as any).lastRequestExecution = requestExecution;
+
+                    // レスポンス実行結果を保存
+                    (request as any).lastResponseExecution = {
+                        status: parsed.status,
+                        duration: parsed.duration,
+                        size: parsed.size,
+                        timestamp: new Date().toISOString(),
+                        headers: parsed.headers,  // パース済みのヘッダーを保存
+                        body: parsed.body
+                    };
+                }
+            }
+        });
+        await saveScenariosToStorage();
 
         // 9. 現在のリクエストにも実行結果を保存
         if (state.currentRequest && state.currentRequest.id === requestObj.id) {
