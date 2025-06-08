@@ -5,7 +5,8 @@ import type { Collection, Scenario, Environment, VariableData } from './types';
 
 /** グローバル変数のサンプル */
 export const sampleGlobalVariables: Record<string, VariableData> = {
-    apiUrl: { value: 'http://localhost:31013', description: '基本となる API の URL' },
+    apiUrl: { value: 'https://reply.tukutano.jp', description: '基本となる API の URL' },
+    baseUrl: { value: 'https://reply.tukutano.jp', description: '基本となる API の URL' },
     timeout: { value: '30000', description: 'タイムアウト（ミリ秒）' }
 };
 

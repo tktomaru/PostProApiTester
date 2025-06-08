@@ -974,11 +974,40 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                     }
                     const headerVarName = argsString.substring(0, headerVarNameEndIndex);
                     const headerVarValue = argsString.substring(headerVarNameEndIndex + 1).trim();
-                    const headerVarResult = getVariable(headerVarValue);
-                    if (headerVarResult === undefined) {
-                        throw new Error(`変数「${headerVarValue}」が変数ではありません`);
+                    
+                    // ${"Collection"."Request"."response"."headers"."key"}形式の変数参照を処理
+                    if (headerVarValue.startsWith('${') && headerVarValue.endsWith('}')) {
+                        const varPath = headerVarValue.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
+                        const collection = state.collections.find(c => c.name === varPath[0]);
+                        if (!collection) {
+                            throw new Error(`コレクション「${varPath[0]}」が見つかりません`);
+                        }
+                        const request = collection.requests.find(r => r.name === varPath[1]);
+                        if (!request) {
+                            throw new Error(`リクエスト「${varPath[1]}」が見つかりません`);
+                        }
+                        if (!request.lastResponseExecution) {
+                            throw new Error('request の実行結果が存在しません');
+                        }
+                        
+                        let value = request.lastResponseExecution;
+                        for (let i = 2; i < varPath.length; i++) {
+                            if (value === undefined) {
+                                throw new Error(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
+                            }
+                            value = value[varPath[i]];
+                        }
+                        if (value === undefined) {
+                            throw new Error(`変数「${headerVarValue}」の値が取得できません`);
+                        }
+                        requestObj.headers[headerVarName] = String(value);
+                    } else {
+                        const headerVarResult = getVariable(headerVarValue);
+                        if (headerVarResult === undefined) {
+                            throw new Error(`変数「${headerVarValue}」が変数ではありません`);
+                        }
+                        requestObj.headers[headerVarName] = headerVarResult;
                     }
-                    requestObj.headers[headerVarName] = headerVarResult;
                     break;
 
                 case 'setBodyWithVar':
@@ -987,11 +1016,40 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         continue;
                     }
                     console.log("argsString", argsString);
-                    const bodyValue = getVariable(argsString);
-                    if (bodyValue === undefined) {
-                        throw new Error(`変数「${argsString}」が変数ではありません`);
+                    
+                    // ${"Collection"."Request"."response"."body"."key"}形式の変数参照を処理
+                    if (argsString.startsWith('${') && argsString.endsWith('}')) {
+                        const varPath = argsString.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
+                        const collection = state.collections.find(c => c.name === varPath[0]);
+                        if (!collection) {
+                            throw new Error(`コレクション「${varPath[0]}」が見つかりません`);
+                        }
+                        const request = collection.requests.find(r => r.name === varPath[1]);
+                        if (!request) {
+                            throw new Error(`リクエスト「${varPath[1]}」が見つかりません`);
+                        }
+                        if (!request.lastResponseExecution) {
+                            throw new Error('request の実行結果が存在しません');
+                        }
+                        
+                        let value = request.lastResponseExecution;
+                        for (let i = 2; i < varPath.length; i++) {
+                            if (value === undefined) {
+                                throw new Error(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
+                            }
+                            value = value[varPath[i]];
+                        }
+                        if (value === undefined) {
+                            throw new Error(`変数「${argsString}」の値が取得できません`);
+                        }
+                        requestObj.body = String(value);
+                    } else {
+                        const bodyValue = getVariable(argsString);
+                        if (bodyValue === undefined) {
+                            throw new Error(`変数「${argsString}」が変数ではありません`);
+                        }
+                        requestObj.body = bodyValue;
                     }
-                    requestObj.body = bodyValue;
                     break;
 
                 default:
@@ -1056,16 +1114,26 @@ export function processVariables(request: RequestData): RequestData {
             processed.body = deepReplaceVariables(processed.body);
         }
     }
-    const url = new URL(processed.url);
-    Object.entries(processed.params).forEach(([key, value]) => {
-        url.searchParams.set(key, String(value));
-    });
-    if (processed.auth.type === 'apikey' && processed.auth.addTo === 'query') {
-        if (processed.auth.key && processed.auth.value) {
-            url.searchParams.set(processed.auth.key, processed.auth.value);
-        }
+
+    // URLの有効性チェック
+    if (!processed.url || !processed.url.trim()) {
+        throw new Error('URL is required');
     }
-    processed.url = url.toString();
+
+    try {
+        const url = new URL(processed.url);
+        Object.entries(processed.params).forEach(([key, value]) => {
+            url.searchParams.set(key, String(value));
+        });
+        if (processed.auth.type === 'apikey' && processed.auth.addTo === 'query') {
+            if (processed.auth.key && processed.auth.value) {
+                url.searchParams.set(processed.auth.key, processed.auth.value);
+            }
+        }
+        processed.url = url.toString();
+    } catch (error) {
+        throw new Error(`Invalid URL: ${processed.url}`);
+    }
     return processed;
 }
 

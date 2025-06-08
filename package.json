@@ -12,6 +12,7 @@
     "jsonpath-plus": "^8.0.0"
   },
   "devDependencies": {
+    "@babel/preset-typescript": "^7.27.1",
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@types/chrome": "^0.0.326",

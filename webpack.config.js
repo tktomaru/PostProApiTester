@@ -4,8 +4,8 @@ const path = require('path');
 module.exports = {
     mode: 'production',            // or 'development'
     entry: {
-        background: './background.js'
-        // content: './src/contentScript.js',  // もし使うなら
+        background: './background.js',
+        content: './src/contentScript.ts'  // TypeScriptファイルをエントリーポイントとして追加
     },
     output: {
         filename: '[name].js',       // → dist/background.js, dist/content.js
@@ -14,13 +14,14 @@ module.exports = {
     module: {
         rules: [
             {
-                test: /\.js$/,
+                test: /\.(js|ts)$/,  // .js と .ts の両方を処理
                 exclude: /node_modules/,
                 use: {
                     loader: 'babel-loader',
                     options: {
                         presets: [
-                            ['@babel/preset-env', { targets: { chrome: '100' } }]
+                            ['@babel/preset-env', { targets: { chrome: '100' } }],
+                            '@babel/preset-typescript'  // TypeScript用のプリセットを追加
                         ]
                     }
                 }
@@ -28,6 +29,6 @@ module.exports = {
         ]
     },
     resolve: {
-        extensions: ['.js']
+        extensions: ['.js', '.ts']  // .ts も解決対象に追加
     }
 };

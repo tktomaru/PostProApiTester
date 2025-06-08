@@ -77,9 +77,20 @@ export async function initializeVariablesManagement(): Promise<void> {
                     }
                 });
             } else {
-                // ストレージに global があればそちらを優先して state に読み込む
-                (state as any).variables.global = storedVars.global;
+                // ストレージに global があれば、既存の変数を保持しながら新しい変数を追加
+                (state as any).variables.global = {
+                    ...sampleGlobalVariables,
+                    ...storedVars.global
+                };
                 (state as any).variables.collection = storedVars.collection || {};
+
+                // 更新された変数を保存
+                await chrome.storage.local.set({
+                    variables: {
+                        global: (state as any).variables.global,
+                        collection: (state as any).variables.collection
+                    }
+                });
             }
         }
 
@@ -697,11 +708,21 @@ export function getVariable(varName: string): any {
 export function replaceVariables(text: string): string {
     if (typeof text !== 'string') return text;
 
-    return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+    // {{apiUrl}}形式の置換
+    text = text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
         const trimmedName = varName.trim();
         const value = getVariable(trimmedName);
         return value !== undefined ? value : match;
     });
+
+    // ${apiUrl}形式の置換
+    text = text.replace(/\${([^}]+)}/g, (match, varName) => {
+        const trimmedName = varName.trim();
+        const value = getVariable(trimmedName);
+        return value !== undefined ? value : match;
+    });
+
+    return text;
 }
 
 export function deepReplaceVariables(obj: any): any {
