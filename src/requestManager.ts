@@ -1038,12 +1038,15 @@ export function displayResponseHeaders(headers: Record<string, string>): void {
  * displayResponseCookies
  *  Cookiesタブに Set-Cookie ヘッダを表示
  */
-export function displayResponseCookies(headers: Record<string, string>): void {
+export function displayResponseCookies(headers: Record<string, string | string[]>): void {
     const cookiesContainer = document.getElementById('response-cookies') as HTMLElement;
-    const setCookieHeader = headers['set-cookie'];
 
-    if (setCookieHeader) {
-        const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+    // 'set-cookie' または 'cookie' ヘッダーを優先的に取得
+    let raw = headers['set-cookie'] ?? headers['cookie'];
+
+    if (raw) {
+        // 単一文字列でも配列でも扱えるように正規化
+        const cookies = Array.isArray(raw) ? raw : [raw];
         let html = '<div class="cookies-list">';
         cookies.forEach(cookie => {
             html += `<div class="cookie-item">${escapeHtml(cookie)}</div>`;
