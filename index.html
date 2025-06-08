@@ -18,14 +18,28 @@
         </div>
     </div>
     <div class="app-container">
-        <!-- 左サイドバー：コレクション一覧＋各コレクションのリクエスト一覧を表示 -->
+        <!-- 左サイドバー：コレクション一覧＋シナリオ一覧 -->
         <aside class="sidebar" id="collectionsSidebar">
-            <!-- 「＋ New Collection」ボタンなどもここに配置可 -->
-            <div class="sidebar-header">
-                <button class="btn btn-sm" id="createCollectionBtn">＋ コレクション作成</button>
+            <!-- コレクション セクション -->
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <h3>Collections</h3>
+                    <button class="btn btn-sm" id="createCollectionBtn">＋ New</button>
+                </div>
+                <div id="collectionsTree">
+                    <!-- JS で動的にコレクションおよびそのリクエスト一覧をここに描画 -->
+                </div>
             </div>
-            <div id="collectionsTree">
-                <!-- JS で動的にコレクションおよびそのリクエスト一覧をここに描画 -->
+
+            <!-- シナリオ セクション -->
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <h3>Scenarios</h3>
+                    <button class="btn btn-sm" id="createScenarioFromSidebarBtn">＋ New</button>
+                </div>
+                <div id="scenariosTree">
+                    <!-- JS で動的にシナリオおよびそのリクエスト一覧をここに描画 -->
+                </div>
             </div>
         </aside>
 

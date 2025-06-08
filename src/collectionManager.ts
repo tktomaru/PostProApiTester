@@ -6,10 +6,12 @@ import type { Collection, RequestData } from './types';
 import {
     saveCollectionsToStorage,
     saveCurrentCollectionToStorage,
+    saveScenariosToStorage,
+    saveCurrentScenarioToStorage,
     state
 } from './state';
 import { sampleCollections } from './defaultData';
-import { showSuccess } from './utils';
+import { showSuccess, switchMainTab } from './utils';
 import { updateCollectionVarSelector, renderVariables } from './variableManager';
 import { addRequestToScenario } from './scenarioManager';
 import { loadRequestIntoEditor } from './requestManager';
@@ -38,6 +40,7 @@ export async function initializeCollections(): Promise<void> {
 
         // 画面にレンダリング
         renderCollectionsTree();
+        renderScenariosTree();
 
         // コレクション変数セレクタも更新
         updateCollectionVarSelector();
@@ -345,6 +348,200 @@ export function renderCollectionsTree(): void {
             }
         });
     });
+}
+
+/**
+ * renderScenariosTree
+ *  state.scenarios の内容をもとに、サイドバーに「シナリオ行＋子リクエスト一覧」を描画
+ */
+export function renderScenariosTree(): void {
+    const container = document.getElementById('scenariosTree');
+    if (!container) return;
+
+    container.innerHTML = ''; // まずクリア
+
+    state.scenarios.forEach((scenario) => {
+        // ① シナリオ行
+        const scenarioDiv = document.createElement('div');
+        scenarioDiv.className = 'scenario-item';
+        scenarioDiv.dataset.id = scenario.id;
+
+        // 「▶」トグルアイコン
+        const toggleIcon = document.createElement('span');
+        toggleIcon.className = 'toggle-icon';
+        toggleIcon.textContent = '▶';
+        scenarioDiv.appendChild(toggleIcon);
+
+        // シナリオアイコン
+        const scenarioIcon = document.createElement('span');
+        scenarioIcon.className = 'scenario-icon';
+        scenarioIcon.textContent = '🎬';
+        scenarioDiv.appendChild(scenarioIcon);
+
+        // シナリオ名
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'scenario-name';
+        nameSpan.textContent = scenario.name;
+        scenarioDiv.appendChild(nameSpan);
+
+        // 三点リーダーメニュー
+        const menuBtn = document.createElement('span');
+        menuBtn.className = 'menu-btn';
+        menuBtn.textContent = '⋮';
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rect = menuBtn.getBoundingClientRect();
+            showContextMenu(rect.left, rect.top, [
+                {
+                    text: 'シナリオを編集',
+                    icon: '✏️',
+                    action: () => {
+                        state.currentScenario = scenario.id;
+                        saveCurrentScenarioToStorage();
+                        switchMainTab('scenarios');
+                    }
+                },
+                {
+                    text: 'シナリオを削除',
+                    icon: '🗑️',
+                    action: () => deleteScenario(scenario.id)
+                }
+            ]);
+        });
+        scenarioDiv.appendChild(menuBtn);
+
+        container.appendChild(scenarioDiv);
+
+        // ② リクエスト一覧（最初は非表示）
+        const ul = document.createElement('ul');
+        ul.className = 'request-list';
+        ul.style.display = 'none'; // デフォルトで非表示
+
+        if (scenario.requests && scenario.requests.length > 0) {
+            scenario.requests.forEach((req) => {
+                const li = document.createElement('li');
+                li.className = 'request-item';
+                li.innerHTML = `
+                    <span class="method-badge method-${req.method}">${req.method}</span>
+                    <span class="request-name">${req.name}</span>
+                    <span class="menu-btn">⋮</span>
+                `;
+
+                // リクエスト選択時の処理
+                li.addEventListener('click', (e) => {
+                    if (!(e.target as HTMLElement).classList.contains('menu-btn')) {
+                        e.stopPropagation();
+                        loadScenarioRequest(req, scenario.id);
+                    }
+                });
+
+                // メニューボタンのクリックイベント
+                const reqMenuBtn = li.querySelector('.menu-btn');
+                reqMenuBtn?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const rect = (e.target as HTMLElement).getBoundingClientRect();
+                    showContextMenu(rect.left, rect.top, [
+                        {
+                            text: 'リクエストを編集',
+                            icon: '✏️',
+                            action: () => loadScenarioRequest(req, scenario.id)
+                        },
+                        {
+                            text: 'シナリオから削除',
+                            icon: '🗑️',
+                            action: () => deleteRequestFromScenario(scenario.id, req.id)
+                        }
+                    ]);
+                });
+
+                ul.appendChild(li);
+            });
+        } else {
+            // シナリオにリクエストがない場合
+            const li = document.createElement('li');
+            li.className = 'request-item empty-message';
+            li.textContent = 'No requests';
+            ul.appendChild(li);
+        }
+
+        container.appendChild(ul);
+
+        // ③ シナリオ行クリックで「リクエスト一覧を開閉」
+        scenarioDiv.addEventListener('click', () => {
+            if (ul.style.display === 'none') {
+                ul.style.display = 'block';
+                toggleIcon.textContent = '▼';
+                // クリックされたシナリオを選択状態に
+                document.querySelectorAll('.scenario-item').forEach(item => {
+                    const element = item as HTMLElement;
+                    element.classList.toggle('active', element.dataset.id == scenario.id);
+                });
+                state.currentScenario = scenario.id;
+                saveCurrentScenarioToStorage();
+            } else {
+                ul.style.display = 'none';
+                toggleIcon.textContent = '▶';
+            }
+        });
+    });
+}
+
+/**
+ * loadScenarioRequest
+ *  シナリオ内リクエストを右側エディタにロードする
+ */
+async function loadScenarioRequest(request: RequestData, scenarioId: string): Promise<void> {
+    // シナリオを選択状態に
+    state.currentScenario = scenarioId;
+    await saveCurrentScenarioToStorage();
+    
+    loadRequestIntoEditor(request);
+    showSuccess('Request loaded from scenario');
+}
+
+/**
+ * deleteScenario
+ *  指定された ID のシナリオを削除し、Storage に保存 → 再描画
+ */
+async function deleteScenario(scenarioId: string): Promise<void> {
+    if (!confirm('本当にこのシナリオを削除しますか？')) {
+        return;
+    }
+
+    // state.scenarios から該当を取り除く
+    const idx = state.scenarios.findIndex(scenario => scenario.id == scenarioId);
+    if (idx === -1) return;
+
+    state.scenarios.splice(idx, 1);
+    await saveScenariosToStorage();
+
+    // currentScenario が削除されたものを指していたらクリア
+    if (state.currentScenario == scenarioId) {
+        state.currentScenario = null;
+        await saveCurrentScenarioToStorage();
+    }
+
+    // ツリーを再描画
+    renderScenariosTree();
+    showSuccess('シナリオを削除しました');
+}
+
+/**
+ * deleteRequestFromScenario
+ *  scenarioId 内の requestId を削除して再保存 → 再描画
+ */
+async function deleteRequestFromScenario(scenarioId: string, requestId: string): Promise<void> {
+    if (!confirm('本当にこのリクエストをシナリオから削除しますか？')) return;
+
+    const scenario = state.scenarios.find(s => s.id == scenarioId);
+    if (!scenario || !scenario.requests || !scenario.requests.some(r => r.id === requestId)) return;
+
+    scenario.requests = scenario.requests.filter(r => r.id !== requestId);
+    await saveScenariosToStorage();
+
+    // 削除後のツリーを再描画
+    renderScenariosTree();
+    showSuccess('リクエストをシナリオから削除しました');
 }
 
 /**

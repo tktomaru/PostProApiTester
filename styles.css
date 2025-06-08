@@ -104,22 +104,40 @@ body {
     z-index: 1;
 }
 
-/* サイドバー上部の「＋ コレクション作成」ボタン */
+/* ──────────────────────────────────────────────
+     サイドバーセクション
+  ────────────────────────────────────────────── */
+.sidebar-section {
+    margin-bottom: 2rem;
+}
+
+/* サイドバーヘッダー（タイトルとボタンを横並び） */
 .sidebar-header {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.5rem;
+}
+
+.sidebar-header h3 {
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-grow: 1;
 }
 
 .sidebar-header .btn {
     background-color: #007bff;
     border: none;
     color: #fff;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.2s ease;
+    flex-shrink: 0;
 }
 
 .sidebar-header .btn:hover {
@@ -167,6 +185,43 @@ body {
 
 /* コレクション名 */
 .collection-name {
+    flex-grow: 1;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ──────────────────────────────────────────────
+     シナリオ行のスタイル
+  ────────────────────────────────────────────── */
+.scenario-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    margin-bottom: 0.2rem;
+}
+
+.scenario-item:hover {
+    background-color: #e9ecef;
+}
+
+.scenario-item.active {
+    background-color: #fce4ec;
+}
+
+/* シナリオアイコン */
+.scenario-icon {
+    font-size: 1rem;
+    margin-right: 0.4rem;
+}
+
+/* シナリオ名 */
+.scenario-name {
     flex-grow: 1;
     font-weight: bold;
     white-space: nowrap;

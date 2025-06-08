@@ -23,6 +23,10 @@ export async function initializeScenarios(): Promise<void> {
 
         // 画面上のシナリオ一覧を描画
         renderScenarioList();
+        
+        // サイドバーのシナリオツリーも描画
+        const { renderScenariosTree } = await import('./collectionManager');
+        renderScenariosTree();
     } catch (error) {
         console.error('Error initializing scenarios:', error);
     }
@@ -248,6 +252,33 @@ export async function newScenario(): Promise<void> {
 }
 
 /**
+ * createNewScenario
+ *  新しいシナリオを作成し、サイドバーのリストを更新
+ */
+export async function createNewScenario(): Promise<void> {
+    const name = prompt('Enter scenario name:');
+    if (!name) return;
+
+    const scenario: Scenario = {
+        id: `scenario_${Date.now()}`,
+        name: name,
+        requests: []
+    };
+
+    state.scenarios.push(scenario);
+    await saveScenariosToStorage();
+
+    // シナリオ一覧を再描画
+    renderScenarioList();
+    
+    // サイドバーのシナリオツリーも更新
+    const { renderScenariosTree } = await import('./collectionManager');
+    renderScenariosTree();
+
+    showSuccess('Scenario created: ' + name);
+}
+
+/**
  * addRequestToScenario
  *  引数 req をコピーしてシナリオ (currentScenario) に追加し、再描画・保存
  */
@@ -269,6 +300,10 @@ export async function addRequestToScenario(req: RequestData): Promise<void> {
     await saveScenariosToStorage();
 
     renderScenarioRequests(state.currentScenario);
+    
+    // サイドバーのシナリオツリーも更新
+    const { renderScenariosTree } = await import('./collectionManager');
+    renderScenariosTree();
 }
 
 /**

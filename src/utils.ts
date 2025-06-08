@@ -248,6 +248,15 @@ export function setupEventListeners(): void {
             createNewCollection();
         });
     }
+
+    // サイドバーからのシナリオ作成
+    const createScenarioFromSidebarBtn = document.getElementById('createScenarioFromSidebarBtn');
+    if (createScenarioFromSidebarBtn) {
+        createScenarioFromSidebarBtn.addEventListener('click', async () => {
+            const { createNewScenario } = await import('./scenarioManager');
+            createNewScenario();
+        });
+    }
     
     // 履歴（検索・クリア）
     const historySearch = document.getElementById('historySearch') as HTMLInputElement;

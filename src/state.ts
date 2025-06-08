@@ -228,6 +228,13 @@ export async function saveScenariosToStorage(): Promise<void> {
 }
 
 /**
+ * saveCurrentScenarioToStorage
+ */
+export async function saveCurrentScenarioToStorage(): Promise<void> {
+    await chrome.storage.local.set({ currentScenario: state.currentScenario });
+}
+
+/**
  * saveCurrentRequestToStorage
  *  state.currentRequest を chrome.storage.local に保存
  */
