@@ -1058,7 +1058,7 @@ export function processVariables(request: RequestData): RequestData {
     }
     const url = new URL(processed.url);
     Object.entries(processed.params).forEach(([key, value]) => {
-        url.searchParams.set(key, value);
+        url.searchParams.set(key, String(value));
     });
     if (processed.auth.type === 'apikey' && processed.auth.addTo === 'query') {
         if (processed.auth.key && processed.auth.value) {

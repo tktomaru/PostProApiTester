@@ -25,7 +25,7 @@ interface PostmanVariable {
 }
 
 interface PostmanAuth {
-    type: string;
+    type: 'none' | 'basic' | 'bearer' | 'apikey' | 'oauth2';
     basic?: Array<{ key: string; value: string }>;
     bearer?: Array<{ key: string; value: string }>;
     apikey?: Array<{ key: string; value: string }>;
@@ -519,7 +519,8 @@ export async function importTalendData(talend: TalendData): Promise<void> {
         environmentsToAdd.push({
             id: e.id,
             name: e.name,
-            variables: vars
+            variables: vars,
+            created: new Date().toISOString()
         });
     });
 
@@ -552,7 +553,8 @@ export async function importTalendData(talend: TalendData): Promise<void> {
         state.environments.push({
             id: envObj.id,
             name: envObj.name,
-            variables: { ...envObj.variables } // ここで key/value を格納
+            variables: { ...envObj.variables },
+            created: envObj.created
         });
 
         // (2) state.variables.environment[env.id] に変数オブジェクトを追加
@@ -774,13 +776,21 @@ export function parseCurlCommand(curlString: string): RequestData {
 
 /** importCurlCommand */
 export function importCurlCommand(request: RequestData): void {
-    // メソッドとURLを設定
-    const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
-    const urlInput = document.getElementById('urlInput') as HTMLInputElement;
-    methodSelect.value = request.method;
-    urlInput.value = request.url;
-
     //state.currentRequest を更新
+    if (!state.currentRequest) {
+        state.currentRequest = {
+            id: '',
+            name: '',
+            method: 'GET',
+            url: '',
+            headers: {},
+            params: {},
+            body: null,
+            bodyType: 'none',
+            auth: { type: 'none' },
+            preRequestScript: ''
+        };
+    }
     state.currentRequest.method = request.method;
     state.currentRequest.url = request.url;
     state.currentRequest.headers = { ...request.headers };

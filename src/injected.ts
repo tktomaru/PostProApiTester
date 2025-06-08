@@ -1,3 +1,29 @@
+export {};
+
+declare global {
+    interface Window {
+        apiTesterInjected?: boolean;
+        apiTester?: {
+            getConfig: () => any;
+            setConfig: (config: any) => void;
+            getPendingRequests: () => any[];
+            clearPendingRequests: () => void;
+            testRequest: (url: string, options?: any) => Promise<Response>;
+        };
+    }
+
+    interface XMLHttpRequest {
+        _apiTesterInfo?: {
+            method: string;
+            url: string;
+            startTime: number;
+            body?: any;
+            requestId: number;
+            headers: Record<string, string>;
+        };
+    }
+}
+
 // injected.js
 // ───────────────────────────────────────────────────────────────────────────────
 // Injected script for API Tester Chrome Extension
@@ -33,7 +59,7 @@
     const originalWebSocket = window.WebSocket;
 
     // Message communication with content script
-    function sendMessage(type, payload) {
+    function sendMessage(type: string, payload: any): void {
         window.postMessage({
             type: type,
             payload: payload,
@@ -120,7 +146,7 @@
 
     // Override XMLHttpRequest
     function overrideXHR() {
-        XMLHttpRequest.prototype.open = function (method, url, async, user, password) {
+        XMLHttpRequest.prototype.open = function (method: string, url: string | URL, async: boolean = true, username?: string | null, password?: string | null): void {
             const requestId = ++requestCounter;
             const startTime = performance.now();
 
@@ -136,11 +162,13 @@
             // Override setRequestHeader to capture headers
             const originalSetRequestHeader = this.setRequestHeader;
             this.setRequestHeader = function (header, value) {
-                this._apiTesterInfo.headers[header] = value;
+                if (this._apiTesterInfo) {
+                    this._apiTesterInfo.headers[header] = value;
+                }
                 return originalSetRequestHeader.call(this, header, value);
             };
 
-            return originalXHROpen.call(this, method, url, async, user, password);
+            return originalXHROpen.call(this, method, url, async, username, password);
         };
 
         XMLHttpRequest.prototype.send = function (body) {
@@ -171,6 +199,7 @@
                 // Add event listeners
                 const self = this;
                 this.addEventListener('loadend', function () {
+                    if (!self._apiTesterInfo) return;
                     const endTime = performance.now();
                     const duration = endTime - self._apiTesterInfo.startTime;
 
@@ -179,24 +208,15 @@
                         status: self.status,
                         statusText: self.statusText,
                         headers: parseXHRResponseHeaders(self.getAllResponseHeaders()),
-                        body: self.responseText,
-                        duration: duration,
-                        size: self.responseText ? new Blob([self.responseText]).size : 0
+                        duration: duration
                     };
 
                     sendMessage('API_TESTER_RESPONSE', responseInfo);
-
-                    if (config.logRequests) {
-                        console.log('✅ XHR Response received');
-                        console.log('Status:', self.status, self.statusText);
-                        console.log('Duration:', duration + 'ms');
-                        console.groupEnd();
-                    }
-
                     pendingRequests.delete(self._apiTesterInfo.requestId);
                 });
 
                 this.addEventListener('error', function () {
+                    if (!self._apiTesterInfo) return;
                     const endTime = performance.now();
                     const duration = endTime - self._apiTesterInfo.startTime;
 
@@ -208,13 +228,6 @@
                     };
 
                     sendMessage('API_TESTER_RESPONSE', errorInfo);
-
-                    if (config.logRequests) {
-                        console.error('❌ XHR Request failed');
-                        console.log('Duration:', duration + 'ms');
-                        console.groupEnd();
-                    }
-
                     pendingRequests.delete(self._apiTesterInfo.requestId);
                 });
             }
@@ -225,117 +238,118 @@
 
     // Override WebSocket for WebSocket API monitoring
     function overrideWebSocket() {
-        window.WebSocket = function (url, protocols) {
-            const requestId = ++requestCounter;
-            const startTime = performance.now();
+        window.WebSocket = new Proxy(originalWebSocket, {
+            construct(target, args: [string | URL, (string | string[])?]) {
+                const requestId = ++requestCounter;
+                const startTime = performance.now();
+                const ws = new target(...args);
 
-            const ws = new originalWebSocket(url, protocols);
-
-            // Send WebSocket connection notification
-            sendMessage('API_TESTER_REQUEST', {
-                requestId: requestId,
-                url: url,
-                method: 'WEBSOCKET',
-                headers: {},
-                body: null,
-                initiator: 'WebSocket',
-                protocols: protocols
-            });
-
-            if (config.logRequests) {
-                console.group(`🔌 WebSocket Connection #${requestId}`);
-                console.log('URL:', url);
-                console.log('Protocols:', protocols);
-            }
-
-            // Override send method to monitor messages
-            const originalSend = ws.send;
-            ws.send = function (data) {
-                if (config.logRequests) {
-                    console.log('📤 WebSocket Send:', data);
-                }
-
-                sendMessage('API_TESTER_WEBSOCKET_SEND', {
+                // Send WebSocket connection notification
+                sendMessage('API_TESTER_REQUEST', {
                     requestId: requestId,
-                    data: data,
-                    timestamp: Date.now()
-                });
-
-                return originalSend.call(this, data);
-            };
-
-            // Monitor WebSocket events
-            ws.addEventListener('open', function () {
-                const duration = performance.now() - startTime;
-
-                sendMessage('API_TESTER_RESPONSE', {
-                    requestId: requestId,
-                    status: 101,
-                    statusText: 'Switching Protocols',
+                    url: args[0],
+                    method: 'WEBSOCKET',
                     headers: {},
-                    body: 'WebSocket connection established',
-                    duration: duration
+                    body: null,
+                    initiator: 'WebSocket',
+                    protocols: args[1]
                 });
 
                 if (config.logRequests) {
-                    console.log('✅ WebSocket Connected');
-                    console.log('Duration:', duration + 'ms');
-                }
-            });
-
-            ws.addEventListener('message', function (event) {
-                if (config.logRequests) {
-                    console.log('📥 WebSocket Message:', event.data);
+                    console.group(`🔌 WebSocket Connection #${requestId}`);
+                    console.log('URL:', args[0]);
+                    console.log('Protocols:', args[1]);
                 }
 
-                sendMessage('API_TESTER_WEBSOCKET_MESSAGE', {
-                    requestId: requestId,
-                    data: event.data,
-                    timestamp: Date.now()
+                // Override send method to monitor messages
+                const originalSend = ws.send;
+                ws.send = function (data) {
+                    if (config.logRequests) {
+                        console.log('📤 WebSocket Send:', data);
+                    }
+
+                    sendMessage('API_TESTER_WEBSOCKET_SEND', {
+                        requestId: requestId,
+                        data: data,
+                        timestamp: Date.now()
+                    });
+
+                    return originalSend.call(this, data);
+                };
+
+                // Monitor WebSocket events
+                ws.addEventListener('open', function () {
+                    const duration = performance.now() - startTime;
+
+                    sendMessage('API_TESTER_RESPONSE', {
+                        requestId: requestId,
+                        status: 101,
+                        statusText: 'Switching Protocols',
+                        headers: {},
+                        body: 'WebSocket connection established',
+                        duration: duration
+                    });
+
+                    if (config.logRequests) {
+                        console.log('✅ WebSocket Connected');
+                        console.log('Duration:', duration + 'ms');
+                    }
                 });
-            });
 
-            ws.addEventListener('close', function (event) {
-                if (config.logRequests) {
-                    console.log('🔌 WebSocket Closed:', event.code, event.reason);
-                    console.groupEnd();
-                }
+                ws.addEventListener('message', function (event) {
+                    if (config.logRequests) {
+                        console.log('📥 WebSocket Message:', event.data);
+                    }
 
-                sendMessage('API_TESTER_WEBSOCKET_CLOSE', {
-                    requestId: requestId,
-                    code: event.code,
-                    reason: event.reason,
-                    timestamp: Date.now()
+                    sendMessage('API_TESTER_WEBSOCKET_MESSAGE', {
+                        requestId: requestId,
+                        data: event.data,
+                        timestamp: Date.now()
+                    });
                 });
-            });
 
-            ws.addEventListener('error', function (event) {
-                if (config.logRequests) {
-                    console.error('❌ WebSocket Error:', event);
-                    console.groupEnd();
-                }
+                ws.addEventListener('close', function (event) {
+                    if (config.logRequests) {
+                        console.log('🔌 WebSocket Closed:', event.code, event.reason);
+                        console.groupEnd();
+                    }
 
-                sendMessage('API_TESTER_WEBSOCKET_ERROR', {
-                    requestId: requestId,
-                    error: 'WebSocket error',
-                    timestamp: Date.now()
+                    sendMessage('API_TESTER_WEBSOCKET_CLOSE', {
+                        requestId: requestId,
+                        code: event.code,
+                        reason: event.reason,
+                        timestamp: Date.now()
+                    });
                 });
-            });
 
-            return ws;
-        };
+                ws.addEventListener('error', function (event) {
+                    if (config.logRequests) {
+                        console.error('❌ WebSocket Error:', event);
+                        console.groupEnd();
+                    }
+
+                    sendMessage('API_TESTER_WEBSOCKET_ERROR', {
+                        requestId: requestId,
+                        error: 'WebSocket error',
+                        timestamp: Date.now()
+                    });
+                });
+
+                return ws;
+            }
+        });
 
         // Copy static properties
         Object.setPrototypeOf(window.WebSocket, originalWebSocket);
         window.WebSocket.prototype = originalWebSocket.prototype;
-        window.WebSocket.CONNECTING = originalWebSocket.CONNECTING;
-        window.WebSocket.OPEN = originalWebSocket.OPEN;
-        window.WebSocket.CLOSING = originalWebSocket.CLOSING;
-        window.WebSocket.CLOSED = originalWebSocket.CLOSED;
+        Object.defineProperty(window.WebSocket, 'CONNECTING', { value: originalWebSocket.CONNECTING });
+        Object.defineProperty(window.WebSocket, 'OPEN', { value: originalWebSocket.OPEN });
+        Object.defineProperty(window.WebSocket, 'CLOSING', { value: originalWebSocket.CLOSING });
+        Object.defineProperty(window.WebSocket, 'CLOSED', { value: originalWebSocket.CLOSED });
     }
 
     // Helper functions
-    function extractFetchRequestInfo(args, requestId, startTime) {
+    function extractFetchRequestInfo(args: [URL | RequestInfo, RequestInit?], requestId: number, startTime: number) {
         const [input, init = {}] = args;
 
         let url, method, headers, body;
@@ -347,8 +361,12 @@
             method = input.method;
             headers = extractHeaders(input.headers);
             // Note: body is not easily extractable from Request object
+        } else if (input instanceof URL) {
+            url = input.href;
+        } else if (typeof input === 'string') {
+            url = input;
         } else {
-            url = input.url || input;
+            url = String(input);
         }
 
         method = method || init.method || 'GET';
@@ -366,7 +384,7 @@
         };
     }
 
-    function extractFetchResponseInfo(response, requestId, duration) {
+    function extractFetchResponseInfo(response: Response, requestId: number, duration: number) {
         return {
             requestId: requestId,
             status: response.status,
@@ -380,10 +398,10 @@
         };
     }
 
-    function extractHeaders(headers) {
+    function extractHeaders(headers: HeadersInit | undefined): Record<string, string> {
         if (!headers) return {};
 
-        const result = {};
+        const result: Record<string, string> = {};
 
         if (headers instanceof Headers) {
             for (const [key, value] of headers.entries()) {
@@ -396,11 +414,11 @@
         return result;
     }
 
-    function parseXHRResponseHeaders(headerString) {
-        const headers = {};
+    function parseXHRResponseHeaders(headerString: string): Record<string, string> {
+        const headers: Record<string, string> = {};
         if (!headerString) return headers;
 
-        headerString.trim().split('\r\n').forEach(line => {
+        headerString.trim().split('\r\n').forEach((line: string) => {
             const parts = line.split(': ');
             if (parts.length === 2) {
                 headers[parts[0]] = parts[1];
@@ -410,7 +428,10 @@
         return headers;
     }
 
-    function resolveURL(url) {
+    function resolveURL(url: string | URL): string {
+        if (url instanceof URL) {
+            url = url.href;
+        }
         if (url.startsWith('http://') || url.startsWith('https://')) {
             return url;
         }
@@ -423,7 +444,7 @@
         return new URL(url, window.location.href).href;
     }
 
-    function serializeBody(body) {
+    function serializeBody(body: string | FormData | URLSearchParams | ArrayBuffer | Uint8Array | Blob | object | null): string | null {
         if (!body) return null;
 
         if (typeof body === 'string') {
@@ -431,7 +452,7 @@
         }
 
         if (body instanceof FormData) {
-            const result = {};
+            const result: Record<string, any> = {};
             for (const [key, value] of body.entries()) {
                 result[key] = value;
             }
@@ -463,13 +484,14 @@
             mutations.forEach(function (mutation) {
                 mutation.addedNodes.forEach(function (node) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
+                        const element = node as Element;
                         // Check for GraphQL-related attributes or content
-                        if (node.textContent && node.textContent.includes('query') &&
-                            (node.textContent.includes('{') || node.textContent.includes('mutation'))) {
+                        if (element.textContent && element.textContent.includes('query') &&
+                            (element.textContent.includes('{') || element.textContent.includes('mutation'))) {
 
                             sendMessage('API_TESTER_GRAPHQL_DETECTED', {
-                                query: node.textContent,
-                                element: node.tagName,
+                                query: element.textContent,
+                                element: element.tagName,
                                 timestamp: Date.now()
                             });
                         }
@@ -507,7 +529,7 @@
         };
     }
 
-    function checkForAPILogs(level, args) {
+    function checkForAPILogs(level: 'log' | 'error' | 'warn', args: any[]): void {
         const message = args.join(' ').toLowerCase();
         if (message.includes('api') || message.includes('xhr') || message.includes('fetch') ||
             message.includes('http') || message.includes('request')) {
@@ -526,6 +548,7 @@
             const observer = new PerformanceObserver(function (list) {
                 list.getEntries().forEach(function (entry) {
                     if (entry.entryType === 'navigation' || entry.entryType === 'resource') {
+                        const resourceEntry = entry as PerformanceResourceTiming;
                         if (entry.name.includes('api') || entry.name.includes('/v1/') ||
                             entry.name.includes('/v2/') || entry.name.endsWith('.json')) {
 
@@ -533,7 +556,7 @@
                                 name: entry.name,
                                 type: entry.entryType,
                                 duration: entry.duration,
-                                size: entry.transferSize,
+                                size: resourceEntry.transferSize,
                                 timestamp: entry.startTime
                             });
                         }
@@ -554,17 +577,17 @@
         const originalCookie = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie') ||
             Object.getOwnPropertyDescriptor(HTMLDocument.prototype, 'cookie');
 
-        if (originalCookie) {
+        if (originalCookie && originalCookie.get && originalCookie.set) {
             Object.defineProperty(document, 'cookie', {
                 get: function () {
-                    return originalCookie.get.call(document);
+                    return originalCookie.get!.call(document);
                 },
                 set: function (value) {
                     sendMessage('API_TESTER_COOKIE_SET', {
                         cookie: value,
                         timestamp: Date.now()
                     });
-                    return originalCookie.set.call(document, value);
+                    return originalCookie.set!.call(document, value);
                 }
             });
         }

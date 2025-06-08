@@ -191,7 +191,8 @@ export async function createNewEnvironment(): Promise<void> {
     const env: Environment = {
         id: `env_${Date.now()}_${Math.random().toString(36).substring(2)}`,
         name: name,
-        variables: {}
+        variables: {},
+        created: new Date().toISOString()
     };
 
     state.environments.push(env);

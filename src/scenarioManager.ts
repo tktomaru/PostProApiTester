@@ -301,8 +301,11 @@ export async function runScenario(): Promise<void> {
         try {
             // 実際に fetch などでリクエストを送信する
             const response = await sendRequest(req);
+            if (typeof response === 'string') {
+                resultDiv.textContent = `[${i + 1}] ${req.name} → ERROR: ${response}`;
+                continue;
+            }
             const text = await response.text();
-
             resultDiv.textContent = `[${i + 1}] ${req.name} → ${response.status} ${response.statusText}`;
             const pre = document.createElement('pre');
             pre.textContent = text;
@@ -311,8 +314,8 @@ export async function runScenario(): Promise<void> {
             // 任意で「続行 or 停止」のダイアログを挿入可能
             // 例： if (!confirm('Continue to next request?')) break;
 
-        } catch (err) {
-            resultDiv.textContent = `[${i + 1}] ${req.name} → ERROR: ${err.message}`;
+        } catch (err: unknown) {
+            resultDiv.textContent = `[${i + 1}] ${req.name} → ERROR: ${(err as Error).message}`;
             // エラー時の処理をここで分岐させる（デフォルトは次へ進む、あるいは停止）
             // 例： break; など
         }

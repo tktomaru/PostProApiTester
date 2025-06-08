@@ -38,8 +38,10 @@ function setupAuthHandlers(): void {
     const authTypeSelect = document.getElementById('authType') as HTMLSelectElement;
     authTypeSelect?.addEventListener('change', function () {
         const authType = this.value;
-        state.currentRequest.auth.type = authType as any;
-        renderAuthDetails(authType);
+        if (state.currentRequest) {
+            state.currentRequest.auth.type = authType as any;
+            renderAuthDetails(authType);
+        }
     });
 }
 

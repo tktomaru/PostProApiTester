@@ -1,9 +1,11 @@
+export {};
+
 // content.ts
 // ───────────────────────────────────────────────────────────────────────────────
 // Content script for API Tester Chrome Extension
 // Handles page-level interactions and communication with injected scripts
 
-interface RequestInfo {
+interface PageRequestInfo {
     id: number;
     timestamp: number;
     url: string;
@@ -47,9 +49,11 @@ declare global {
     }
     interface XMLHttpRequest {
         _apiTesterInfo?: {
+            requestId: number;
             method: string;
             url: string;
             startTime: number;
+            headers: Record<string, string>;
             body?: any;
         };
     }
@@ -80,7 +84,7 @@ declare global {
 
     // Request tracking
     let requestId = 0;
-    let activeRequests = new Map<number, RequestInfo>();
+    let activeRequests = new Map<number, PageRequestInfo>();
 
     // Initialize the content script
     function initializeContentScript(): void {
@@ -104,7 +108,7 @@ declare global {
         const script = document.createElement('script');
         script.src = chrome.runtime.getURL('injected.js');
         script.onload = function () {
-            this.remove();
+            script.remove();
         };
         (document.head || document.documentElement).appendChild(script);
     }
@@ -158,7 +162,7 @@ declare global {
 
     // Handle requests detected on the page
     function handlePageRequest(requestData: any): void {
-        const request: RequestInfo = {
+        const request: PageRequestInfo = {
             id: ++requestId,
             timestamp: Date.now(),
             url: requestData.url,
@@ -248,11 +252,14 @@ declare global {
 
         // Override XMLHttpRequest
         if (CONFIG.interceptXHR) {
-            XMLHttpRequest.prototype.open = function (method: string, url: string, async?: boolean, user?: string | null, password?: string | null) {
+            XMLHttpRequest.prototype.open = function (method: string, url: string, async: boolean = true, user?: string | null, password?: string | null) {
                 this._apiTesterInfo = {
+                    requestId: ++requestId,
                     method: method,
                     url: url,
-                    startTime: Date.now()
+                    startTime: Date.now(),
+                    headers: {},
+                    body: null
                 };
 
                 return originalXHROpen.call(this, method, url, async, user, password);
@@ -285,10 +292,13 @@ declare global {
     }
 
     // Extract information from fetch arguments
-    function extractFetchInfo(args: Parameters<typeof fetch>): Partial<RequestInfo> {
+    function extractFetchInfo(args: Parameters<typeof fetch>): Partial<PageRequestInfo> {
         const [input, init = {}] = args;
 
-        const url = typeof input === 'string' ? input : input.url;
+        const url = typeof input === 'string' ? input : 
+                   input instanceof URL ? input.href :
+                   input instanceof Request ? input.url : '';
+
         const method = init.method || 'GET';
         const headers = extractRequestHeaders(init.headers);
         const body = init.body;

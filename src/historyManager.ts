@@ -50,6 +50,8 @@ export async function saveToHistory(request: RequestData, response: ResponseData
         id: Date.now(),
         timestamp: new Date().toISOString(),
         request: {
+            id: request.id,
+            name: request.name,
             method: request.method,
             url: request.url,
             headers: request.headers,
@@ -59,6 +61,10 @@ export async function saveToHistory(request: RequestData, response: ResponseData
         },
         response: {
             status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            body: response.body,
+            bodyText: response.bodyText,
             duration: response.duration,
             size: response.size
         }

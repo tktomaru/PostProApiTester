@@ -128,8 +128,8 @@ interface RequestData {
         console.log('Network interceptor stopped');
     }
 
-    function handleBeforeRequest(details: chrome.webRequest.WebRequestBodyDetails): void {
-        if (!shouldInterceptRequest(details)) return;
+    function handleBeforeRequest(details: chrome.webRequest.OnBeforeRequestDetails): chrome.webRequest.BlockingResponse | undefined {
+        if (!shouldInterceptRequest(details)) return undefined;
 
         const requestData: RequestData = {
             id: details.requestId,
@@ -148,7 +148,7 @@ interface RequestData {
             if (details.requestBody.raw) {
                 // Binary data
                 const decoder = new TextDecoder();
-                requestData.body = details.requestBody.raw.map(data =>
+                requestData.body = details.requestBody.raw.map((data: { bytes?: ArrayBuffer }) =>
                     decoder.decode(data.bytes!)
                 ).join('');
             } else if (details.requestBody.formData) {
@@ -158,15 +158,16 @@ interface RequestData {
         }
 
         interceptedRequests.set(details.requestId, requestData);
+        return undefined;
     }
 
-    function handleSendHeaders(details: chrome.webRequest.WebRequestHeadersDetails): void {
+    function handleSendHeaders(details: chrome.webRequest.OnSendHeadersDetails): void {
         const requestData = interceptedRequests.get(details.requestId);
         if (!requestData) return;
 
         // Store request headers
         if (details.requestHeaders) {
-            details.requestHeaders.forEach(header => {
+            details.requestHeaders.forEach((header: chrome.webRequest.HttpHeader) => {
                 if (header.name && header.value) {
                     requestData.headers[header.name] = header.value;
                 }
@@ -176,15 +177,15 @@ interface RequestData {
         interceptedRequests.set(details.requestId, requestData);
     }
 
-    function handleHeadersReceived(details: chrome.webRequest.WebResponseHeadersDetails): void {
+    function handleHeadersReceived(details: chrome.webRequest.OnHeadersReceivedDetails): chrome.webRequest.BlockingResponse | undefined {
         const requestData = interceptedRequests.get(details.requestId);
-        if (!requestData) return;
+        if (!requestData) return undefined;
 
         // Store response headers and status
         requestData.status = details.statusCode;
 
         if (details.responseHeaders) {
-            details.responseHeaders.forEach(header => {
+            details.responseHeaders.forEach((header: chrome.webRequest.HttpHeader) => {
                 if (header.name && header.value) {
                     requestData.responseHeaders[header.name] = header.value;
                 }
@@ -192,9 +193,10 @@ interface RequestData {
         }
 
         interceptedRequests.set(details.requestId, requestData);
+        return undefined;
     }
 
-    function handleRequestCompleted(details: chrome.webRequest.WebResponseHeadersDetails): void {
+    function handleRequestCompleted(details: chrome.webRequest.OnCompletedDetails): void {
         const requestData = interceptedRequests.get(details.requestId);
         if (!requestData) return;
 
@@ -214,11 +216,13 @@ interface RequestData {
         // Clean up old requests (keep only last 100)
         if (interceptedRequests.size > 100) {
             const oldestKey = interceptedRequests.keys().next().value;
-            interceptedRequests.delete(oldestKey);
+            if (oldestKey) {
+                interceptedRequests.delete(oldestKey);
+            }
         }
     }
 
-    function handleRequestError(details: chrome.webRequest.WebRequestErrorDetails): void {
+    function handleRequestError(details: chrome.webRequest.OnErrorOccurredDetails): void {
         const requestData = interceptedRequests.get(details.requestId);
         if (!requestData) return;
 
@@ -238,7 +242,7 @@ interface RequestData {
         interceptedRequests.delete(details.requestId);
     }
 
-    function shouldInterceptRequest(details: chrome.webRequest.WebRequestDetails): boolean {
+    function shouldInterceptRequest(details: chrome.webRequest.OnBeforeRequestDetails): boolean {
         // Skip chrome-extension URLs
         if (details.url.startsWith('chrome-extension://')) return false;
 
