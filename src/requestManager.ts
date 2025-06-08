@@ -935,6 +935,20 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
 
         try {
             switch (command) {
+                case 'removeHeader':
+                    if (!argsString) {
+                        console.warn('removeHeader requires a header name');
+                        continue;
+                    }
+                    // ヘッダー名の大文字小文字を区別せずに削除
+                    const headerToRemove = argsString.toLowerCase();
+                    Object.keys(requestObj.headers).forEach(key => {
+                        if (key.toLowerCase() === headerToRemove) {
+                            delete requestObj.headers[key];
+                        }
+                    });
+                    break;
+
                 case 'setUrl':
                     if (!argsString) {
                         console.warn('setUrl requires a URL');
