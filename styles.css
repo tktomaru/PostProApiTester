@@ -5,6 +5,11 @@
     box-sizing: border-box;
 }
 
+:root {
+    /* メニューボタンの sidebar 端からのオフセット量（負の値で内側へ） */
+    --menu-btn-offset: -12px;
+}
+
 html,
 body {
     height: 100%;
@@ -97,11 +102,8 @@ body {
 
 /* メインコンテンツエリア */
 .main-content {
-    flex: 1;
-    padding: 20px;
     overflow-y: auto;
-    position: relative;
-    z-index: 1;
+    overflow-x: visible;
 }
 
 /* ──────────────────────────────────────────────
@@ -278,11 +280,22 @@ body {
     display: flex;
     align-items: center;
     padding: 4px 8px;
-    margin: 2px 0;
+    margin: 2px 2px;
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.2s;
     position: relative;
+}
+
+/* まず、li に右側の余白を確保しておきます */
+.sidebar .request-item {
+    padding-right: 32px;
+    /* メニューボタン分だけ余白を追加 */
+}
+
+/* ホバーで表示 */
+.sidebar .request-item:hover .menu-btn {
+    opacity: 1;
 }
 
 .request-item:hover {
@@ -321,6 +334,25 @@ body {
 
 .request-item .menu-btn:hover {
     background-color: #e0e0e0;
+}
+
+/* sidebar 内のリクエスト行を相対位置に */
+.sidebar .request-list .request-item {
+    position: relative;
+}
+
+/* メニューボタンを絶対位置に & CSS変数でオフセット */
+.sidebar .request-list .request-item .menu-btn {
+    right: 8px;
+    /* ここを調整すれば左右の位置が変わります */
+    /* 必要なら z-index で手前に */
+    position: absolute;
+    z-index: 10;
+}
+
+/* ホバーしたら表示 */
+.sidebar .request-list .request-item:hover .menu-btn {
+    opacity: 1;
 }
 
 /* メソッドバッジの色 */
@@ -1731,9 +1763,9 @@ transition: all 0.2s ease;
 
 /* 左サイド：シナリオ一覧 */
 .scenario-list {
-    width: 25%;
+    width: 30%;
     /* 300pxから25%に変更 */
-    min-width: 200px;
+    min-width: 300px;
     /* 最小幅を設定 */
     background-color: #f8f9fa;
     border-right: 1px solid #ddd;
@@ -2034,6 +2066,8 @@ transition: all 0.2s ease;
     transition: background-color 0.2s;
     font-size: 16px;
     color: #666;
+    position: relative;
+    z-index: 10;
 }
 
 .menu-btn:hover {
