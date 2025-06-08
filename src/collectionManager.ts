@@ -121,6 +121,12 @@ export async function editCollectionRequest(collectionId: string, requestIndex: 
  *  （実装は requestManager.js 側に移譲してもOK）
  */
 export async function loadCollectionRequest(request: RequestData): Promise<void> {
+    // リクエストが属するコレクションを探して選択
+    const collection = state.collections.find(c => c.requests?.some(r => r.id === request.id));
+    if (collection) {
+        await selectCollection(collection.id);
+    }
+
     loadRequestIntoEditor(request);
     showSuccess('Request loaded from collection');
 }
@@ -299,14 +305,7 @@ export function renderCollectionsTree(): void {
                 // クリック時にリクエストをロード
                 li.addEventListener('click', (e) => {
                     e.stopPropagation(); // 上位のコレクションクリックと衝突しないように
-
-                    const currentCollection = state.collections.find(s => s.id === state.currentCollection);
-                    if (currentCollection && currentCollection.requests) {
-                        const idx2 = currentCollection.requests.findIndex(r => r.id === req.id);
-                        if (idx2 !== -1) {
-                            loadCollectionRequest(currentCollection.requests[idx2]);
-                        }
-                    }
+                    loadCollectionRequest(req);
                 });
 
                 ul.appendChild(li);
