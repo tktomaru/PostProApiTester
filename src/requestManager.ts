@@ -1036,38 +1036,56 @@ export function displayResponseHeaders(headers: Record<string, string>): void {
 
 /**
  * displayResponseCookies
- *  Cookiesタブに Set-Cookie ヘッダを表示
+ *  Cookiesタブに Set-Cookie と Cookie ヘッダを
+ *  key=value 単位で1行ずつ表示
  */
-export function displayResponseCookies(headers: Record<string, string | string[]>): void {
-    const cookiesContainer = document.getElementById('response-cookies') as HTMLElement;
+export function displayResponseCookies(
+    headers: Record<string, string | string[]>
+): void {
+    const cookiesContainer = document.getElementById(
+        'response-cookies'
+    ) as HTMLElement;
 
     // set-cookie と cookie の両方を取得
     const setCookieRaw = headers['set-cookie'];
     const cookieRaw = headers['cookie'];
 
-    // 配列／文字列いずれにも対応して一つのリストにまとめる
+    // 単一文字列／配列いずれにも対応してまとめる
     const cookies: string[] = [];
     if (setCookieRaw) {
-        Array.isArray(setCookieRaw)
-            ? cookies.push(...setCookieRaw)
-            : cookies.push(setCookieRaw);
+        if (Array.isArray(setCookieRaw)) {
+            cookies.push(...setCookieRaw);
+        } else {
+            cookies.push(setCookieRaw);
+        }
     }
     if (cookieRaw) {
-        Array.isArray(cookieRaw)
-            ? cookies.push(...cookieRaw)
-            : cookies.push(cookieRaw);
+        if (Array.isArray(cookieRaw)) {
+            cookies.push(...cookieRaw);
+        } else {
+            cookies.push(cookieRaw);
+        }
     }
 
     // 表示
     if (cookies.length > 0) {
         let html = '<div class="cookies-list">';
-        cookies.forEach(cookie => {
-            html += `<div class="cookie-item">${escapeHtml(cookie)}</div>`;
+        cookies.forEach((rawCookie: string) => {
+            // セミコロンで分割し、key=value 単位に正規化
+            const pairs: string[] = rawCookie
+                .split(';')
+                .map((part: string) => part.trim())
+                .filter((part: string) => part.length > 0);
+
+            pairs.forEach((pair: string) => {
+                html += `<div class="cookie-item">${escapeHtml(pair)}</div>`;
+            });
         });
         html += '</div>';
         cookiesContainer.innerHTML = html;
     } else {
-        cookiesContainer.innerHTML = '<p class="empty-message">No cookies in response</p>';
+        cookiesContainer.innerHTML =
+            '<p class="empty-message">No cookies in response</p>';
     }
 }
 
@@ -1307,8 +1325,8 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                         // 実際のヘッダ値をペアに分割
                         const actualPairs = actualValue
                             .split(';')
-                            .map(s => s.trim())
-                            .filter(s => s.length > 0);
+                            .map((s: string) => s.trim())
+                            .filter((s: string) => s.length > 0);
                         // 期待値も同様に分割
                         const expectedPairs = expectedValue
                             .split(';')
