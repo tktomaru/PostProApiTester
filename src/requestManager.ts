@@ -120,7 +120,7 @@ interface ResponseExecution {
 export function loadRequestIntoEditor(request: RequestData): void {
     console.log('loadRequestIntoEditor called with request:', request);
     console.log('Request params from input:', request.params);
-    
+
     // state.currentRequest の値をまるごと置き換え
     state.currentRequest = JSON.parse(JSON.stringify(request));
     if (state.currentRequest) {
@@ -131,15 +131,15 @@ export function loadRequestIntoEditor(request: RequestData): void {
         state.currentRequest.body = request.body;
         state.currentRequest.auth = { ...request.auth };
     }
-    
+
     console.log('After setting state.currentRequest.params:', state.currentRequest?.params);
-    
+
     // ① リクエスト 名称 を表示する
     const nameDisplay = document.getElementById('request-name-display') as HTMLElement;
     if (nameDisplay) {
         nameDisplay.innerHTML = `<input type="text" id="nameInput" value="${request.name}"></input>`;
     }
-    
+
     // ① リクエスト ID を表示する
     const idDisplay = document.getElementById('request-id-display') as HTMLElement;
     if (idDisplay) {
@@ -175,30 +175,30 @@ export function loadRequestIntoEditor(request: RequestData): void {
     paramsContainer.innerHTML = '';
     console.log('Loading request params:', request.params);
     console.log('ParamsContainer element:', paramsContainer);
-    
+
     if (request.params && Object.keys(request.params).length > 0) {
         // 一度にすべての行を追加
         const paramEntries = Object.entries(request.params);
         paramEntries.forEach(() => {
             addKeyValueRow(paramsContainer, 'param');
         });
-        
+
         // すべての行を追加した後に値を設定
         setTimeout(() => {
             const rows = paramsContainer.querySelectorAll('.key-value-row');
             console.log(`Found ${rows.length} rows, expected ${paramEntries.length}`);
-            
+
             paramEntries.forEach(([key, value], index) => {
                 if (index < rows.length) {
                     const row = rows[index] as HTMLElement;
                     const keyInput = row.querySelector('.key-input') as HTMLInputElement;
                     const valueInput = row.querySelector('.value-input') as HTMLInputElement;
-                    
+
                     if (keyInput && valueInput) {
                         keyInput.value = key;
                         valueInput.value = value;
                         console.log(`Set param ${index}: ${key} = ${value}`);
-                        
+
                         // 手動でinputイベントを発火してstate.currentRequestを更新
                         keyInput.dispatchEvent(new Event('input', { bubbles: true }));
                         valueInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -210,7 +210,7 @@ export function loadRequestIntoEditor(request: RequestData): void {
                 }
             });
         }, 50); // 50ms遅延でより確実に
-        
+
         // state.currentRequestのparamsも更新
         if (state.currentRequest) {
             state.currentRequest.params = { ...request.params };
@@ -292,7 +292,7 @@ export function loadRequestIntoEditor(request: RequestData): void {
         const radioElement = radio as HTMLInputElement;
         radioElement.checked = radioElement.value === bodyType;
     });
-    
+
     // Body Type に応じて表示を切り替え
     handleBodyTypeChange({ target: { value: bodyType } } as any);
 
@@ -319,10 +319,10 @@ export function loadRequestIntoEditor(request: RequestData): void {
         // 最新のレスポンス情報がある場合、レスポンスタブに反映
         if (request.lastResponseExecution) {
             // ResponseExecutionからProcessedResponseに変換
-            const bodyText = typeof request.lastResponseExecution.body === 'string' 
-                ? request.lastResponseExecution.body 
+            const bodyText = typeof request.lastResponseExecution.body === 'string'
+                ? request.lastResponseExecution.body
                 : JSON.stringify(request.lastResponseExecution.body, null, 2);
-                
+
             const responseData: ProcessedResponse = {
                 status: request.lastResponseExecution.status,
                 statusText: getStatusText(request.lastResponseExecution.status),
@@ -333,7 +333,7 @@ export function loadRequestIntoEditor(request: RequestData): void {
                 bodyText: bodyText
             };
             displayResponse(responseData);
-            
+
             // 保存されたテスト結果を表示
             if (request.lastResponseExecution.testResults) {
                 displayTestResults(request.lastResponseExecution.testResults);
@@ -367,7 +367,7 @@ export async function executeTestScript(responseData: ProcessedResponse, testScr
         const testScriptElement = document.getElementById('testScript') as HTMLTextAreaElement;
         raw = testScriptElement?.value || '';
     }
-    
+
     console.log('実行するテストスクリプト:', raw);
     if (!raw?.trim()) {
         if (testsContainer) {
@@ -408,164 +408,77 @@ export async function executeTestScript(responseData: ProcessedResponse, testScr
         return results;
     }
 }
-
 /**
  * sendRequest
- *  引数 requestObj を使って XHR 送信を行うバージョン
- *  forScenario が true の場合は、UIを更新せずにレスポンスとテスト結果を返す
+ *  RequestData に従ってリクエストを送信します。
+ *  Cookie ヘッダーの有無にかかわらず常に chrome.cookies API 経由で送信し、
+ *  レスポンスを処理 → 表示 → テスト実行 → 履歴保存 まで行います。
+ *
+ * @param requestObj 送信設定を含む RequestData
+ * @param forScenario シナリオ実行モードの場合は true（UI 更新をスキップし、結果オブジェクトを返します）
  */
-export async function sendRequest(requestObj: RequestData, forScenario: boolean = false): Promise<XhrResponse | string | { response: ProcessedResponse; testResults: TestResult[] }> {
+export async function sendRequest(
+    requestObj: RequestData,
+    forScenario: boolean = false
+): Promise<
+    XhrResponse |
+    string |
+    { response: ProcessedResponse; testResults: TestResult[] }
+> {
+    showLoading(true);
     try {
-        showLoading(true);
-
-        // 必須チェック: URL が空でないか
-        if (!requestObj.url || !requestObj.url.trim()) {
+        // 1. URL が空でないかチェック
+        if (!requestObj.url?.trim()) {
             showError('URL is required');
             return '';
         }
 
-        // 2. 変数置換後のリクエストを生成
-        let processedRequest = processVariables(requestObj);
-
-        // 1. プリリクエストスクリプト実行
-        processedRequest = executePreRequestScript(processedRequest.preRequestScript || '', processedRequest);
-
+        // 2. 変数置換 & プリリクエストスクリプトの実行
+        let req = processVariables(requestObj);
+        req = executePreRequestScript(req.preRequestScript || '', req);
         // リクエスト実行結果を保存
         const requestExecution = {
             timestamp: new Date().toISOString(),
-            method: processedRequest.method,
-            url: processedRequest.url,
-            headers: processedRequest.headers,
-            params: processedRequest.params,
-            body: processedRequest.body,
-            auth: processedRequest.auth,
-            folder: (processedRequest as any).folder || '',
-            description: (processedRequest as any).description || '',
-            bodyType: processedRequest.bodyType || 'none',
-            preRequestScript: processedRequest.preRequestScript || ''
+            method: req.method,
+            url: req.url,
+            headers: req.headers,
+            params: req.params,
+            body: req.body,
+            auth: req.auth,
+            folder: (req as any).folder || '',
+            description: (req as any).description || '',
+            bodyType: req.bodyType || 'none',
+            preRequestScript: req.preRequestScript || ''
         };
 
-        // 3. XHR 用オプションを作成
-        const opts = buildFetchOptions(processedRequest);
-        if (!opts) {
-            return '';
-        }
+        // 3. 送信オプションを作成
+        const opts = buildFetchOptions(req);
+        if (!opts) return '';
 
         const { method, headers, bodyData, url } = opts;
 
-        // Cookieヘッダーがある場合はchrome.cookies APIを使用
-        const hasCookieHeader = Object.keys(headers).some(key => 
-            key.toLowerCase() === 'cookie'
-        );
-
-        if (hasCookieHeader) {
-            console.log('🍪 Cookie header detected, using chrome.cookies API');
-            // chrome.cookies APIを使用してリクエストを送信
-            const cookieResponse = await sendRequestWithCookieSupport({
-                method,
-                url,
-                headers,
-                body: bodyData
-            });
-            
-            const parsed = await processResponse(cookieResponse, cookieResponse.duration || 0);
-            
-            if (!forScenario) {
-                displayResponse(parsed);
-            }
-
-            const testResults = await executeTestScript(parsed, requestObj.testScript);
-            await saveToHistory(processedRequest, parsed, testResults);
-
-            return { response: parsed, testResults };
-        }
-
-        // 4. XMLHttpRequest で送信（タイムアウト付き）
-        const startTime = Date.now();
-
-        const responseData = await new Promise<{ response: XhrResponse; duration: number }>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open(method, url, true);
-            xhr.timeout = 30000; // 30秒
-
-            // ヘッダーを設定
-            Object.entries(headers).forEach(([key, value]) => {
-                xhr.setRequestHeader(key, value);
-            });
-
-            // レスポンス取得時のイベント
-            xhr.onreadystatechange = () => {
-                if (xhr.readyState !== 4) return;
-
-                const duration = Date.now() - startTime;
-
-                if (xhr.status !== 0) {
-                    // レスポンスヘッダーをパースしてオブジェクトに変換
-                    const rawHeaders = xhr.getAllResponseHeaders();
-                    const headerLines = rawHeaders.trim().split(/[\r\n]+/);
-                    const headerObj: Record<string, string> = {};
-                    headerLines.forEach(line => {
-                        const parts = line.split(': ');
-                        const headerKey = parts.shift();
-                        const headerVal = parts.join(': ');
-                        if (headerKey) {
-                            headerObj[headerKey] = headerVal;
-                        }
-                    });
-
-                    // レスポンス本文を取得
-                    const text = xhr.responseText || '';
-
-                    // Fetch の Response っぽい要素を持つ「疑似レスポンス」を作成
-                    const pseudoResponse: XhrResponse = {
-                        status: xhr.status,
-                        statusText: xhr.statusText,
-                        headers: headerObj,  // ヘッダーオブジェクトを直接設定
-                        text: async () => text,
-                        json: async () => {
-                            try {
-                                return JSON.parse(text);
-                            } catch {
-                                return {};
-                            }
-                        }
-                    };
-
-                    resolve({ response: pseudoResponse, duration });
-                } else {
-                    // ネットワークエラーなど status が 0 のとき
-                    reject(new Error('Network error or CORS issue (status 0).'));
-                }
-            };
-
-            // タイムアウト時
-            xhr.ontimeout = () => {
-                reject(new Error('Request timeout'));
-            };
-
-            // ネットワークエラー時
-            xhr.onerror = () => {
-                reject(new Error('Network error'));
-            };
-
-            // リクエスト送信
-            xhr.send(bodyData);
+        // ───────────────────────────
+        // ● 常に chrome.cookies API 経由で送信
+        console.log('🍪 Always using sendRequestWithCookieSupport');
+        const xhrResp = await sendRequestWithCookieSupport({
+            method,
+            url,
+            headers,
+            body: bodyData
         });
+        // ───────────────────────────
 
-        // 5. processResponse と displayResponse を使って結果を表示
-        const { response, duration } = responseData;
-        const parsed = await processResponse(response, duration);
-        
-        // forScenarioがfalseの場合のみUIを更新
+        // 4. レスポンスの処理と表示
+        const parsed = await processResponse(xhrResp, xhrResp.duration || 0);
         if (!forScenario) {
             displayResponse(parsed);
         }
 
-        // 6. テストスクリプト実行（リクエストオブジェクトにテストスクリプトがあればそれを使用）
+        // 5. テストスクリプトを実行
         const testResults = await executeTestScript(parsed, requestObj.testScript);
 
-        // 7. 履歴に保存
-        await saveToHistory(processedRequest, parsed, testResults);
+        // 6. 履歴に保存
+        await saveToHistory(req, parsed, testResults);
 
         // 8. コレクションのリクエストに最新の実行結果を保存
         if (state.currentCollection) {
@@ -629,7 +542,12 @@ export async function sendRequest(requestObj: RequestData, forScenario: boolean 
             };
         }
 
-        return response || "";
+        // 8. 返却
+        if (forScenario) {
+            return { response: parsed, testResults };
+        } else {
+            return xhrResp;
+        }
 
     } catch (error: any) {
         showError('Request failed: ' + error.message);
@@ -713,33 +631,33 @@ async function sendRequestWithCookieSupport(options: {
     body: string | FormData | URLSearchParams | null;
 }): Promise<XhrResponse> {
     console.log('🍪 sendRequestWithCookieSupport called with:', options);
-    
+
     return new Promise((resolve, reject) => {
         const startTime = Date.now();
-        
+
         const messageData = {
             action: 'sendHttpRequest',
             options: {
                 method: options.method,
                 url: options.url,
                 headers: options.headers,
-                body: typeof options.body === 'string' ? options.body : 
-                      options.body?.toString() || null
+                body: typeof options.body === 'string' ? options.body :
+                    options.body?.toString() || null
             }
         };
-        
+
         console.log('Sending message to background script for Cookie handling:', messageData);
-        
+
         // Background Scriptにクッキー付きHTTPリクエストを要求
         chrome.runtime.sendMessage(messageData, (response) => {
             console.log('Received response from background script:', response);
-            
+
             if (chrome.runtime.lastError) {
                 console.error('Chrome runtime error:', chrome.runtime.lastError.message);
                 reject(new Error(chrome.runtime.lastError.message));
                 return;
             }
-            
+
             if (response.success) {
                 const duration = Date.now() - startTime;
                 const xhrResponse: XhrResponse = {
@@ -885,14 +803,14 @@ function formatXml(xml: string): string {
     try {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xml, 'application/xml');
-        
+
         if (xmlDoc.querySelector('parsererror')) {
             return xml;
         }
-        
+
         const serializer = new XMLSerializer();
         const formatted = serializer.serializeToString(xmlDoc);
-        
+
         // 基本的なインデント処理
         return formatted.replace(/></g, '>\n<')
             .replace(/^\s*\n/gm, '')
@@ -976,7 +894,7 @@ function formatJavaScript(js: string): string {
                 const depth = prevLines.reduce((acc, l) => {
                     return acc + (l.match(/\{/g) || []).length - (l.match(/\}/g) || []).length;
                 }, 0);
-                
+
                 if (closeBraces > 0 && openBraces === 0) {
                     return '  '.repeat(Math.max(0, depth - closeBraces)) + line;
                 } else {
@@ -995,7 +913,7 @@ function formatJavaScript(js: string): string {
  */
 function detectContentType(contentType: string, bodyText: string): string {
     const lowerContentType = contentType.toLowerCase();
-    
+
     if (lowerContentType.includes('json')) {
         return 'json';
     }
@@ -1011,7 +929,7 @@ function detectContentType(contentType: string, bodyText: string): string {
     if (lowerContentType.includes('javascript') || lowerContentType.includes('text/js')) {
         return 'javascript';
     }
-    
+
     // Content-Typeがtext/plainやその他の場合、内容から推測
     const trimmedBody = bodyText.trim();
     if (trimmedBody.startsWith('{') || trimmedBody.startsWith('[')) {
@@ -1029,7 +947,7 @@ function detectContentType(contentType: string, bodyText: string): string {
             return 'xml';
         }
     }
-    
+
     return 'text';
 }
 
@@ -1314,11 +1232,11 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
             // reply.tukutano.jpのようなエコーサイト用: リクエストヘッダーがレスポンスに正しく反映されているかチェック
             const headerName = args[0];
             const expectedValue = args.slice(1).join(' ');
-            
+
             // レスポンスボディからリクエストヘッダー情報を取得
             try {
                 let responseBody = responseData.body;
-                
+
                 // レスポンスボディが文字列の場合はJSONパースを試行
                 if (typeof responseBody === 'string') {
                     try {
@@ -1327,13 +1245,13 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                         return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
                     }
                 }
-                
+
                 if (typeof responseBody === 'object' && responseBody.headers) {
                     const echoedHeaders = responseBody.headers;
                     // ヘッダー名を小文字で検索（reply.tukutano.jpは小文字で返す）
                     const headerKeyLower = headerName.toLowerCase();
                     const actualValue = echoedHeaders[headerKeyLower];
-                    
+
                     if (actualValue === undefined) {
                         return { passed: false, error: `エコーされたリクエストヘッダー "${headerName}" が見つかりません` };
                     }
@@ -1352,10 +1270,10 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
         case 'echoRequestMethodEquals': {
             // reply.tukutano.jpのようなエコーサイト用: リクエストメソッドがレスポンスに正しく反映されているかチェック
             const expectedMethod = args[0];
-            
+
             try {
                 let responseBody = responseData.body;
-                
+
                 // レスポンスボディが文字列の場合はJSONパースを試行
                 if (typeof responseBody === 'string') {
                     try {
@@ -1364,7 +1282,7 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                         return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
                     }
                 }
-                
+
                 if (typeof responseBody === 'object' && responseBody.method) {
                     const actualMethod = responseBody.method;
                     if (actualMethod !== expectedMethod) {
@@ -1382,10 +1300,10 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
         case 'echoRequestBodyEquals': {
             // reply.tukutano.jpのようなエコーサイト用: リクエストボディがレスポンスに正しく反映されているかチェック
             const expectedBody = args.join(' ');
-            
+
             try {
                 let responseBody = responseData.body;
-                
+
                 // レスポンスボディが文字列の場合はJSONパースを試行
                 if (typeof responseBody === 'string') {
                     try {
@@ -1394,11 +1312,11 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                         return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
                     }
                 }
-                
+
                 if (typeof responseBody === 'object' && responseBody.body !== undefined) {
                     // reply.tukutano.jpはbodyを文字列として返す
                     const actualBody = responseBody.body;
-                        
+
                     if (actualBody !== expectedBody) {
                         return { passed: false, error: `エコーされたボディが期待値と異なります\n期待: ${expectedBody}\n実際: ${actualBody}` };
                     }
@@ -1414,10 +1332,10 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
         case 'echoRequestUrlContains': {
             // reply.tukutano.jpのようなエコーサイト用: リクエストURLがレスポンスに正しく反映されているかチェック
             const expectedUrlPart = args.join(' ');
-            
+
             try {
                 let responseBody = responseData.body;
-                
+
                 // レスポンスボディが文字列の場合はJSONパースを試行
                 if (typeof responseBody === 'string') {
                     try {
@@ -1426,7 +1344,7 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                         return { passed: false, error: 'レスポンスボディのJSONパースに失敗しました' };
                     }
                 }
-                
+
                 if (typeof responseBody === 'object' && responseBody.url) {
                     const actualUrl = responseBody.url;
                     if (!actualUrl.includes(expectedUrlPart)) {
@@ -1453,7 +1371,7 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
  */
 function getValueFromVarPath(varPath: string[]): any {
     console.log('変数パス:', varPath);
-    
+
     const collection = state.collections.find(c => c.name === varPath[0]);
     if (!collection) {
         throw new Error(`コレクション「${varPath[0]}」が見つかりません`);
@@ -1465,15 +1383,15 @@ function getValueFromVarPath(varPath: string[]): any {
     if (!request.lastResponseExecution) {
         throw new Error('request の実行結果が存在しません');
     }
-    
+
     let value: any = request.lastResponseExecution as ResponseExecution;
     console.log('初期値:', value);
-    
+
     // response.headers や response.body などのパスを処理
     for (let i = 2; i < varPath.length; i++) {
         const path = varPath[i];
         console.log(`パス[${i}]:`, path, '現在の値:', value);
-        
+
         if (path === 'response') {
             value = value;
         } else if (path === 'headers' && value.headers) {
@@ -1505,7 +1423,7 @@ function getValueFromVarPath(varPath: string[]): any {
         }
         console.log(`パス[${i}]処理後:`, value);
     }
-    
+
     if (value === undefined) {
         throw new Error(`変数「${varPath.join('.')}」の値が取得できません`);
     }
@@ -1520,12 +1438,12 @@ function getValueFromVarPath(varPath: string[]): any {
  */
 function evaluateJsonPath(json: any, path: string): any {
     console.log('JSONPath評価:', { json, path });
-    
+
     // 単純なドット記法のパスを処理
     if (path.startsWith('$.')) {
         const keys = path.slice(2).split('.');
         console.log('JSONPathキー:', keys);
-        
+
         let value = json;
         for (const key of keys) {
             console.log('キー処理:', key, '現在の値:', value);
@@ -1637,7 +1555,7 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                     }
                     const headerVarName = argsString.substring(0, headerVarNameEndIndex);
                     const headerVarValue = argsString.substring(headerVarNameEndIndex + 1).trim();
-                    
+
                     try {
                         const value = getValueFromVarString(headerVarValue);
                         requestObj.headers[headerVarName] = String(value);
@@ -1652,7 +1570,7 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         showError('setBodyWithVar requires a variable name');
                         continue;
                     }
-                    
+
                     try {
                         const value = getValueFromVarString(argsString);
                         requestObj.body = String(value);
@@ -1703,10 +1621,10 @@ export function displayTestResults(results: TestResult[]): void {
  */
 export function processVariables(request: RequestData): RequestData {
     const processed = JSON.parse(JSON.stringify(request));
-    
+
     // URLの変数置換を最初に行う
     processed.url = replaceVariables(processed.url);
-    
+
     // URLの有効性チェック
     if (!processed.url || !processed.url.trim()) {
         throw new Error('URL is required');
@@ -1719,7 +1637,7 @@ export function processVariables(request: RequestData): RequestData {
 
     try {
         const url = new URL(processed.url);
-        
+
         // パラメータの変数置換
         processed.params = deepReplaceVariables(processed.params);
         Object.entries(processed.params).forEach(([key, value]) => {
@@ -1732,9 +1650,9 @@ export function processVariables(request: RequestData): RequestData {
                 url.searchParams.set(processed.auth.key, processed.auth.value);
             }
         }
-        
+
         processed.url = url.toString();
-        
+
         // その他のプロパティの変数置換
         processed.headers = deepReplaceVariables(processed.headers);
         if (processed.body) {
@@ -1747,7 +1665,7 @@ export function processVariables(request: RequestData): RequestData {
     } catch (error) {
         throw new Error(`Invalid URL: ${processed.url}`);
     }
-    
+
     return processed;
 }
 
@@ -1778,7 +1696,7 @@ export async function saveCurrentRequest(): Promise<void> {
         const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
         const nameInput = document.getElementById('nameInput') as HTMLInputElement;
         const urlInput = document.getElementById('urlInput') as HTMLInputElement;
-        
+
         req.method = methodSelect.value;
         req.name = nameInput.value.trim();
         req.url = urlInput.value.trim();
@@ -1873,7 +1791,7 @@ export async function saveCurrentRequest(): Promise<void> {
         const testScriptTextarea = document.getElementById('testScript') as HTMLTextAreaElement;
         req.preRequestScript = preRequestScriptTextarea?.value || '';
         req.testScript = testScriptTextarea?.value || '';
-        
+
         console.log('保存するリクエスト:', req);
         console.log('保存するテストスクリプト:', req.testScript);
 
@@ -1919,13 +1837,13 @@ export async function saveCurrentRequest(): Promise<void> {
  */
 function getValueFromVarString(varString: string): any {
     console.log('変数参照文字列:', varString);
-    
+
     if (varString.startsWith('${') && varString.endsWith('}')) {
         // jsonPathを含む場合の特別な処理
         if (varString.includes('jsonPath(')) {
             const parts = varString.slice(2, -1).split('"."');
             const varPath: string[] = [];
-            
+
             for (let i = 0; i < parts.length; i++) {
                 const part = parts[i].replace(/"/g, '');
                 if (part.includes('jsonPath(')) {
