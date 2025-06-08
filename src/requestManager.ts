@@ -45,6 +45,15 @@ interface TestResult {
     error?: string;
 }
 
+interface ResponseExecution {
+    status: number;
+    duration: number;
+    size: number;
+    timestamp: string;
+    headers: Record<string, string>;
+    body: any;
+}
+
 /**
  * loadRequestIntoEditor
  *  コレクションや履歴から呼ばれ、右側エディタ（メソッド、URL、ヘッダ、ボディ、認証）に
@@ -912,6 +921,100 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
 }
 
 /**
+ * 変数参照から値を取得する
+ * @param varPath 変数パス（例: ["Collection", "Request", "response", "headers", "key"]）
+ * @returns 取得した値
+ */
+function getValueFromVarPath(varPath: string[]): any {
+    console.log('変数パス:', varPath);
+    
+    const collection = state.collections.find(c => c.name === varPath[0]);
+    if (!collection) {
+        throw new Error(`コレクション「${varPath[0]}」が見つかりません`);
+    }
+    const request = collection.requests.find(r => r.name === varPath[1]);
+    if (!request) {
+        throw new Error(`リクエスト「${varPath[1]}」が見つかりません`);
+    }
+    if (!request.lastResponseExecution) {
+        throw new Error('request の実行結果が存在しません');
+    }
+    
+    let value: any = request.lastResponseExecution as ResponseExecution;
+    console.log('初期値:', value);
+    
+    // response.headers や response.body などのパスを処理
+    for (let i = 2; i < varPath.length; i++) {
+        const path = varPath[i];
+        console.log(`パス[${i}]:`, path, '現在の値:', value);
+        
+        if (path === 'response') {
+            value = value;
+        } else if (path === 'headers' && value.headers) {
+            value = value.headers;
+        } else if (path === 'body' && value.body) {
+            value = value.body;
+        } else if (path.startsWith('jsonPath(') && path.endsWith(')')) {
+            // jsonPath式を処理
+            const jsonPathExpr = path.slice(9, -1);
+            console.log('JSONPath式:', jsonPathExpr);
+            try {
+                if (typeof value === 'string') {
+                    try {
+                        value = JSON.parse(value);
+                    } catch (e) {
+                        throw new Error('JSONのパースに失敗しました');
+                    }
+                }
+                value = evaluateJsonPath(value, jsonPathExpr);
+            } catch (error: any) {
+                throw new Error(`JSONPath評価エラー: ${error.message}`);
+            }
+        } else if (value && typeof value === 'object' && path in value) {
+            value = value[path];
+        } else {
+            // パスが見つからない場合、残りのパスを結合してエラーメッセージを生成
+            const remainingPath = varPath.slice(0, i + 1).join('.');
+            throw new Error(`パス「${remainingPath}」が見つかりません`);
+        }
+        console.log(`パス[${i}]処理後:`, value);
+    }
+    
+    if (value === undefined) {
+        throw new Error(`変数「${varPath.join('.')}」の値が取得できません`);
+    }
+    return value;
+}
+
+/**
+ * JSONPath式を評価して値を取得する
+ * @param json JSONオブジェクト
+ * @param path JSONPath式
+ * @returns 取得した値
+ */
+function evaluateJsonPath(json: any, path: string): any {
+    console.log('JSONPath評価:', { json, path });
+    
+    // 単純なドット記法のパスを処理
+    if (path.startsWith('$.')) {
+        const keys = path.slice(2).split('.');
+        console.log('JSONPathキー:', keys);
+        
+        let value = json;
+        for (const key of keys) {
+            console.log('キー処理:', key, '現在の値:', value);
+            if (value && typeof value === 'object' && key in value) {
+                value = value[key];
+            } else {
+                throw new Error(`JSONPath「${path}」が見つかりません`);
+            }
+        }
+        return value;
+    }
+    throw new Error(`未対応のJSONPath式です: ${path}`);
+}
+
+/**
  * executePreRequestScript
  * プリリクエストスクリプトを実行する
  */
@@ -1009,44 +1112,12 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                     const headerVarName = argsString.substring(0, headerVarNameEndIndex);
                     const headerVarValue = argsString.substring(headerVarNameEndIndex + 1).trim();
                     
-                    // ${"Collection"."Request"."response"."headers"."key"}形式の変数参照を処理
-                    if (headerVarValue.startsWith('${') && headerVarValue.endsWith('}')) {
-                        const varPath = headerVarValue.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
-                        const collection = state.collections.find(c => c.name === varPath[0]);
-                        if (!collection) {
-                            showError(`コレクション「${varPath[0]}」が見つかりません`);
-                            continue;
-                        }
-                        const request = collection.requests.find(r => r.name === varPath[1]);
-                        if (!request) {
-                            showError(`リクエスト「${varPath[1]}」が見つかりません`);
-                            continue;
-                        }
-                        if (!request.lastResponseExecution) {
-                            showError('request の実行結果が存在しません');
-                            continue;
-                        }
-                        
-                        let value = request.lastResponseExecution;
-                        for (let i = 2; i < varPath.length; i++) {
-                            if (value === undefined) {
-                                showError(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
-                                continue;
-                            }
-                            value = value[varPath[i]];
-                        }
-                        if (value === undefined) {
-                            showError(`変数「${headerVarValue}」の値が取得できません`);
-                            continue;
-                        }
+                    try {
+                        const value = getValueFromVarString(headerVarValue);
                         requestObj.headers[headerVarName] = String(value);
-                    } else {
-                        const headerVarResult = getVariable(headerVarValue);
-                        if (headerVarResult === undefined) {
-                            showError(`変数「${headerVarValue}」が変数ではありません`);
-                            continue;
-                        }
-                        requestObj.headers[headerVarName] = headerVarResult;
+                    } catch (error: any) {
+                        showError(error.message);
+                        continue;
                     }
                     break;
 
@@ -1055,46 +1126,13 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         showError('setBodyWithVar requires a variable name');
                         continue;
                     }
-                    console.log("argsString", argsString);
                     
-                    // ${"Collection"."Request"."response"."body"."key"}形式の変数参照を処理
-                    if (argsString.startsWith('${') && argsString.endsWith('}')) {
-                        const varPath = argsString.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
-                        const collection = state.collections.find(c => c.name === varPath[0]);
-                        if (!collection) {
-                            showError(`コレクション「${varPath[0]}」が見つかりません`);
-                            continue;
-                        }
-                        const request = collection.requests.find(r => r.name === varPath[1]);
-                        if (!request) {
-                            showError(`リクエスト「${varPath[1]}」が見つかりません`);
-                            continue;
-                        }
-                        if (!request.lastResponseExecution) {
-                            showError('request の実行結果が存在しません');
-                            continue;
-                        }
-                        
-                        let value = request.lastResponseExecution;
-                        for (let i = 2; i < varPath.length; i++) {
-                            if (value === undefined) {
-                                showError(`パス「${varPath.slice(0, i + 1).join('.')}」が見つかりません`);
-                                continue;
-                            }
-                            value = value[varPath[i]];
-                        }
-                        if (value === undefined) {
-                            showError(`変数「${argsString}」の値が取得できません`);
-                            continue;
-                        }
+                    try {
+                        const value = getValueFromVarString(argsString);
                         requestObj.body = String(value);
-                    } else {
-                        const bodyValue = getVariable(argsString);
-                        if (bodyValue === undefined) {
-                            showError(`変数「${argsString}」が変数ではありません`);
-                            continue;
-                        }
-                        requestObj.body = bodyValue;
+                    } catch (error: any) {
+                        showError(error.message);
+                        continue;
                     }
                     break;
 
@@ -1330,5 +1368,49 @@ export async function saveCurrentRequest(): Promise<void> {
     } catch (error: any) {
         console.error('Error saving request:', error);
         showError('Failed to save request: ' + error.message);
+    }
+}
+
+/**
+ * 変数参照文字列から値を取得する
+ * @param varString 変数参照文字列（例: ${"Collection"."Request"."response"."headers"."key"}）
+ * @returns 取得した値
+ */
+function getValueFromVarString(varString: string): any {
+    console.log('変数参照文字列:', varString);
+    
+    if (varString.startsWith('${') && varString.endsWith('}')) {
+        // jsonPathを含む場合の特別な処理
+        if (varString.includes('jsonPath(')) {
+            const parts = varString.slice(2, -1).split('"."');
+            const varPath: string[] = [];
+            
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i].replace(/"/g, '');
+                if (part.includes('jsonPath(')) {
+                    // jsonPathの前の部分を追加
+                    const beforeJsonPath = part.split('.jsonPath(')[0];
+                    if (beforeJsonPath) {
+                        varPath.push(beforeJsonPath);
+                    }
+                    // jsonPath部分を追加
+                    varPath.push('jsonPath(' + part.split('.jsonPath(')[1]);
+                } else {
+                    varPath.push(part);
+                }
+            }
+            console.log('パースされた変数パス:', varPath);
+            return getValueFromVarPath(varPath);
+        } else {
+            const varPath = varString.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
+            console.log('パースされた変数パス:', varPath);
+            return getValueFromVarPath(varPath);
+        }
+    } else {
+        const value = getVariable(varString);
+        if (value === undefined) {
+            throw new Error(`変数「${varString}」が変数ではありません`);
+        }
+        return value;
     }
 }
