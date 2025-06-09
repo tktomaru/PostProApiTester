@@ -477,13 +477,29 @@ function getPersistedBody(requestId: string): any {
 
 /**
  * setupEventListeners
- *  ページ全体で使う「クリック・入力」などのイベントを一度にまとめる
+ * ページ全体で使う「クリック・入力」などのイベントを一度にまとめる
+ * 大きな関数を小さな責任ごとに分割してメンテナビリティを向上
  */
 export function setupEventListeners(): void {
-    // BodyTypeのリスナ登録
     setupBodyTypeListener();
+    setupFormEventListeners();
+    setupNavigationEventListeners();
+    setupDataManagementEventListeners();
+}
 
-    // Save ボタンのクリック登録
+/**
+ * フォーム関連のイベントリスナーを設定
+ */
+function setupFormEventListeners(): void {
+    setupSaveButton();
+    setupSendButton();
+    setupMethodAndUrlInputs();
+}
+
+/**
+ * 保存ボタンのイベントリスナーを設定
+ */
+function setupSaveButton(): void {
     const saveBtn = document.getElementById('saveBtn');
     if (saveBtn) {
         saveBtn.addEventListener('click', (e: Event) => {
@@ -491,17 +507,115 @@ export function setupEventListeners(): void {
             saveCurrentRequest();
         });
     }
+}
 
-    // Send ボタン
+/**
+ * 送信ボタンのイベントリスナーを設定
+ */
+function setupSendButton(): void {
     const sendBtn = document.getElementById('sendBtn');
     if (sendBtn) {
         sendBtn.addEventListener('click', async (e: Event) => {
             e.preventDefault();
-            let requestObj = state.currentRequest;
-            if (!requestObj) return;
+            await handleSendButtonClick();
+        });
+    }
+}
 
-            // フォームから最新の値を収集してrequestObjを更新
-            const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
+/**
+ * 送信ボタンクリック時の処理
+ */
+async function handleSendButtonClick(): Promise<void> {
+    const requestObj = state.currentRequest;
+    if (!requestObj) return;
+
+    updateRequestFromFormInputs(requestObj);
+    
+    // requestManager.sendRequestに委譲
+    const { sendRequest } = await import('./requestManager');
+    await sendRequest(requestObj);
+}
+
+/**
+ * フォーム入力からリクエストオブジェクトを更新
+ */
+function updateRequestFromFormInputs(requestObj: any): void {
+    updateBasicRequestFields(requestObj);
+    updateRequestHeaders(requestObj);
+    updateRequestParams(requestObj);
+}
+
+/**
+ * 基本的なリクエストフィールドを更新
+ */
+function updateBasicRequestFields(requestObj: any): void {
+    const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
+    const nameInput = document.getElementById('nameInput') as HTMLInputElement;
+    const urlInput = document.getElementById('urlInput') as HTMLInputElement;
+
+    requestObj.method = methodSelect?.value || requestObj.method;
+    requestObj.name = nameInput?.value?.trim() || requestObj.name;
+    requestObj.url = urlInput?.value?.trim() || requestObj.url;
+}
+
+/**
+ * リクエストヘッダーを収集して更新
+ */
+function updateRequestHeaders(requestObj: any): void {
+    const newHeaders = collectKeyValuePairs('#headersContainer');
+    requestObj.headers = newHeaders;
+}
+
+/**
+ * リクエストパラメータを収集して更新
+ */
+function updateRequestParams(requestObj: any): void {
+    const newParams = collectKeyValuePairs('#paramsContainer');
+    requestObj.params = newParams;
+}
+
+/**
+ * 指定されたコンテナからキー・バリューペアを収集
+ */
+function collectKeyValuePairs(containerSelector: string): Record<string, string> {
+    const rows = document.querySelectorAll(`${containerSelector} .key-value-row`);
+    const result: Record<string, string> = {};
+    
+    rows.forEach(row => {
+        const rowElement = row as HTMLElement;
+        const keyInput = rowElement.querySelector('.key-input') as HTMLInputElement;
+        const valueInput = rowElement.querySelector('.value-input') as HTMLInputElement;
+        const key = keyInput?.value?.trim();
+        const value = valueInput?.value?.trim();
+        if (key) result[key] = value || '';
+    });
+    
+    return result;
+}
+
+/**
+ * メソッドとURL入力のイベントリスナーを設定
+ */
+function setupMethodAndUrlInputs(): void {
+    // この関数は既存のロジックを維持しながら必要に応じて実装
+    // 現在は他の関数で処理されているため、プレースホルダーとして残す
+}
+
+/**
+ * ナビゲーション関連のイベントリスナーを設定
+ */
+function setupNavigationEventListeners(): void {
+    // タブ切り替えなどのナビゲーション関連のイベントリスナー
+    // 既存のコードから分離予定
+}
+
+/**
+ * データ管理関連のイベントリスナーを設定
+ */
+function setupDataManagementEventListeners(): void {
+    // インポート・エクスポート、履歴管理などのイベントリスナー
+    // 既存のコードから分離予定
+}
             const nameInput = document.getElementById('nameInput') as HTMLInputElement;
             const urlInput = document.getElementById('urlInput') as HTMLInputElement;
 
