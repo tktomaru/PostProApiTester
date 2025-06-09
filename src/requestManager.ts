@@ -17,7 +17,10 @@ import {
     formatBytes
 } from './utils';
 
-import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues, collectFormDataWithFiles, base64ToFile } from './utils';
+import {
+    switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues,
+    base64ToFile, serializeFormDataWithFiles, serializeBinaryFile
+} from './utils';
 import { getVariable, replaceVariables, deepReplaceVariables, renderVariables, setVariable } from './variableManager';
 import { saveToHistory as saveToHistoryFn } from './historyManager';
 
@@ -223,76 +226,98 @@ export function loadRequestIntoEditor(request: RequestData): void {
 
     // ボディ描画
     if (request.body) {
-        if (typeof request.body === 'string') {
-            const rawRadio = document.querySelector('input[name="bodyType"][value="raw"]') as HTMLInputElement;
-            rawRadio.checked = true;
-            handleBodyTypeChange({ target: { value: 'raw' } } as any);
-            const rawBody = document.getElementById('rawBody') as HTMLTextAreaElement;
-            rawBody.value = request.body;
-        } else {
-            const formDataRadio = document.querySelector('input[name="bodyType"][value="form-data"]') as HTMLInputElement;
-            formDataRadio.checked = true;
-            handleBodyTypeChange({ target: { value: 'form-data' } } as any);
-            const formDataFieldsContainer = document.getElementById('formDataFieldsContainer') as HTMLElement;
-            if (formDataFieldsContainer) {
-                formDataFieldsContainer.innerHTML = '';
-                
-                // FormDataField[]形式の場合（ファイルを含む可能性）
-                if (Array.isArray(request.body)) {
-                    console.log('🔍 [loadRequestIntoEditor] FormDataField[]形式で復元:', request.body);
-                    (request.body as any[]).forEach((field: any) => {
-                        addKeyValueRow(formDataFieldsContainer, 'body');
-                        const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
-                        const lastRow = rows[rows.length - 1] as HTMLElement;
-                        const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
-                        const valueTypeSelect = lastRow.querySelector('.value-type-select') as HTMLSelectElement;
-                        const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
-                        const fileInput = lastRow.querySelector('.file-input') as HTMLInputElement;
-                        
-                        keyInput.value = field.key;
-                        
-                        if (field.type === 'file') {
-                            valueTypeSelect.value = 'file';
-                            valueInput.style.display = 'none';
-                            fileInput.style.display = 'block';
-                            
-                            // ファイル情報を表示し、データも保存
-                            if (field.fileName) {
-                                const fileInfo = document.createElement('span');
-                                fileInfo.textContent = `Saved: ${field.fileName}`;
-                                fileInfo.style.color = '#666';
-                                fileInfo.style.fontSize = '12px';
-                                fileInfo.style.marginLeft = '8px';
-                                fileInfo.dataset.fileInfo = JSON.stringify({
-                                    fileName: field.fileName,
-                                    fileType: field.fileType,
-                                    fileSize: field.fileSize,
-                                    fileContent: field.fileContent
-                                });
-                                fileInput.parentNode?.appendChild(fileInfo);
-                            }
-                        } else {
-                            valueTypeSelect.value = 'text';
-                            valueInput.style.display = 'block';
-                            fileInput.style.display = 'none';
-                            valueInput.value = field.value || '';
-                        }
-                    });
-                } else {
-                    // 従来のRecord<string, string>形式
-                    console.log('🔍 [loadRequestIntoEditor] Record形式で復元:', request.body);
-                    Object.entries(request.body as Record<string, string>).forEach(([key, value]) => {
-                        addKeyValueRow(formDataFieldsContainer, 'body');
-                        const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
-                        const lastRow = rows[rows.length - 1] as HTMLElement;
-                        const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
-                        const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
-                        keyInput.value = key;
-                        valueInput.value = value;
-                    });
+        if (request.bodyType === 'binary') {
+            // 1) すでに File オブジェクトとして入っていればそのまま
+            // 2) Base64 文字列なら JSON.parse → base64ToFile → state.currentRequest.body にセット
+            const binaryInput = document.getElementById('binaryFileInput') as HTMLInputElement;
+            const info = document.getElementById('binaryFileInfo') as HTMLElement;
+            if (request.body instanceof File) {
+                // file input 側にもセットしておく
+                binaryInput.files = new DataTransfer().files; // ここは要調整
+                info.textContent = `Saved: ${request.body.name} (${formatBytes(request.body.size)})`;
+            } else if (typeof request.body === 'string') {
+                try {
+                    const meta = JSON.parse(request.body);
+                    const f = base64ToFile(meta.base64Data, meta.fileName, meta.fileType);
+                    state.currentRequest!.body = f;
+                    info.textContent = `Restored: ${meta.fileName} (${formatBytes(meta.fileSize)})`;
+                } catch {
+                    console.warn('binary の復元に失敗');
                 }
             }
-        }
+
+
+        } else
+            if (typeof request.body === 'string') {
+                const rawRadio = document.querySelector('input[name="bodyType"][value="raw"]') as HTMLInputElement;
+                rawRadio.checked = true;
+                handleBodyTypeChange({ target: { value: 'raw' } } as any);
+                const rawBody = document.getElementById('rawBody') as HTMLTextAreaElement;
+                rawBody.value = request.body;
+            } else {
+                const formDataRadio = document.querySelector('input[name="bodyType"][value="form-data"]') as HTMLInputElement;
+                formDataRadio.checked = true;
+                handleBodyTypeChange({ target: { value: 'form-data' } } as any);
+                const formDataFieldsContainer = document.getElementById('formDataFieldsContainer') as HTMLElement;
+                if (formDataFieldsContainer) {
+                    formDataFieldsContainer.innerHTML = '';
+
+                    // FormDataField[]形式の場合（ファイルを含む可能性）
+                    if (Array.isArray(request.body)) {
+                        console.log('🔍 [loadRequestIntoEditor] FormDataField[]形式で復元:', request.body);
+                        (request.body as any[]).forEach((field: any) => {
+                            addKeyValueRow(formDataFieldsContainer, 'body');
+                            const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
+                            const lastRow = rows[rows.length - 1] as HTMLElement;
+                            const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
+                            const valueTypeSelect = lastRow.querySelector('.value-type-select') as HTMLSelectElement;
+                            const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
+                            const fileInput = lastRow.querySelector('.file-input') as HTMLInputElement;
+
+                            keyInput.value = field.key;
+
+                            if (field.type === 'file') {
+                                valueTypeSelect.value = 'file';
+                                valueInput.style.display = 'none';
+                                fileInput.style.display = 'block';
+
+                                // ファイル情報を表示し、データも保存
+                                if (field.fileName) {
+                                    const fileInfo = document.createElement('span');
+                                    fileInfo.textContent = `Saved: ${field.fileName}`;
+                                    fileInfo.style.color = '#666';
+                                    fileInfo.style.fontSize = '12px';
+                                    fileInfo.style.marginLeft = '8px';
+                                    fileInfo.dataset.fileInfo = JSON.stringify({
+                                        fileName: field.fileName,
+                                        fileType: field.fileType,
+                                        fileSize: field.fileSize,
+                                        fileContent: field.fileContent
+                                    });
+                                    fileInput.parentNode?.appendChild(fileInfo);
+                                }
+                            } else {
+                                valueTypeSelect.value = 'text';
+                                valueInput.style.display = 'block';
+                                fileInput.style.display = 'none';
+                                valueInput.value = field.value || '';
+                            }
+                        });
+                    } else {
+                        // 従来のRecord<string, string>形式
+                        console.log('🔍 [loadRequestIntoEditor] Record形式で復元:', request.body);
+                        Object.entries(request.body as Record<string, string>).forEach(([key, value]) => {
+                            addKeyValueRow(formDataFieldsContainer, 'body');
+                            const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
+                            const lastRow = rows[rows.length - 1] as HTMLElement;
+                            const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
+                            const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
+                            keyInput.value = key;
+                            valueInput.value = value;
+                        });
+                    }
+                }
+            }
     } else {
         const noneRadio = document.querySelector('input[name="bodyType"][value="none"]') as HTMLInputElement;
         noneRadio.checked = true;
@@ -360,7 +385,7 @@ export function loadRequestIntoEditor(request: RequestData): void {
     if (bodyType === 'binary') {
         const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
         const binaryFileInfo = document.getElementById('binaryFileInfo') as HTMLElement;
-        
+
         if (request.body instanceof File) {
             // Fileオブジェクトの場合
             if (binaryFileInfo) {
@@ -371,7 +396,7 @@ export function loadRequestIntoEditor(request: RequestData): void {
                         <span class="file-type">${request.body.type || 'Unknown type'}</span>
                     </div>
                 `;
-                
+
                 // ファイル情報をdata属性に保存（必要に応じて）
                 if (binaryFileInput) {
                     binaryFileInput.dataset.savedFile = JSON.stringify({
@@ -381,7 +406,7 @@ export function loadRequestIntoEditor(request: RequestData): void {
                     });
                 }
             }
-            
+
             console.log('🔍 [loadRequestIntoEditor] Binary file restored:', {
                 name: request.body.name,
                 size: request.body.size,
@@ -402,13 +427,13 @@ export function loadRequestIntoEditor(request: RequestData): void {
                                 <span class="file-type">${fileData.fileType || 'Unknown type'}</span>
                             </div>
                         `;
-                        
+
                         // 復元したファイルをcurrentRequestに設定
                         if (state.currentRequest) {
                             state.currentRequest.body = restoredFile;
                         }
                     }
-                    
+
                     console.log('🔍 [loadRequestIntoEditor] Binary file restored from Base64:', {
                         name: fileData.fileName,
                         size: fileData.fileSize,
@@ -527,6 +552,72 @@ export async function executeTestScript(responseData: ProcessedResponse, testScr
         return results;
     }
 }
+
+/**
+ * リクエスト実行結果を Collections／Scenarios／currentRequest に注入し、ストレージ保存まで行う
+ */
+export async function persistExecutionResults(
+    requestId: string,
+    requestExecution: any,                   // Timestamp, method, url, headers, params, body, auth...
+    parsedResponse: ProcessedResponse,       // status, duration, size, headers, body, bodyText...
+    testResults: TestResult[]
+): Promise<void> {
+    // 1. Collection 内の該当リクエスト
+    if (state.currentCollection) {
+        const col = state.collections.find(c => c.id === state.currentCollection);
+        if (col) {
+            const req = col.requests.find(r => r.id === requestId) as any;
+            if (req) {
+                req.lastRequestExecution = requestExecution;
+                req.lastResponseExecution = {
+                    status: parsedResponse.status,
+                    duration: parsedResponse.duration,
+                    size: parsedResponse.size,
+                    timestamp: new Date().toISOString(),
+                    headers: parsedResponse.headers,
+                    body: parsedResponse.body,
+                    testResults
+                };
+            }
+        }
+        await saveCollectionsToStorage();
+    }
+
+    // 2. 全 Scenarios 内の該当リクエスト
+    state.scenarios.forEach(scenario => {
+        const req = (scenario.requests || []).find(r => r.id === requestId) as any;
+        if (req) {
+            req.lastRequestExecution = requestExecution;
+            req.lastResponseExecution = {
+                status: parsedResponse.status,
+                duration: parsedResponse.duration,
+                size: parsedResponse.size,
+                timestamp: new Date().toISOString(),
+                headers: parsedResponse.headers,
+                body: parsedResponse.body,
+                testResults
+            };
+        }
+    });
+    await saveScenariosToStorage();
+
+    // 3. currentRequest が同一なら更新
+    if (state.currentRequest?.id === requestId) {
+        const cr = state.currentRequest as any;
+        cr.lastRequestExecution = requestExecution;
+        cr.lastResponseExecution = {
+            status: parsedResponse.status,
+            duration: parsedResponse.duration,
+            size: parsedResponse.size,
+            timestamp: new Date().toISOString(),
+            headers: parsedResponse.headers,
+            body: parsedResponse.body,
+            testResults
+        };
+    }
+}
+
+
 /**
  * sendRequest
  *  RequestData に従ってリクエストを送信します。
@@ -600,66 +691,13 @@ export async function sendRequest(
         await saveToHistory(req, parsed, testResults);
 
         // 8. コレクションのリクエストに最新の実行結果を保存
-        if (state.currentCollection) {
-            const collection = state.collections.find(c => c.id === state.currentCollection);
-            if (collection) {
-                const request = collection.requests.find(r => r.id === requestObj.id);
-                if (request) {
-                    // リクエスト実行結果を保存
-                    (request as any).lastRequestExecution = requestExecution;
-
-                    // レスポンス実行結果を保存
-                    (request as any).lastResponseExecution = {
-                        status: parsed.status,
-                        duration: parsed.duration,
-                        size: parsed.size,
-                        timestamp: new Date().toISOString(),
-                        headers: parsed.headers,  // パース済みのヘッダーを保存
-                        body: parsed.body,
-                        testResults: testResults
-                    };
-
-                    await saveCollectionsToStorage();
-                }
-            }
-        }
-
-        // 8.5. 全シナリオのリクエストに最新の実行結果を保存（リクエストIDベース）
-        state.scenarios.forEach(async (scenario) => {
-            if (scenario.requests) {
-                const request = scenario.requests.find(r => r.id === requestObj.id);
-                if (request) {
-                    // リクエスト実行結果を保存
-                    (request as any).lastRequestExecution = requestExecution;
-
-                    // レスポンス実行結果を保存
-                    (request as any).lastResponseExecution = {
-                        status: parsed.status,
-                        duration: parsed.duration,
-                        size: parsed.size,
-                        timestamp: new Date().toISOString(),
-                        headers: parsed.headers,  // パース済みのヘッダーを保存
-                        body: parsed.body,
-                        testResults: testResults
-                    };
-                }
-            }
-        });
-        await saveScenariosToStorage();
-
-        // 9. 現在のリクエストにも実行結果を保存
-        if (state.currentRequest && state.currentRequest.id === requestObj.id) {
-            (state.currentRequest as any).lastRequestExecution = requestExecution;
-            (state.currentRequest as any).lastResponseExecution = {
-                status: parsed.status,
-                duration: parsed.duration,
-                size: parsed.size,
-                timestamp: new Date().toISOString(),
-                headers: parsed.headers,  // パース済みのヘッダーを保存
-                body: parsed.body,
-                testResults: testResults
-            };
-        }
+        // 8. 実行結果を一括して永続化
+        await persistExecutionResults(
+            requestObj.id,
+            requestExecution,
+            parsed,
+            testResults
+        );
 
         // 8. 返却
         if (forScenario) {
@@ -694,20 +732,20 @@ function fileToBase64(file: any): Promise<string> {
             constructor: file?.constructor?.name,
             typeof: typeof file
         });
-        
+
         // ファイルオブジェクトの詳細チェック
         if (!file) {
             console.error('🔍 [fileToBase64] ファイルオブジェクトがnullまたはundefined');
             reject(new Error('File object is null or undefined'));
             return;
         }
-        
+
         if (!(file instanceof File) && !(file instanceof Blob)) {
             console.error('🔍 [fileToBase64] ファイルオブジェクトがFile/Blobインスタンスではありません');
             reject(new Error(`File object is not a File or Blob instance. Type: ${typeof file}, Constructor: ${(file as any)?.constructor?.name}`));
             return;
         }
-        
+
         const reader = new FileReader();
         reader.onload = () => {
             console.log('🔍 [fileToBase64] FileReader.onload成功');
@@ -721,7 +759,7 @@ function fileToBase64(file: any): Promise<string> {
             console.error('🔍 [fileToBase64] FileReader.onerror:', error);
             reject(error);
         };
-        
+
         try {
             console.log('🔍 [fileToBase64] FileReader.readAsDataURL呼び出し開始');
             reader.readAsDataURL(file);
@@ -843,13 +881,13 @@ async function sendRequestWithCookieSupport(options: {
         // bodyの処理
         let processedBody: string | null = null;
         let hasFiles = false;
-        
+
         try {
             console.log('🔍 [requestManager.ts] bodyの処理開始. options.body:', options.body);
             console.log('🔍 [requestManager.ts] options.body type:', typeof options.body);
             console.log('🔍 [requestManager.ts] options.body instanceof FormData:', options.body instanceof FormData);
             console.log('🔍 [requestManager.ts] Array.isArray(options.body):', Array.isArray(options.body));
-            
+
             if (options.body instanceof FormData) {
                 console.log('🔍 [requestManager.ts] FormDataオブジェクトとして処理');
                 // FormDataオブジェクトをkey-valueオブジェクトに変換
@@ -865,7 +903,7 @@ async function sendRequestWithCookieSupport(options: {
                 const formDataFields = options.body as any[];
                 console.log('🔍 [requestManager.ts] formDataFields:', formDataFields);
                 const processedFields: any[] = [];
-                
+
                 for (const field of formDataFields) {
                     console.log('🔍 [requestManager.ts] 処理中のfield:', field);
                     console.log('🔍 [requestManager.ts] field.file詳細:', {
@@ -875,7 +913,7 @@ async function sendRequestWithCookieSupport(options: {
                         isFile: field.file instanceof File,
                         constructor: field.file?.constructor?.name
                     });
-                    
+
                     if (field.type === 'file' && field.file) {
                         // ファイルオブジェクトの型チェック
                         if (!(field.file instanceof File) && !(field.file instanceof Blob)) {
@@ -888,7 +926,7 @@ async function sendRequestWithCookieSupport(options: {
                             });
                             continue;
                         }
-                        
+
                         console.log('🔍 [requestManager.ts] ファイルフィールドを処理:', {
                             key: field.key,
                             filename: field.file.name,
@@ -2090,12 +2128,12 @@ export function processVariables(request: RequestData): RequestData {
             console.error('🔍 [processVariables] Failed to restore binary file:', error);
         }
     }
-    
+
     // File objectsを含む場合はJSON.stringify/parseできないため、特別な処理が必要
-    const hasFiles = (Array.isArray(requestWithRestoredFiles.body) && 
+    const hasFiles = (Array.isArray(requestWithRestoredFiles.body) &&
         requestWithRestoredFiles.body.some((field: any) => field.type === 'file' && (field.file || field.fileContent))) ||
         (requestWithRestoredFiles.bodyType === 'binary' && requestWithRestoredFiles.body instanceof File);
-    
+
     let processed: RequestData;
     if (hasFiles) {
         // Fileオブジェクトを含む場合は手動でクローン
@@ -2250,99 +2288,37 @@ export async function saveCurrentRequest(): Promise<void> {
         console.log('saveCurrentRequest: New params object:', newParams);
         req.params = newParams;
 
-        // ボディ
+
+        // ボディタイプと内容を保存
         const selectedBodyType = document.querySelector('input[name="bodyType"]:checked') as HTMLInputElement;
-        if (selectedBodyType?.value === 'raw') {
-            const rawBody = document.getElementById('rawBody') as HTMLTextAreaElement;
-            req.body = rawBody.value;
-        } else if (selectedBodyType?.value === 'json') {
-            const jsonBody = document.getElementById('jsonBody') as HTMLTextAreaElement;
-            req.body = jsonBody.value;
-        } else if (selectedBodyType?.value === 'form-data') {
-            // ファイル情報を含めて保存するため、collectFormDataWithFilesを使用してからファイル情報のみ保存
-            const formDataFields = await collectFormDataWithFiles('formDataFieldsContainer');
-            
-            // Fileオブジェクトは保存できないため、ファイル情報のみを保存
-            const serializableFields = formDataFields.map(field => {
-                if (field.type === 'file') {
-                    return {
-                        key: field.key,
-                        type: field.type,
-                        fileName: field.fileName,
-                        fileType: field.fileType,
-                        fileSize: field.fileSize,
-                        fileContent: field.fileContent
-                    };
-                } else {
-                    return {
-                        key: field.key,
-                        type: field.type,
-                        value: field.value
-                    };
-                }
-            });
-            
-            console.log('🔍 [saveCurrentRequest] 保存するform-dataフィールド:', serializableFields);
-            req.body = serializableFields as any;
-        } else if (selectedBodyType?.value === 'urlencoded') {
-            const urlRows = document.querySelectorAll('#urlEncodedContainer .key-value-row');
-            const urlObj: Record<string, string> = {};
-            urlRows.forEach(row => {
-                const rowElement = row as HTMLElement;
-                const keyInput = rowElement.querySelector('.key-input') as HTMLInputElement;
-                const valueInput = rowElement.querySelector('.value-input') as HTMLInputElement;
-                const key = keyInput.value.trim();
-                const value = valueInput.value.trim();
-                if (key) urlObj[key] = value;
-            });
-            req.body = urlObj;
-        } else if (selectedBodyType?.value === 'binary') {
-            // Binary ファイルの保存処理
-            const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
-            const file = binaryFileInput?.files?.[0];
-            if (file) {
-                // ファイルをBase64でエンコードして保存
-                try {
-                    const base64Data = await fileToBase64(file);
-                    req.body = JSON.stringify({
-                        type: 'binaryFile',
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        base64Data: base64Data
-                    });
-                    console.log('🔍 [saveCurrentRequest] Binary file saved:', {
-                        name: file.name,
-                        size: file.size,
-                        type: file.type
-                    });
-                } catch (error) {
-                    console.error('🔍 [saveCurrentRequest] Failed to save binary file:', error);
-                    showError('Failed to save binary file');
-                    req.body = null;
-                }
-            } else {
-                // 保存済みファイルがある場合はそれを保持
-                if (state.currentRequest && state.currentRequest.body instanceof File) {
-                    try {
-                        const base64Data = await fileToBase64(state.currentRequest.body);
-                        req.body = JSON.stringify({
-                            type: 'binaryFile',
-                            fileName: state.currentRequest.body.name,
-                            fileType: state.currentRequest.body.type,
-                            fileSize: state.currentRequest.body.size,
-                            base64Data: base64Data
-                        });
-                    } catch (error) {
-                        console.error('🔍 [saveCurrentRequest] Failed to save existing binary file:', error);
-                        req.body = null;
-                    }
-                } else {
-                    req.body = null;
-                }
-            }
-        } else {
-            req.body = null;
+        req.bodyType = selectedBodyType.value as any;
+
+        switch (req.bodyType) {
+            case 'raw':
+                req.body = (document.getElementById('rawBody') as HTMLTextAreaElement).value;
+                break;
+
+            case 'json':
+                req.body = (document.getElementById('jsonBody') as HTMLTextAreaElement).value;
+                break;
+
+            case 'form-data':
+                // helper returns FormDataField[]
+                req.body = await serializeFormDataWithFiles('formDataFieldsContainer');
+                break;
+
+            case 'urlencoded':
+                req.body = collectKeyValues('urlEncodedContainer');
+                break;
+
+            case 'binary':
+                // helper returns JSON string or null
+                const bin = await serializeBinaryFile('binaryFileInput');
+                req.body = bin;
+                break;
+
+            default:
+                req.body = null;
         }
 
         // 認証設定

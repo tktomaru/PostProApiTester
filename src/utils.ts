@@ -38,7 +38,7 @@ export function formatBytes(bytes: number): string {
 export function showNotification(message: string, type: string = 'info'): void {
     const area = document.getElementById('notificationArea');
     if (!area) return;
-    
+
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
@@ -73,7 +73,7 @@ export function getValueByPath(obj: any, path: string): any {
 export function addKeyValueRow(container: HTMLElement, type: string): void {
     const row = document.createElement('div');
     row.className = 'key-value-row';
-    
+
     // form-dataの場合はファイル選択オプションも追加
     if (type === 'body' && container.id === 'formDataFieldsContainer') {
         row.innerHTML = `
@@ -97,7 +97,7 @@ export function addKeyValueRow(container: HTMLElement, type: string): void {
             <button type="button" class="delete-btn">×</button>
         `;
     }
-    
+
     const keyInput = row.querySelector('.key-input') as HTMLInputElement;
     const valueInput = row.querySelector('.value-input') as HTMLInputElement;
     const deleteBtn = row.querySelector('.delete-btn') as HTMLButtonElement;
@@ -138,7 +138,7 @@ export function addKeyValueRow(container: HTMLElement, type: string): void {
 export function collectKeyValues(containerId: string): Record<string, string> {
     const container = document.getElementById(containerId);
     if (!container) return {};
-    
+
     const rows = container.querySelectorAll('.key-value-row');
     const result: Record<string, string> = {};
     rows.forEach(row => {
@@ -168,40 +168,40 @@ export interface FormDataField {
 export async function collectFormDataWithFiles(containerId: string): Promise<FormDataField[]> {
     const container = document.getElementById(containerId);
     if (!container) return [];
-    
+
     const rows = container.querySelectorAll('.key-value-row');
-    
+
     // 非同期処理のためPromise.allを使用
     const promises = Array.from(rows).map(async (row) => {
         const keyInput = row.querySelector('.key-input') as HTMLInputElement;
         const valueTypeSelect = row.querySelector('.value-type-select') as HTMLSelectElement;
         const valueInput = row.querySelector('.value-input') as HTMLInputElement;
         const fileInput = row.querySelector('.file-input') as HTMLInputElement;
-        
+
         const key = keyInput?.value?.trim();
         if (!key) return null;
-        
-        console.log('Collecting field:', { 
-            key, 
-            valueTypeSelect: valueTypeSelect?.value, 
+
+        console.log('Collecting field:', {
+            key,
+            valueTypeSelect: valueTypeSelect?.value,
             hasFile: !!fileInput?.files?.[0],
-            textValue: valueInput?.value 
+            textValue: valueInput?.value
         });
-        
+
         if (valueTypeSelect && valueTypeSelect.value === 'file') {
             const file = fileInput?.files?.[0];
             if (file) {
                 try {
                     // ファイル内容をBase64に変換
                     const fileContent = await fileToBase64(file);
-                    console.log('Adding file field:', { 
-                        key, 
+                    console.log('Adding file field:', {
+                        key,
                         filename: file.name,
-                        type: file.type, 
+                        type: file.type,
                         size: file.size,
                         contentLength: fileContent.length
                     });
-                    
+
                     return {
                         key,
                         type: 'file' as const,
@@ -243,7 +243,7 @@ export async function collectFormDataWithFiles(containerId: string): Promise<For
                         };
                     }
                 }
-                
+
                 console.log('File field has no file selected:', key);
                 return {
                     key,
@@ -261,10 +261,10 @@ export async function collectFormDataWithFiles(containerId: string): Promise<For
             };
         }
     });
-    
+
     const results = await Promise.all(promises);
     const filteredResults = results.filter(item => item !== null) as FormDataField[];
-    
+
     console.log('collectFormDataWithFiles result:', filteredResults);
     return filteredResults;
 }
@@ -289,11 +289,11 @@ export function base64ToFile(base64: string, fileName: string, fileType: string)
     const byteString = atob(base64);
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
-    
+
     for (let i = 0; i < byteString.length; i++) {
         ia[i] = byteString.charCodeAt(i);
     }
-    
+
     const blob = new Blob([ab], { type: fileType });
     return new File([blob], fileName, { type: fileType });
 }
@@ -344,13 +344,32 @@ function setupBodyTypeListener(): void {
 }
 
 /**
+ * 永続化されたコレクション／シナリオの request.body を取得する
+ */
+function getPersistedBody(requestId: string): any {
+    // ① コレクション内
+    if (state.currentCollection) {
+        const col = state.collections.find(c => c.id === state.currentCollection);
+        const req = col?.requests.find(r => r.id === requestId);
+        if (req) return req.body;
+    }
+    // ② シナリオ内
+    if (state.currentScenario) {
+        const scenario = state.scenarios.find(s => s.id === state.currentScenario);
+        const req = scenario?.requests.find(r => r.id === requestId);
+        if (req) return req.body;
+    }
+    return undefined;
+}
+
+/**
  * setupEventListeners
  *  ページ全体で使う「クリック・入力」などのイベントを一度にまとめる
  */
 export function setupEventListeners(): void {
     // BodyTypeのリスナ登録
     setupBodyTypeListener();
-    
+
     // Save ボタンのクリック登録
     const saveBtn = document.getElementById('saveBtn');
     if (saveBtn) {
@@ -359,7 +378,7 @@ export function setupEventListeners(): void {
             saveCurrentRequest();
         });
     }
-    
+
     // Send ボタン
     const sendBtn = document.getElementById('sendBtn');
     if (sendBtn) {
@@ -367,12 +386,12 @@ export function setupEventListeners(): void {
             e.preventDefault();
             let requestObj = state.currentRequest;
             if (!requestObj) return;
-            
+
             // フォームから最新の値を収集してrequestObjを更新
             const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
             const nameInput = document.getElementById('nameInput') as HTMLInputElement;
             const urlInput = document.getElementById('urlInput') as HTMLInputElement;
-            
+
             requestObj.method = methodSelect?.value || requestObj.method;
             requestObj.name = nameInput?.value?.trim() || requestObj.name;
             requestObj.url = urlInput?.value?.trim() || requestObj.url;
@@ -402,50 +421,68 @@ export function setupEventListeners(): void {
                 if (key) newParams[key] = value || '';
             });
             requestObj.params = newParams;
-            
+
             // bodyType の選択状況を反映し、requestObj.body を適宜セット
             const bodyType = (document.querySelector('input[name="bodyType"]:checked') as HTMLInputElement)?.value || 'none';
             requestObj.bodyType = bodyType as 'none' | 'raw' | 'json' | 'form-data' | 'urlencoded' | 'binary';
             requestObj.body = null;
 
             switch (bodyType) {
-                case 'raw':
-                    const rawBody = document.getElementById('rawBody') as HTMLTextAreaElement;
-                    requestObj.body = rawBody?.value || '';
+                case 'raw': {
+                    const rawBody = (document.getElementById('rawBody') as HTMLTextAreaElement)?.value?.trim();
+                    requestObj.body = rawBody || requestObj.body;
+                    // if the textarea is empty, keep whatever was in state.currentRequest.body
                     break;
-                case 'json':
-                    const jsonBody = document.getElementById('jsonBody') as HTMLTextAreaElement;
-                    requestObj.body = jsonBody?.value || '';
+                }
+
+                case 'json': {
+                    const jsonBody = (document.getElementById('jsonBody') as HTMLTextAreaElement)?.value?.trim();
+                    requestObj.body = jsonBody || requestObj.body;
                     break;
-                case 'form-data':
-                    // form-data の場合はファイルを含む特別な収集処理
-                    console.log('🔍 [utils.ts] form-data処理開始');
+                }
+
+                case 'form-data': {
                     const formDataFields = await collectFormDataWithFiles('formDataFieldsContainer');
-                    console.log('🔍 [utils.ts] 収集されたformDataFields:', formDataFields);
-                    requestObj.body = formDataFields as any;
-                    console.log('🔍 [utils.ts] requestObj.bodyに設定完了:', requestObj.body);
-                    break;
-                case 'urlencoded':
-                    // urlencoded の場合は従来通り
-                    const urlEncodedFields = collectKeyValues('formDataFieldsContainer');
-                    requestObj.body = urlEncodedFields;
-                    break;
-                case 'binary':
-                    // binary の場合はファイルをそのまま設定
-                    const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
-                    const binaryFile = binaryFileInput?.files?.[0];
-                    if (binaryFile) {
-                        requestObj.body = binaryFile;
-                        console.log('🔍 [utils.ts] Binary file selected:', {
-                            name: binaryFile.name,
-                            size: binaryFile.size,
-                            type: binaryFile.type
-                        });
-                    } else {
-                        console.log('🔍 [utils.ts] No binary file selected');
-                        requestObj.body = null;
+                    if (formDataFields.length > 0) {
+                        // 新しく入力された form-data があればそれを使う
+                        requestObj.body = formDataFields as any;
+                    } else if (Array.isArray(state?.currentRequest?.body)) {
+                        console.log('🔍 [utils.ts] No new form-data selected → using getPersistedBody');
+                        // なければコレクション/シナリオに保存済みの body を復元
+                        const persisted = getPersistedBody(requestObj.id);
+                        requestObj.body = persisted ?? [];
                     }
                     break;
+                }
+
+                case 'urlencoded': {
+                    const kv = collectKeyValues('formDataFieldsContainer');
+                    if (Object.keys(kv).length > 0) {
+                        requestObj.body = kv;
+                    } else if (typeof state.currentRequest?.body === 'object' && !Array.isArray(state.currentRequest.body)) {
+                        requestObj.body = state.currentRequest.body;
+                    }
+                    break;
+                }
+                case 'binary': {
+                    const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
+                    // first, try the input
+                    let file = binaryFileInput?.files?.[0];
+                    // if nothing is selected in the input, but we restored a File in state.currentRequest.body, use that
+                    if (!file && state.currentRequest?.body instanceof File) {
+                        file = state.currentRequest.body;
+                    }
+                    if (file) {
+                        requestObj.body = file;
+                        console.log('🔍 [utils.ts] Sending binary file:', { name: file.name, size: file.size });
+                    } else {
+                        console.log('🔍 [utils.ts] No new binary selected → using getPersistedBody');
+                        // なければコレクション/シナリオに保存済みの body (File or Base64) を復元
+                        const persisted = getPersistedBody(requestObj.id);
+                        requestObj.body = persisted ?? null;
+                    }
+                    break;
+                }
                 default:
                     break;
             }
@@ -459,7 +496,7 @@ export function setupEventListeners(): void {
             sendRequest(requestObj);
         });
     }
-    
+
     // メソッド・URL 更新時
     const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
     if (methodSelect) {
@@ -470,7 +507,7 @@ export function setupEventListeners(): void {
             }
         });
     }
-    
+
     const urlInput = document.getElementById('urlInput') as HTMLInputElement;
     if (urlInput) {
         urlInput.addEventListener('input', (e: Event) => {
@@ -480,7 +517,7 @@ export function setupEventListeners(): void {
             }
         });
     }
-    
+
     // インポート・エクスポート・設定
     const importBtn = document.getElementById('importBtn');
     if (importBtn) {
@@ -488,7 +525,7 @@ export function setupEventListeners(): void {
             openImportModal();
         });
     }
-    
+
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {
@@ -512,7 +549,7 @@ export function setupEventListeners(): void {
             createNewScenario();
         });
     }
-    
+
     // 履歴（検索・クリア）
     const historySearch = document.getElementById('historySearch') as HTMLInputElement;
     if (historySearch) {
@@ -520,14 +557,14 @@ export function setupEventListeners(): void {
             filterHistory();
         });
     }
-    
+
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     if (clearHistoryBtn) {
         clearHistoryBtn.addEventListener('click', async () => {
             clearHistory();
         });
     }
-    
+
     // インターセプタ（開始・停止）
     const startInterceptorBtn = document.getElementById('startInterceptorBtn');
     if (startInterceptorBtn) {
@@ -535,21 +572,21 @@ export function setupEventListeners(): void {
             startInterceptor();
         });
     }
-    
+
     const stopInterceptorBtn = document.getElementById('stopInterceptorBtn');
     if (stopInterceptorBtn) {
         stopInterceptorBtn.addEventListener('click', async () => {
             stopInterceptor();
         });
     }
-    
+
     // Body タイプ切り替え
     document.querySelectorAll('input[name="bodyType"]').forEach(radio => {
         radio.addEventListener('change', (e: Event) => {
             handleBodyTypeChange(e as Event & { target: { value: string } });
         });
     });
-    
+
     // Raw Body 入力
     const rawBody = document.getElementById('rawBody') as HTMLTextAreaElement;
     if (rawBody) {
@@ -568,7 +605,7 @@ export function setupEventListeners(): void {
             const target = e.target as HTMLInputElement;
             const file = target.files?.[0];
             const binaryFileInfo = document.getElementById('binaryFileInfo') as HTMLElement;
-            
+
             if (file && binaryFileInfo) {
                 // ファイル情報を表示
                 binaryFileInfo.innerHTML = `
@@ -578,7 +615,7 @@ export function setupEventListeners(): void {
                         <span class="file-type">${file.type || 'Unknown type'}</span>
                     </div>
                 `;
-                
+
                 console.log('🔍 [utils.ts] Binary file selected:', {
                     name: file.name,
                     size: file.size,
@@ -607,7 +644,7 @@ export function setupTabSwitching(): void {
             }
         });
     });
-    
+
     // サブタブ
     document.querySelectorAll('.sub-tab-btn').forEach(btn => {
         btn.addEventListener('click', function (this: HTMLElement) {
@@ -617,7 +654,7 @@ export function setupTabSwitching(): void {
             }
         });
     });
-    
+
     // レスポンスタブ
     document.querySelectorAll('.response-tab-btn').forEach(btn => {
         btn.addEventListener('click', function (this: HTMLElement) {
@@ -627,7 +664,7 @@ export function setupTabSwitching(): void {
             }
         });
     });
-    
+
     // フォーマット切り替え
     document.querySelectorAll('.format-btn').forEach(btn => {
         btn.addEventListener('click', function (this: HTMLElement) {
@@ -649,10 +686,10 @@ export function switchMainTab(tabName: string): void {
     console.log(tabName);
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
+
     const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
     const tabContent = document.getElementById(`${tabName}-tab`);
-    
+
     if (tabBtn) tabBtn.classList.add('active');
     if (tabContent) tabContent.classList.add('active');
 }
@@ -664,10 +701,10 @@ export function switchMainTab(tabName: string): void {
 export function switchSubTab(subtabName: string): void {
     document.querySelectorAll('.sub-tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.sub-tab-content').forEach(content => content.classList.remove('active'));
-    
+
     const subTabBtn = document.querySelector(`[data-subtab="${subtabName}"]`);
     const subTabContent = document.getElementById(`${subtabName}-subtab`);
-    
+
     if (subTabBtn) subTabBtn.classList.add('active');
     if (subTabContent) subTabContent.classList.add('active');
 }
@@ -679,10 +716,10 @@ export function switchSubTab(subtabName: string): void {
 export function switchResponseTab(restabName: string): void {
     document.querySelectorAll('.response-tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.response-tab-content').forEach(content => content.classList.remove('active'));
-    
+
     const responseTabBtn = document.querySelector(`[data-restab="${restabName}"]`);
     const responseTabContent = document.getElementById(`response-${restabName}`);
-    
+
     if (responseTabBtn) responseTabBtn.classList.add('active');
     if (responseTabContent) responseTabContent.classList.add('active');
 }
@@ -690,7 +727,7 @@ export function switchResponseTab(restabName: string): void {
 export function renderAuthDetails(authType: string): void {
     const container = document.getElementById('authDetails');
     if (!container) return;
-    
+
     container.innerHTML = '';
 
     switch (authType) {
@@ -810,7 +847,7 @@ export function updateAuthData(): void {
 export function showLoading(show: boolean): void {
     const sendBtn = document.getElementById('sendBtn') as HTMLButtonElement;
     if (!sendBtn) return;
-    
+
     if (show) {
         sendBtn.disabled = true;
         sendBtn.textContent = 'Sending...';
@@ -863,5 +900,36 @@ export function handleBodyTypeChange(event: Event & { target: { value: string } 
         default: // 'none'
             // 何もしない（全て非表示のまま）
             break;
+    }
+}
+
+
+/**
+ * シリアライズ可能な Form-Data フィールド配列を返す
+ */
+export async function serializeFormDataWithFiles(containerId: string): Promise<FormDataField[]> {
+    return await collectFormDataWithFiles(containerId);
+}
+
+/**
+ * Binary ファイルを Base64 エンコードしてシリアライズ文字列を返す
+ */
+export async function serializeBinaryFile(inputId: string): Promise<string | null> {
+    const fileInput = document.getElementById(inputId) as HTMLInputElement;
+    const file = fileInput?.files?.[0];
+    if (!file) return null;
+
+    try {
+        const base64Data = await fileToBase64(file);
+        return JSON.stringify({
+            type: 'binaryFile',
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            base64Data
+        });
+    } catch (error: any) {
+        showError(`Failed to serialize binary file \"${file.name}\": ${error.message}`);
+        return null;
     }
 }

@@ -1,5 +1,17 @@
 // Common types for the API Tester application
 
+/** A single form-data field, either text or file (base64). */
+export interface FormDataField {
+  key: string;
+  type: 'text' | 'file';
+  value?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  fileContent?: string;
+}
+
+
 export interface RequestData {
   id: string;
   name: string;
@@ -7,7 +19,13 @@ export interface RequestData {
   url: string;
   headers: Record<string, string>;
   params: Record<string, string>;
-  body: string | Record<string, string> | File | null;
+  /** now allows our serialized form-data array too */
+  body:
+  | null
+  | string
+  | Record<string, string>
+  | FormDataField[]
+  | File;
   bodyType: 'none' | 'raw' | 'json' | 'form-data' | 'urlencoded' | 'binary';
   auth: AuthConfig;
   preRequestScript: string;
