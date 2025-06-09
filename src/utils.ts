@@ -322,14 +322,14 @@ function setupBodyTypeListener(): void {
             if (!selected || !state.currentRequest) return;
 
             // state.currentRequest に反映
-            state.currentRequest.bodyType = selected;
+            state.currentRequest.bodyType = selected as 'none' | 'raw' | 'json' | 'form-data' | 'urlencoded' | 'binary';
 
             // コレクション内の該当リクエストにも同期
             const col = state.collections.find(c => c.id === state.currentCollection);
             if (col && state.currentRequest) {
                 const req = col.requests.find(r => r.id === state.currentRequest!.id);
                 if (req) {
-                    req.bodyType = selected;
+                    req.bodyType = selected as 'none' | 'raw' | 'json' | 'form-data' | 'urlencoded' | 'binary';
                 }
             }
 
@@ -405,7 +405,7 @@ export function setupEventListeners(): void {
             
             // bodyType の選択状況を反映し、requestObj.body を適宜セット
             const bodyType = (document.querySelector('input[name="bodyType"]:checked') as HTMLInputElement)?.value || 'none';
-            requestObj.bodyType = bodyType;
+            requestObj.bodyType = bodyType as 'none' | 'raw' | 'json' | 'form-data' | 'urlencoded' | 'binary';
             requestObj.body = null;
 
             switch (bodyType) {
@@ -429,6 +429,22 @@ export function setupEventListeners(): void {
                     // urlencoded の場合は従来通り
                     const urlEncodedFields = collectKeyValues('formDataFieldsContainer');
                     requestObj.body = urlEncodedFields;
+                    break;
+                case 'binary':
+                    // binary の場合はファイルをそのまま設定
+                    const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
+                    const binaryFile = binaryFileInput?.files?.[0];
+                    if (binaryFile) {
+                        requestObj.body = binaryFile;
+                        console.log('🔍 [utils.ts] Binary file selected:', {
+                            name: binaryFile.name,
+                            size: binaryFile.size,
+                            type: binaryFile.type
+                        });
+                    } else {
+                        console.log('🔍 [utils.ts] No binary file selected');
+                        requestObj.body = null;
+                    }
                     break;
                 default:
                     break;
@@ -541,6 +557,36 @@ export function setupEventListeners(): void {
             const target = e.target as HTMLTextAreaElement;
             if (state.currentRequest) {
                 state.currentRequest.body = target.value;
+            }
+        });
+    }
+
+    // Binary File 入力
+    const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
+    if (binaryFileInput) {
+        binaryFileInput.addEventListener('change', (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            const file = target.files?.[0];
+            const binaryFileInfo = document.getElementById('binaryFileInfo') as HTMLElement;
+            
+            if (file && binaryFileInfo) {
+                // ファイル情報を表示
+                binaryFileInfo.innerHTML = `
+                    <div class="selected-binary-file">
+                        <span class="file-name">Selected: ${file.name}</span>
+                        <span class="file-size">(${formatBytes(file.size)})</span>
+                        <span class="file-type">${file.type || 'Unknown type'}</span>
+                    </div>
+                `;
+                
+                console.log('🔍 [utils.ts] Binary file selected:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                });
+            } else if (binaryFileInfo) {
+                // ファイルが未選択の場合は情報をクリア
+                binaryFileInfo.innerHTML = '';
             }
         });
     }
@@ -780,13 +826,15 @@ export function handleBodyTypeChange(event: Event & { target: { value: string } 
     const rawBody = document.getElementById('rawBody') as HTMLElement;
     const jsonEditor = document.getElementById('jsonEditor') as HTMLElement;
     const formDataContainer = document.getElementById('formDataContainer') as HTMLElement;
+    const binaryContainer = document.getElementById('binaryContainer') as HTMLElement;
 
-    if (!rawBody || !jsonEditor || !formDataContainer) return;
+    if (!rawBody || !jsonEditor || !formDataContainer || !binaryContainer) return;
 
     // まずすべて非表示にする
     rawBody.style.display = 'none';
     jsonEditor.style.display = 'none';
     formDataContainer.style.display = 'none';
+    binaryContainer.style.display = 'none';
 
     // 選択された bodyType に応じて表示切り替え
     switch (bodyType) {
@@ -806,6 +854,10 @@ export function handleBodyTypeChange(event: Event & { target: { value: string } 
                 // 最初にキー・バリュー行がなければ追加
                 addKeyValueRow(formDataFieldsContainer, 'body');
             }
+            break;
+
+        case 'binary':
+            binaryContainer.style.display = 'block';
             break;
 
         default: // 'none'

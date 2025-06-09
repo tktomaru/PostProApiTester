@@ -219,7 +219,22 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
                     console.log('🔍 [background.ts] body JSON.parse完了:', bodyData);
                     console.log('🔍 [background.ts] hasFiles && Array.isArray(bodyData):', hasFiles && Array.isArray(bodyData));
                     
-                    if (hasFiles && Array.isArray(bodyData)) {
+                    if (bodyData.type === 'binary' && bodyData.arrayBuffer) {
+                        console.log('🔍 [background.ts] Binary ファイルの処理開始');
+                        // ArrayBufferデータから Uint8Array を復元
+                        const uint8Array = new Uint8Array(bodyData.arrayBuffer);
+                        processedBody = uint8Array;
+                        // 既存のContent-Typeヘッダーを削除してファイルのContent-Typeを設定
+                        delete fetchHeaders['Content-Type'];
+                        if (bodyData.contentType) {
+                            fetchHeaders['Content-Type'] = bodyData.contentType;
+                        }
+                        console.log('🔍 [background.ts] Binary ファイル処理完了:', { 
+                            filename: bodyData.filename,
+                            contentType: bodyData.contentType,
+                            size: uint8Array.length 
+                        });
+                    } else if (hasFiles && Array.isArray(bodyData)) {
                         console.log('🔍 [background.ts] ファイルを含むFormDataの処理開始');
                         console.log('🔍 [background.ts] bodyData配列:', bodyData);
                         // ファイルを含むFormDataの場合

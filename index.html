@@ -133,6 +133,7 @@
                                     <label><input type="radio" name="bodyType" value="form-data"> Form Data</label>
                                     <label><input type="radio" name="bodyType" value="urlencoded"> URL
                                         Encoded</label>
+                                    <label><input type="radio" name="bodyType" value="binary"> Binary</label>
                                 </div>
                                 <div id="bodyEditor">
                                     <textarea id="rawBody" class="raw-body" placeholder="Enter request body"></textarea>
@@ -154,6 +155,15 @@
                                         </div>
                                         <div id="formDataFieldsContainer" class="key-value-fields-container"></div>
                                         <button class="btn btn-sm add-form-data">Add Form Data</button>
+                                    </div>
+
+                                    <!-- Binary 用エリア（最初は非表示）-->
+                                    <div id="binaryContainer" style="display: none;">
+                                        <div class="binary-upload-area">
+                                            <label for="binaryFileInput">Select Binary File:</label>
+                                            <input type="file" id="binaryFileInput" class="binary-file-input">
+                                            <div id="binaryFileInfo" class="binary-file-info"></div>
+                                        </div>
                                     </div>
                                 </div>
 

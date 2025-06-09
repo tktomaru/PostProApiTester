@@ -7,8 +7,8 @@ export interface RequestData {
   url: string;
   headers: Record<string, string>;
   params: Record<string, string>;
-  body: string | Record<string, string> | null;
-  bodyType: string;
+  body: string | Record<string, string> | File | null;
+  bodyType: 'none' | 'raw' | 'json' | 'form-data' | 'urlencoded' | 'binary';
   auth: AuthConfig;
   preRequestScript: string;
   testScript?: string;

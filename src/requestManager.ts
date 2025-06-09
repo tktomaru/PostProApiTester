@@ -80,7 +80,7 @@ function clearResponseDisplay(): void {
 interface FetchOptions {
     method: string;
     headers: Record<string, string>;
-    bodyData: string | FormData | URLSearchParams | null;
+    bodyData: string | FormData | URLSearchParams | File | null;
     url: string;
 }
 
@@ -355,6 +355,71 @@ export function loadRequestIntoEditor(request: RequestData): void {
     const jsonBodyTextarea = document.getElementById('jsonBody') as HTMLTextAreaElement;
     if (rawBodyTextarea) rawBodyTextarea.value = (request.body as string) || '';
     if (jsonBodyTextarea) jsonBodyTextarea.value = (request.body as string) || '';
+
+    // Binary ファイルの復元
+    if (bodyType === 'binary') {
+        const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
+        const binaryFileInfo = document.getElementById('binaryFileInfo') as HTMLElement;
+        
+        if (request.body instanceof File) {
+            // Fileオブジェクトの場合
+            if (binaryFileInfo) {
+                binaryFileInfo.innerHTML = `
+                    <div class="saved-binary-file">
+                        <span class="file-name">Saved: ${request.body.name}</span>
+                        <span class="file-size">(${formatBytes(request.body.size)})</span>
+                        <span class="file-type">${request.body.type || 'Unknown type'}</span>
+                    </div>
+                `;
+                
+                // ファイル情報をdata属性に保存（必要に応じて）
+                if (binaryFileInput) {
+                    binaryFileInput.dataset.savedFile = JSON.stringify({
+                        name: request.body.name,
+                        size: request.body.size,
+                        type: request.body.type
+                    });
+                }
+            }
+            
+            console.log('🔍 [loadRequestIntoEditor] Binary file restored:', {
+                name: request.body.name,
+                size: request.body.size,
+                type: request.body.type
+            });
+        } else if (typeof request.body === 'string') {
+            // Base64文字列形式で保存されたファイルの復元
+            try {
+                const fileData = JSON.parse(request.body);
+                if (fileData.type === 'binaryFile' && fileData.base64Data) {
+                    // Base64からFileオブジェクトを復元
+                    const restoredFile = base64ToFile(fileData.base64Data, fileData.fileName, fileData.fileType);
+                    if (binaryFileInput && binaryFileInfo) {
+                        binaryFileInfo.innerHTML = `
+                            <div class="saved-binary-file">
+                                <span class="file-name">Restored: ${fileData.fileName}</span>
+                                <span class="file-size">(${formatBytes(fileData.fileSize || 0)})</span>
+                                <span class="file-type">${fileData.fileType || 'Unknown type'}</span>
+                            </div>
+                        `;
+                        
+                        // 復元したファイルをcurrentRequestに設定
+                        if (state.currentRequest) {
+                            state.currentRequest.body = restoredFile;
+                        }
+                    }
+                    
+                    console.log('🔍 [loadRequestIntoEditor] Binary file restored from Base64:', {
+                        name: fileData.fileName,
+                        size: fileData.fileSize,
+                        type: fileData.fileType
+                    });
+                }
+            } catch (error) {
+                console.error('🔍 [loadRequestIntoEditor] Failed to restore binary file:', error);
+            }
+        }
+    }
 
     // ⑥ Pre-requestスクリプトを設定
     const preRequestScriptTextarea = document.getElementById('preRequestScript') as HTMLTextAreaElement;
@@ -674,7 +739,7 @@ function fileToBase64(file: any): Promise<string> {
 export function buildFetchOptions(request: RequestData): FetchOptions | null {
     const method = (request.method || 'GET').toUpperCase();
     const headers: Record<string, string> = {};
-    let bodyData: string | FormData | URLSearchParams | null = null;
+    let bodyData: string | FormData | URLSearchParams | File | null = null;
 
     // 1. カスタムヘッダーをコピー
     if (request.headers) {
@@ -732,6 +797,25 @@ export function buildFetchOptions(request: RequestData): FetchOptions | null {
                 break;
             }
 
+            case 'binary': {
+                // Binary ファイルをそのまま送信
+                if (request.body instanceof File) {
+                    console.log('🔍 [buildFetchOptions] Binary file処理:', {
+                        name: request.body.name,
+                        size: request.body.size,
+                        type: request.body.type
+                    });
+                    bodyData = request.body;
+                    // ファイルのContent-Typeを設定（指定がない場合）
+                    if (!headers['Content-Type'] && request.body.type) {
+                        headers['Content-Type'] = request.body.type;
+                    }
+                } else {
+                    console.log('🔍 [buildFetchOptions] Binary body is not a File object');
+                }
+                break;
+            }
+
             default:
                 // none の場合は bodyData を null のままにする
                 break;
@@ -749,7 +833,7 @@ async function sendRequestWithCookieSupport(options: {
     method: string;
     url: string;
     headers: Record<string, string>;
-    body: string | FormData | URLSearchParams | null;
+    body: string | FormData | URLSearchParams | File | null;
 }): Promise<XhrResponse> {
     console.log('🍪 sendRequestWithCookieSupport called with:', options);
 
@@ -847,6 +931,23 @@ async function sendRequestWithCookieSupport(options: {
                 processedBody = JSON.stringify(processedFields);
                 console.log('🔍 [requestManager.ts] 配列処理完了. hasFiles:', hasFiles);
                 console.log('🔍 [requestManager.ts] processedFields:', processedFields);
+            } else if (options.body instanceof File) {
+                console.log('🔍 [requestManager.ts] Binary File として処理');
+                // Binary ファイルを直接ArrayBufferとして送信
+                const arrayBuffer = await options.body.arrayBuffer();
+                processedBody = JSON.stringify({
+                    type: 'binary',
+                    filename: options.body.name,
+                    contentType: options.body.type,
+                    arrayBuffer: Array.from(new Uint8Array(arrayBuffer))
+                });
+                hasFiles = true;
+                console.log('🔍 [requestManager.ts] Binary File 処理完了:', {
+                    filename: options.body.name,
+                    size: options.body.size,
+                    contentType: options.body.type,
+                    arrayBufferSize: arrayBuffer.byteLength
+                });
             } else if (typeof options.body === 'string') {
                 console.log('🔍 [requestManager.ts] 文字列として処理');
                 processedBody = options.body;
@@ -862,7 +963,7 @@ async function sendRequestWithCookieSupport(options: {
                     url: options.url,
                     headers: options.headers,
                     body: processedBody,
-                    isFormData: options.body instanceof FormData || Array.isArray(options.body),
+                    isFormData: options.body instanceof FormData || Array.isArray(options.body) || options.body instanceof File,
                     hasFiles: hasFiles
                 }
             };
@@ -1824,7 +1925,8 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         continue;
                     }
                     // ファイルデータが含まれている場合は警告を表示
-                    if (Array.isArray(requestObj.body) && requestObj.body.some((field: any) => field.type === 'file')) {
+                    if ((Array.isArray(requestObj.body) && requestObj.body.some((field: any) => field.type === 'file')) ||
+                        (requestObj.bodyType === 'binary' && requestObj.body instanceof File)) {
                         console.warn('⚠️ setBody: Request contains file data. setBody command will be ignored to preserve file data.');
                         showError('setBody command ignored: Request contains file data');
                         continue;
@@ -1913,7 +2015,8 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         continue;
                     }
                     // ファイルデータが含まれている場合は警告を表示
-                    if (Array.isArray(requestObj.body) && requestObj.body.some((field: any) => field.type === 'file')) {
+                    if ((Array.isArray(requestObj.body) && requestObj.body.some((field: any) => field.type === 'file')) ||
+                        (requestObj.bodyType === 'binary' && requestObj.body instanceof File)) {
                         console.warn('⚠️ setBodyWithVar: Request contains file data. setBodyWithVar command will be ignored to preserve file data.');
                         showError('setBodyWithVar command ignored: Request contains file data');
                         continue;
@@ -1968,21 +2071,42 @@ export function displayTestResults(results: TestResult[]): void {
  *  変数置換を行った結果を返す
  */
 export function processVariables(request: RequestData): RequestData {
+    // バイナリファイルの復元処理
+    let requestWithRestoredFiles = { ...request };
+    if (request.bodyType === 'binary' && typeof request.body === 'string') {
+        try {
+            const binaryData = JSON.parse(request.body);
+            if (binaryData.type === 'binaryFile' && binaryData.base64Data) {
+                // Base64からFileオブジェクトを復元
+                const restoredFile = base64ToFile(binaryData.base64Data, binaryData.fileName, binaryData.fileType);
+                requestWithRestoredFiles = { ...request, body: restoredFile };
+                console.log('🔍 [processVariables] Binary file restored from Base64:', {
+                    name: binaryData.fileName,
+                    size: binaryData.fileSize,
+                    type: binaryData.fileType
+                });
+            }
+        } catch (error) {
+            console.error('🔍 [processVariables] Failed to restore binary file:', error);
+        }
+    }
+    
     // File objectsを含む場合はJSON.stringify/parseできないため、特別な処理が必要
-    const hasFiles = Array.isArray(request.body) && 
-        request.body.some((field: any) => field.type === 'file' && (field.file || field.fileContent));
+    const hasFiles = (Array.isArray(requestWithRestoredFiles.body) && 
+        requestWithRestoredFiles.body.some((field: any) => field.type === 'file' && (field.file || field.fileContent))) ||
+        (requestWithRestoredFiles.bodyType === 'binary' && requestWithRestoredFiles.body instanceof File);
     
     let processed: RequestData;
     if (hasFiles) {
         // Fileオブジェクトを含む場合は手動でクローン
         console.log('🔍 [processVariables] File objects detected, using manual clone');
         processed = {
-            ...request,
-            headers: { ...request.headers },
-            params: { ...request.params },
-            auth: { ...request.auth },
+            ...requestWithRestoredFiles,
+            headers: { ...requestWithRestoredFiles.headers },
+            params: { ...requestWithRestoredFiles.params },
+            auth: { ...requestWithRestoredFiles.auth },
             // bodyは元のオブジェクトを保持（File objectsを保護）
-            body: Array.isArray(request.body) ? request.body.map((field: any) => {
+            body: Array.isArray(requestWithRestoredFiles.body) ? requestWithRestoredFiles.body.map((field: any) => {
                 if (field.type === 'file' && field.fileContent && !field.file) {
                     // Base64からFileオブジェクトを復元
                     try {
@@ -1994,12 +2118,12 @@ export function processVariables(request: RequestData): RequestData {
                     }
                 }
                 return field;
-            }) as any : request.body
+            }) as any : requestWithRestoredFiles.body
         };
     } else {
         // 通常の場合はJSONクローン
         console.log('🔍 [processVariables] No file objects, using JSON clone');
-        processed = JSON.parse(JSON.stringify(request));
+        processed = JSON.parse(JSON.stringify(requestWithRestoredFiles));
     }
 
     // URLの変数置換を最初に行う
@@ -2172,6 +2296,51 @@ export async function saveCurrentRequest(): Promise<void> {
                 if (key) urlObj[key] = value;
             });
             req.body = urlObj;
+        } else if (selectedBodyType?.value === 'binary') {
+            // Binary ファイルの保存処理
+            const binaryFileInput = document.getElementById('binaryFileInput') as HTMLInputElement;
+            const file = binaryFileInput?.files?.[0];
+            if (file) {
+                // ファイルをBase64でエンコードして保存
+                try {
+                    const base64Data = await fileToBase64(file);
+                    req.body = JSON.stringify({
+                        type: 'binaryFile',
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        base64Data: base64Data
+                    });
+                    console.log('🔍 [saveCurrentRequest] Binary file saved:', {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type
+                    });
+                } catch (error) {
+                    console.error('🔍 [saveCurrentRequest] Failed to save binary file:', error);
+                    showError('Failed to save binary file');
+                    req.body = null;
+                }
+            } else {
+                // 保存済みファイルがある場合はそれを保持
+                if (state.currentRequest && state.currentRequest.body instanceof File) {
+                    try {
+                        const base64Data = await fileToBase64(state.currentRequest.body);
+                        req.body = JSON.stringify({
+                            type: 'binaryFile',
+                            fileName: state.currentRequest.body.name,
+                            fileType: state.currentRequest.body.type,
+                            fileSize: state.currentRequest.body.size,
+                            base64Data: base64Data
+                        });
+                    } catch (error) {
+                        console.error('🔍 [saveCurrentRequest] Failed to save existing binary file:', error);
+                        req.body = null;
+                    }
+                } else {
+                    req.body = null;
+                }
+            }
         } else {
             req.body = null;
         }
