@@ -428,6 +428,18 @@ class PMExpect {
                         throw new AssertionError(`Expected ${this.value} to be at most ${expected}`);
                     }
                 }
+            },
+            an: (expectedType: string) => {
+                const actualType = Array.isArray(this.value) ? 'array' : typeof this.value;
+                if (actualType !== expectedType) {
+                    throw new AssertionError(`Expected ${JSON.stringify(this.value)} to be an ${expectedType}, got ${actualType}`);
+                }
+            },
+            a: (expectedType: string) => {
+                const actualType = Array.isArray(this.value) ? 'array' : typeof this.value;
+                if (actualType !== expectedType) {
+                    throw new AssertionError(`Expected ${JSON.stringify(this.value)} to be a ${expectedType}, got ${actualType}`);
+                }
             }
         },
         include: (expected: any) => {
