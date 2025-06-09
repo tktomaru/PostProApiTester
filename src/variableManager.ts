@@ -48,7 +48,7 @@ function setupVariableEventListeners(): void {
         console.log('Collection changed to:', selectedCollectionId);
         console.log('Collection variables data:', (state as any).variables.collection);
         console.log('Selected collection variables:', (state as any).variables.collection[selectedCollectionId]);
-        
+
         renderVariables('collection');
     });
 }
@@ -248,7 +248,7 @@ export async function editCurrentEnvironment(): Promise<void> {
 export async function switchEnvironment(): Promise<void> {
     const select = document.getElementById('environmentSelect') as HTMLSelectElement;
     if (!select) return;
-    
+
     const envId = select.value;
 
     if (state.currentEnvironment) {
@@ -424,7 +424,7 @@ export function createVariableRow(scope: string, key: string = '', value: string
         }
         await saveVariable(scope, newKey, newValue, newDesc);
         row.dataset.originalKey = newKey;
-        
+
         // 成功メッセージを表示（オプション）
         console.log(`Variable "${newKey}" saved successfully`);
     };
@@ -439,7 +439,7 @@ export function createVariableRow(scope: string, key: string = '', value: string
     keyInput.addEventListener('blur', updateVariable);
     valueInput.addEventListener('blur', updateVariable);
     descInput.addEventListener('blur', updateVariable);
-    
+
     // リアルタイム保存（デバウンス付き）
     keyInput.addEventListener('input', debouncedSave);
     valueInput.addEventListener('input', debouncedSave);
@@ -513,7 +513,7 @@ export async function saveVariable(scope: string, key: string, value: string, de
             await saveVariablesToStorage();
             break;
     }
-    
+
     // 変数保存後、画面を再描画
     console.log(`Variable saved: ${scope}.${key} = ${value}`);
 }
@@ -571,7 +571,7 @@ export function addVariableRow(scope: string): void {
             return;
     }
     if (!container) return;
-    
+
     const emptyMsg = container.querySelector('.empty-variables');
     if (emptyMsg) {
         emptyMsg.remove();
@@ -581,142 +581,134 @@ export function addVariableRow(scope: string): void {
     const keyInput = row.querySelector('.var-key') as HTMLInputElement;
     keyInput?.focus();
 }
-
 /**
- * getVariable
+ * 変数参照パーツから値を取得する
+ * @param varPath 変数パス（例: ["scenarios","My Flow","My Request","response","body",{jsonPath:"$.headers.authorization"}]）
+ */
+export function getValueFromVarPath(varPath: (string | { jsonPath: string })[]): any {
+    if (varPath.length < 4) {
+        throw new Error(`変数参照構文が不正です: ${JSON.stringify(varPath)}`);
+    }
+
+    // scenariosかcollectionか判定
+    const isScenario = varPath[0] === 'scenarios';
+    const containerName = varPath[1] as string;
+    const requestName = varPath[2] as string;
+    const type = varPath[3] as string; // "response" or "request"
+    const pathParts = varPath.slice(4);
+
+    // --- ① シナリオ or コレクションから reqObj を取得 ---
+    let reqObj: any;
+    if (isScenario) {
+        const scenario = state.scenarios.find(s => s.name === containerName);
+        if (!scenario) throw new Error(`シナリオ「${containerName}」が見つかりません`);
+        reqObj = scenario.requests.find(r => r.name === requestName);
+        if (!reqObj) throw new Error(`シナリオ「${containerName}」内にリクエスト「${requestName}」が見つかりません`);
+    } else {
+        const coll = state.collections.find(c => c.name === containerName);
+        if (!coll) throw new Error(`コレクション「${containerName}」が見つかりません`);
+        reqObj = coll.requests.find(r => r.name === requestName);
+        if (!reqObj) throw new Error(`コレクション「${containerName}」内にリクエスト「${requestName}」が見つかりません`);
+    }
+
+    // --- ② 実行結果を取り出す ---
+    const exec = type === 'response'
+        ? (reqObj as any).lastResponseExecution
+        : (reqObj as any).lastRequestExecution;
+    if (!exec) throw new Error(`${type} の実行結果が存在しません`);
+
+    // --- ③ pathParts で掘り下げ ---
+    let value: any = exec;
+    for (let i = 0; i < pathParts.length; i++) {
+        const part = pathParts[i];
+
+        // → JSONPath オブジェクト
+        if (typeof part === 'object' && 'jsonPath' in part) {
+            const expr = part.jsonPath;
+            const json = typeof value === 'string' ? JSON.parse(value) : value;
+            const result: any[] = JSONPath({ path: expr, json });
+            if (!Array.isArray(result) || result.length === 0) {
+                throw new Error(`JSONPath "${expr}" に一致する値がありません`);
+            }
+            return result[0];
+        }
+
+        // → headers.NAME
+        if (part === 'headers') {
+            const headerName = pathParts[++i] as string;
+            const found = Object.entries(value.headers || {})
+                .find(([k]) => k.toLowerCase() === headerName.toLowerCase());
+            if (!found) {
+                throw new Error(`ヘッダー "${headerName}" が見つかりません`);
+            }
+            return found[1];
+        }
+
+        // → body
+        if (part === 'body') {
+            value = value.body;
+            continue;
+        }
+
+        // → その他のネスト
+        const key = part as string;
+        if (value != null && typeof value === 'object' && key in value) {
+            value = value[key];
+        } else {
+            throw new Error(`プロパティ "${key}" が見つかりません`);
+        }
+    }
+
+    return value;
+}/**
+ * 変数名・参照文字列から値を取得する
+ * @param varName 変数参照文字列（例: ${"scenarios"."My Flow"."My Request"."response"."body".jsonPath("$.headers.authorization")}）
  */
 export function getVariable(varName: string): any {
-    // --- 1) 新フォーマット ${"..."} の処理 ---
-    if (varName.startsWith('${') && varName.endsWith('}')) {
-        // 中身を取り出し
-        const inner = varName.slice(2, -1);
+    console.log("🔍 [getVariable] START - varName:", varName);
 
-        // "Collection"."Request"."response" と .jsonPath("…") をパース
-        const parts: any[] = [];
+    // --- 1) 新フォーマット ${…} の処理 ---
+    if (varName.startsWith('${') && varName.endsWith('}')) {
+        const inner = varName.slice(2, -1);
+        const parts: (string | { jsonPath: string })[] = [];
         const regex = /\.?"([^"]+)"|\.jsonPath\("([^"]+)"\)/g;
-        let match;
+        let match: RegExpExecArray | null;
         let lastIndex = 0;
+
         while ((match = regex.exec(inner)) !== null) {
-            // マッチした位置が前回のマッチの直後でない場合、エラー
+            // マッチ間にギャップがないかチェック
             if (match.index !== lastIndex) {
                 throw new Error(`変数参照構文が不正です: ${inner.slice(lastIndex, match.index)}`);
             }
-            lastIndex = match.index + match[0].length;
+            lastIndex = regex.lastIndex;
 
-            if (match[1]) {
-                // 例えば "Sample Collection"
+            if (match[1] !== undefined) {
+                // "～" 部分
                 parts.push(match[1]);
-            } else if (match[2]) {
-                // 例えば jsonPath("$.Headers.date") → jsonPath("$.Headers.date") のまま
-                let jsonPathExpr = match[2];  // toLowerCase()を削除
-                // JSONPathの式が$で始まっていない場合は追加
-                if (!jsonPathExpr.startsWith('$')) {
-                    jsonPathExpr = '$' + jsonPathExpr;
-                }
-                console.log("jsonPathExpr", jsonPathExpr);
-                parts.push({ jsonPath: jsonPathExpr });
+            } else {
+                // .jsonPath("～") 部分
+                parts.push({ jsonPath: match[2]! });
             }
         }
 
-        // 最後のマッチ以降に文字が残っている場合、エラー
         if (lastIndex < inner.length) {
             throw new Error(`変数参照構文が不正です: ${inner.slice(lastIndex)}`);
         }
 
-        if (parts.length < 4) {
-            throw new Error(`変数参照構文が不正です: ${varName}`);
-        }
-
-        // 各要素を分解
-        const [collectionName, requestName, type, ...pathParts] = parts;
-
-        // コレクション／リクエストを探す
-        const collection = state.collections.find(c => c.name === collectionName);
-        if (!collection) {
-            throw new Error(`コレクション「${collectionName}」が見つかりません`);
-        }
-        const request = collection.requests.find(r => r.name === requestName);
-        if (!request) {
-            throw new Error(`リクエスト「${requestName}」が見つかりません`);
-        }
-
-        // 実行結果オブジェクトを取得
-        const execution =
-            type === 'response'
-                ? ((request as any).lastResponseExecution || (request as any).lastResponse)
-                : ((request as any).lastRequestExecution || (request as any).lastRequest);
-        if (!execution) {
-            throw new Error(`${type} の実行結果が存在しません`);
-        }
-
-        // プロパティパスに従って値を掘り下げ
-        let value = execution;
-        for (let i = 0; i < pathParts.length; i++) {
-            const part = pathParts[i];
-
-            // --- headers.xxx の場合 ---
-            if (part === 'headers') {
-                const key = pathParts[++i];
-                if (!key) throw new Error('ヘッダー名が指定されていません');
-                // 大文字小文字を無視して検索
-                const found = Object.entries(value.headers || {}).find(
-                    ([k]) => k.toLowerCase() === key.toLowerCase()
-                );
-                if (!found) {
-                    throw new Error(`ヘッダー "${key}" が見つかりません`);
-                }
-                return found[1];
-            }
-
-            // --- body.jsonPath(...) の場合 ---
-            if (part === 'body') {
-                value = value.body;
-                const next = pathParts[i + 1];
-                if (next && typeof next === 'object' && next.jsonPath) {
-                    console.log("next.jsonPath", next.jsonPath);
-                    // JSONPath 処理
-                    try {
-                        const json = typeof value === 'string' ? JSON.parse(value) : value;
-                        console.log("JSONPath処理前のJSON:", json);
-                        console.log("使用するJSONPath:", next.jsonPath);
-
-                        const result = JSONPath({ path: next.jsonPath, json: json });
-                        console.log("JSONPath処理結果:", result);
-                        if (!Array.isArray(result) || result.length === 0) {
-                            throw new Error(`JSONPath "${next.jsonPath}" に一致する値がありません`);
-                        }
-                        return result[0];
-                    } catch (e: any) {
-                        console.error("JSONPath処理エラー:", e);
-                        throw new Error(`JSONPath の処理に失敗しました: ${e.message}`);
-                    }
-                }
-                return value;
-            }
-
-            // --- 通常のネストしたプロパティアクセス ---
-            if (value != null && typeof value === 'object' && part in value) {
-                value = value[part];
-            } else {
-                throw new Error(`プロパティ "${part}" が見つかりません`);
-            }
-        }
-
-        return value;
+        console.log("🔍 [getVariable] Parsed parts:", parts);
+        // 汎用関数で値を取得
+        return getValueFromVarPath(parts);
     }
 
-    // --- 2) 既存の {{...}} フォーマット ---
+    // --- 2) 既存の {{…}} フォーマット ---
     if (varName.startsWith('{{') && varName.endsWith('}}')) {
         const key = varName.slice(2, -2).trim();
-        // 環境変数
         if ((state as any).variables.environment[key]) {
             return (state as any).variables.environment[key].value;
         }
-        // グローバル変数
         if ((state as any).variables.global[key]) {
             return (state as any).variables.global[key].value;
         }
-        // コレクション変数
         if (
             state.currentCollection &&
             (state as any).variables.collection[state.currentCollection]?.[key]
@@ -740,9 +732,10 @@ export function getVariable(varName: string): any {
     ) {
         return (state as any).variables.collection[state.currentCollection][plainKey].value;
     }
+
+    console.log("🔍 [getVariable] Variable not found:", varName);
     return undefined;
 }
-
 // Include the variable replacement functions
 export function replaceVariables(text: string): string {
     if (typeof text !== 'string') return text;

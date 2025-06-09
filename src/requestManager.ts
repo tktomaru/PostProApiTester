@@ -22,7 +22,9 @@ import {
     switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues,
     base64ToFile, serializeFormDataWithFiles, serializeBinaryFile
 } from './utils';
-import { getVariable, replaceVariables, deepReplaceVariables, renderVariables, setVariable } from './variableManager';
+import {
+    getVariable, replaceVariables, deepReplaceVariables, renderVariables, setVariable
+} from './variableManager';
 import { saveToHistory as saveToHistoryFn } from './historyManager';
 
 /**
@@ -107,15 +109,6 @@ interface TestResult {
     error?: string;
 }
 
-interface ResponseExecution {
-    status: number;
-    duration: number;
-    size: number;
-    timestamp: string;
-    headers: Record<string, string>;
-    body: any;
-}
-
 /**
  * loadRequestIntoEditor
  *  コレクションや履歴から呼ばれ、右側エディタ（メソッド、URL、ヘッダ、ボディ、認証）に
@@ -127,14 +120,6 @@ export function loadRequestIntoEditor(request: RequestData): void {
 
     // state.currentRequest の値をまるごと置き換え
     state.currentRequest = JSON.parse(JSON.stringify(request));
-    if (state.currentRequest) {
-        state.currentRequest.method = request.method;
-        state.currentRequest.url = request.url;
-        state.currentRequest.headers = { ...request.headers };
-        state.currentRequest.params = { ...request.params };
-        state.currentRequest.body = request.body;
-        state.currentRequest.auth = { ...request.auth };
-    }
 
     console.log('After setting state.currentRequest.params:', state.currentRequest?.params);
 
@@ -594,6 +579,7 @@ export async function persistExecutionResults(
     state.scenarios.forEach(scenario => {
         const req = (scenario.requests || []).find(r => r.id === requestId) as any;
         if (req) {
+            console.log(`🔍 [saveExecutionResult] Saving execution result for scenario "${scenario.name}" request "${req.name}"`);
             req.lastRequestExecution = requestExecution;
             req.lastResponseExecution = {
                 status: parsedResponse.status,
@@ -604,6 +590,11 @@ export async function persistExecutionResults(
                 body: parsedResponse.body,
                 testResults
             };
+            console.log(`🔍 [saveExecutionResult] Saved response data:`, {
+                status: parsedResponse.status,
+                headers: Object.keys(parsedResponse.headers || {}),
+                bodyType: typeof parsedResponse.body
+            });
         }
     });
     await saveScenariosToStorage();
@@ -1846,99 +1837,6 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
     }
 }
 
-/**
- * 変数参照から値を取得する
- * @param varPath 変数パス（例: ["Collection", "Request", "response", "headers", "key"]）
- * @returns 取得した値
- */
-function getValueFromVarPath(varPath: string[]): any {
-    console.log('変数パス:', varPath);
-
-    const collection = state.collections.find(c => c.name === varPath[0]);
-    if (!collection) {
-        throw new Error(`コレクション「${varPath[0]}」が見つかりません`);
-    }
-    const request = collection.requests.find(r => r.name === varPath[1]);
-    if (!request) {
-        throw new Error(`リクエスト「${varPath[1]}」が見つかりません`);
-    }
-    if (!request.lastResponseExecution) {
-        throw new Error('request の実行結果が存在しません');
-    }
-
-    let value: any = request.lastResponseExecution as ResponseExecution;
-    console.log('初期値:', value);
-
-    // response.headers や response.body などのパスを処理
-    for (let i = 2; i < varPath.length; i++) {
-        const path = varPath[i];
-        console.log(`パス[${i}]:`, path, '現在の値:', value);
-
-        if (path === 'response') {
-            value = value;
-        } else if (path === 'headers' && value.headers) {
-            value = value.headers;
-        } else if (path === 'body' && value.body) {
-            value = value.body;
-        } else if (path.startsWith('jsonPath(') && path.endsWith(')')) {
-            // jsonPath式を処理
-            const jsonPathExpr = path.slice(9, -1);
-            console.log('JSONPath式:', jsonPathExpr);
-            try {
-                if (typeof value === 'string') {
-                    try {
-                        value = JSON.parse(value);
-                    } catch (e) {
-                        throw new Error('JSONのパースに失敗しました');
-                    }
-                }
-                value = evaluateJsonPath(value, jsonPathExpr);
-            } catch (error: any) {
-                throw new Error(`JSONPath評価エラー: ${error.message}`);
-            }
-        } else if (value && typeof value === 'object' && path in value) {
-            value = value[path];
-        } else {
-            // パスが見つからない場合、残りのパスを結合してエラーメッセージを生成
-            const remainingPath = varPath.slice(0, i + 1).join('.');
-            throw new Error(`パス「${remainingPath}」が見つかりません`);
-        }
-        console.log(`パス[${i}]処理後:`, value);
-    }
-
-    if (value === undefined) {
-        throw new Error(`変数「${varPath.join('.')}」の値が取得できません`);
-    }
-    return value;
-}
-
-/**
- * JSONPath式を評価して値を取得する
- * @param json JSONオブジェクト
- * @param path JSONPath式
- * @returns 取得した値
- */
-function evaluateJsonPath(json: any, path: string): any {
-    console.log('JSONPath評価:', { json, path });
-
-    // 単純なドット記法のパスを処理
-    if (path.startsWith('$.')) {
-        const keys = path.slice(2).split('.');
-        console.log('JSONPathキー:', keys);
-
-        let value = json;
-        for (const key of keys) {
-            console.log('キー処理:', key, '現在の値:', value);
-            if (value && typeof value === 'object' && key in value) {
-                value = value[key];
-            } else {
-                throw new Error(`JSONPath「${path}」が見つかりません`);
-            }
-        }
-        return value;
-    }
-    throw new Error(`未対応のJSONPath式です: ${path}`);
-}
 
 /**
  * executePreRequestScript
@@ -2425,40 +2323,18 @@ export async function saveCurrentRequest(): Promise<void> {
  * @returns 取得した値
  */
 function getValueFromVarString(varString: string): any {
-    console.log('変数参照文字列:', varString);
-
-    if (varString.startsWith('${') && varString.endsWith('}')) {
-        // jsonPathを含む場合の特別な処理
-        if (varString.includes('jsonPath(')) {
-            const parts = varString.slice(2, -1).split('"."');
-            const varPath: string[] = [];
-
-            for (let i = 0; i < parts.length; i++) {
-                const part = parts[i].replace(/"/g, '');
-                if (part.includes('jsonPath(')) {
-                    // jsonPathの前の部分を追加
-                    const beforeJsonPath = part.split('.jsonPath(')[0];
-                    if (beforeJsonPath) {
-                        varPath.push(beforeJsonPath);
-                    }
-                    // jsonPath部分を追加
-                    varPath.push('jsonPath(' + part.split('.jsonPath(')[1]);
-                } else {
-                    varPath.push(part);
-                }
-            }
-            console.log('パースされた変数パス:', varPath);
-            return getValueFromVarPath(varPath);
-        } else {
-            const varPath = varString.slice(2, -1).split('"."').map(s => s.replace(/"/g, ''));
-            console.log('パースされた変数パス:', varPath);
-            return getValueFromVarPath(varPath);
-        }
-    } else {
+    console.log('🔍 [getValueFromVarString] Processing variable string:', varString);
+    
+    // Use the new getVariable function from variableManager.ts
+    try {
         const value = getVariable(varString);
         if (value === undefined) {
-            throw new Error(`変数「${varString}」が変数ではありません`);
+            throw new Error(`変数「${varString}」が見つかりません`);
         }
+        console.log('🔍 [getValueFromVarString] Resolved value:', value);
         return value;
+    } catch (error: any) {
+        console.error('🔍 [getValueFromVarString] Error resolving variable:', error);
+        throw new Error(`変数解析エラー: ${error.message}`);
     }
 }

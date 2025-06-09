@@ -1570,7 +1570,6 @@ transition: all 0.2s ease;
 .script-section {
     display: flex;
     flex-direction: column;
-    height: 100%;
 }
 
 .script-editor {

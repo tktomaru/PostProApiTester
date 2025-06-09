@@ -10,8 +10,8 @@
     "unlimitedStorage",
     "background",
     "webRequest",
-    "webRequestBlocking",
     "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
     "cookies",
     "tabs"
   ],

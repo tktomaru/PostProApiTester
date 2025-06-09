@@ -52,13 +52,13 @@ export const sampleCollections: Collection[] = [
                 preRequestScript: `
 // リクエスト/レスポンス実行結果の参照例
 // リクエストのヘッダーを参照
-addHeaderWithVar Authorization \${"Sample Collection"."POST Users"."request"."headers"."authorization"}
+addHeaderWithVar Authorization \${"collections"."Sample Collection"."POST Users"."request"."headers"."authorization"}
 
 // レスポンスのステータスコードを参照
-setVarFromHeader statusCode \${"Sample Collection"."POST Users"."response"."status"}
+setVarFromHeader statusCode \${"collections"."Sample Collection"."POST Users"."response"."status"}
 
 // レスポンスのボディから値を取得
-setBodyWithVar \${"Sample Collection"."POST Users"."response"."body"."token"}
+setBodyWithVar \${"collections"."Sample Collection"."POST Users"."response"."body"."token"}
 
 // 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
@@ -114,8 +114,8 @@ setBody setBodyWithScript2
                 preRequestScript: `
 // リクエスト/レスポンス実行結果の参照例
 // 前のリクエストのレスポンスから値を取得して使用
-addHeaderWithVar Authorization \${"Sample Collection"."サンプル POST 1"."response"."headers"."authorization"}
-setBodyWithVar \${"Sample Collection"."サンプル POST 1"."response"."body".jsonPath("$.headers.authorization")}
+addHeaderWithVar Authorization \${"collections"."Sample Collection"."サンプル POST 1"."response"."headers"."authorization"}
+setBodyWithVar \${"collections"."Sample Collection"."サンプル POST 1"."response"."body".jsonPath("$.headers.authorization")}
 
 // 既存のプリリクエストスクリプト
 setUrl https://reply.tukutano.jp/items?page=9
@@ -283,8 +283,8 @@ addHeader test scriptadd1
                 bodyType: "json",
                 preRequestScript: `
 addHeader test scriptadd2
-addHeaderWithVar authorization \${"Sample post Flow"."サンプル POST"."response"."headers"."test"}
-setBodyWithVar \${"Sample post Flow"."サンプル POST"."response"."body".jsonPath("$.headers.authorization")}
+addHeaderWithVar authorization \${"scenarios"."Sample post Flow"."サンプル POST"."response"."headers"."test"}
+setBodyWithVar \${"scenarios"."Sample post Flow"."サンプル POST"."response"."body".jsonPath("$.headers.authorization")}
                 `
             },
             {

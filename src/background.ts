@@ -108,14 +108,14 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
     function serializeFormData(formDataObj: Record<string, string>): { body: string; boundary: string } {
         const boundary = `----------------------------${Date.now().toString(16)}${Math.random().toString(16).substring(2)}`;
         let body = '';
-        
+
         Object.entries(formDataObj).forEach(([key, value]) => {
             body += `--${boundary}\r\n`;
             body += `Content-Disposition: form-data; name="${key}"\r\n`;
             body += '\r\n';
             body += `${value}\r\n`;
         });
-        
+
         body += `--${boundary}--\r\n`;
         return { body, boundary };
     }
@@ -127,18 +127,18 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
         console.log('🔍 [background.ts] boundary生成:', boundary);
         const encoder = new TextEncoder();
         const parts: Uint8Array[] = [];
-        
+
         fields.forEach((field, index) => {
             console.log(`🔍 [background.ts] field[${index}]処理開始:`, field);
             // パート境界
             parts.push(encoder.encode(`--${boundary}\r\n`));
-            
+
             if (field.type === 'file') {
                 console.log(`🔍 [background.ts] field[${index}]はファイル型. filename:${field.filename}, contentType:${field.contentType}`);
                 // ファイルのヘッダー
                 parts.push(encoder.encode(`Content-Disposition: form-data; name="${field.key}"; filename="${field.filename}"\r\n`));
                 parts.push(encoder.encode(`Content-Type: ${field.contentType || 'application/octet-stream'}\r\n\r\n`));
-                
+
                 // Base64デコードしてバイナリデータとして追加
                 console.log(`🔍 [background.ts] field[${index}] Base64データ長:`, field.data?.length || 0);
                 const binaryString = atob(field.data);
@@ -158,22 +158,22 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
             }
             console.log(`🔍 [background.ts] field[${index}]処理完了`);
         });
-        
+
         // 終了境界
         parts.push(encoder.encode(`--${boundary}--\r\n`));
-        
+
         // すべてのパートを結合
         const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
         console.log('🔍 [background.ts] 全パート合計長:', totalLength);
         const body = new Uint8Array(totalLength);
         let offset = 0;
-        
+
         parts.forEach((part, index) => {
             console.log(`🔍 [background.ts] part[${index}]設定. 長さ:${part.length}, オフセット:${offset}`);
             body.set(part, offset);
             offset += part.length;
         });
-        
+
         console.log('🔍 [background.ts] serializeFormDataWithFiles完了. body長:', body.length, 'boundary:', boundary);
         return { body, boundary };
     }
@@ -211,14 +211,14 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
             // bodyの処理 - isFormDataフラグに基づいて処理
             let processedBody: string | Uint8Array | undefined;
             console.log('🔍 [background.ts] bodyの処理開始. isFormData && body:', isFormData && body);
-            
+
             if (isFormData && body) {
                 try {
                     console.log('🔍 [background.ts] body JSON.parse開始');
                     const bodyData = JSON.parse(body);
                     console.log('🔍 [background.ts] body JSON.parse完了:', bodyData);
                     console.log('🔍 [background.ts] hasFiles && Array.isArray(bodyData):', hasFiles && Array.isArray(bodyData));
-                    
+
                     if (bodyData.type === 'binary' && bodyData.arrayBuffer) {
                         console.log('🔍 [background.ts] Binary ファイルの処理開始');
                         // ArrayBufferデータから Uint8Array を復元
@@ -229,10 +229,10 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
                         if (bodyData.contentType) {
                             fetchHeaders['Content-Type'] = bodyData.contentType;
                         }
-                        console.log('🔍 [background.ts] Binary ファイル処理完了:', { 
+                        console.log('🔍 [background.ts] Binary ファイル処理完了:', {
                             filename: bodyData.filename,
                             contentType: bodyData.contentType,
-                            size: uint8Array.length 
+                            size: uint8Array.length
                         });
                     } else if (hasFiles && Array.isArray(bodyData)) {
                         console.log('🔍 [background.ts] ファイルを含むFormDataの処理開始');
@@ -300,7 +300,7 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
                 debugInfo: {
                     sentBodyType: processedBody instanceof Uint8Array ? 'Uint8Array' : typeof processedBody,
                     sentBodyPreview: debugBody,
-                    boundary: fetchHeaders['Content-Type']?.includes('boundary=') ? 
+                    boundary: fetchHeaders['Content-Type']?.includes('boundary=') ?
                         fetchHeaders['Content-Type'].split('boundary=')[1] : null
                 }
             });
@@ -350,8 +350,7 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
                 }
                 // マッチしない場合は何も返さない
             },
-            { urls: ['<all_urls>'] },
-            ['blocking', 'requestHeaders']
+            { urls: ['<all_urls>'] }
         );
     }
 
