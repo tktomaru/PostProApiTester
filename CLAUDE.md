@@ -20,6 +20,7 @@ src/
 ├── init.ts                # 初期化処理
 ├── injected.ts            # ページ注入スクリプト
 ├── interceptorManager.ts  # HTTPリクエストインターセプト
+├── postmanTestAPI.ts      # Postman形式テストAPI実装（NEW!）
 ├── requestManager.ts      # リクエスト送信・レスポンス処理・テスト実行
 ├── scenarioManager.ts     # シナリオ管理
 ├── settings.ts            # 設定管理

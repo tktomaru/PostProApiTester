@@ -9,6 +9,7 @@ import {
     saveCollectionsToStorage,
     saveScenariosToStorage
 } from './state';
+import { executePostmanTestScript, isPostmanStyleScript } from './postmanTestAPI';
 
 import {
     showLoading,
@@ -490,8 +491,9 @@ export function loadRequestIntoEditor(request: RequestData): void {
 /**
  * executeTestScript
  *  Tests タブに書かれたスクリプトを実行し、結果を表示
+ *  Postman形式のpm.test()と従来のコマンド形式の両方をサポート
  */
-export async function executeTestScript(responseData: ProcessedResponse, testScript?: string): Promise<TestResult[]> {
+export async function executeTestScript(responseData: ProcessedResponse, testScript?: string, requestData?: RequestData): Promise<TestResult[]> {
     // テスト結果表示エリアをクリア
     const testsContainer = document.getElementById('response-tests') as HTMLElement;
     if (testsContainer) {
@@ -515,6 +517,32 @@ export async function executeTestScript(responseData: ProcessedResponse, testScr
         return [];
     }
 
+    // Postman形式のテストかどうかを判定
+    if (isPostmanStyleScript(raw)) {
+        console.log('Postman形式のテストスクリプトを実行します');
+        try {
+            const results = await executePostmanTestScript(
+                raw, 
+                responseData, 
+                requestData || state.currentRequest || {} as RequestData
+            );
+            displayTestResults(results);
+            return results;
+        } catch (error: any) {
+            console.error('Postman test script 実行エラー:', error);
+            const errorResult = {
+                name: 'Postman Script Execution Error',
+                passed: false,
+                error: error.message
+            };
+            displayTestResults([errorResult]);
+            return [errorResult];
+        }
+    }
+
+    // 従来のコマンド形式のテスト実行
+    console.log('従来のコマンド形式のテストスクリプトを実行します');
+    
     // 改行で分割し、空行や先頭が // のコメント行を除外
     const lines = raw
         .split(/\r?\n/)
@@ -701,7 +729,7 @@ export async function sendRequest(
         }
 
         // 5. テストスクリプトを実行
-        const testResults = await executeTestScript(parsed, requestObj.testScript);
+        const testResults = await executeTestScript(parsed, requestObj.testScript, requestObj);
 
         // 6. 履歴に保存
         await saveToHistory(req, parsed, testResults);

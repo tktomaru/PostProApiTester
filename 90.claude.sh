@@ -17,11 +17,11 @@ echo
 cd "$REPO_DIR"
 git checkout main
 
-# ── YAML を1件ずつ読み込む（yq コマンドが必要です） ──
-# yq eval -c '.[]' は tasks.yml がトップレベル配列の場合
-yq eval -c '.tasks[]' "$TASKS_FILE" | while read -r task; do
-  id=$(echo "$task" | yq eval -r '.id' -)
-  prompt=$(echo "$task" | yq eval -r '.prompt' -)
+# ── YAML を1件ずつ読み込む（Python版 yq 向け） ──
+# tasks.yml の tasks 配列を compact JSON で展開
+yq -c '.tasks[]' "$TASKS_FILE" | while read -r task; do
+  id=$(echo "$task" | yq -r '.id' -)
+  prompt=$(echo "$task" | yq -r '.prompt' -)
 
   echo "▶ [$id] 実行開始: $(date)"
 

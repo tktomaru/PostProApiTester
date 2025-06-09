@@ -99,11 +99,42 @@ setBodyWithVar ${"collections"."Data"."Get Template"."response"."body"}
 ```
 
 ### テストスクリプト
-レスポンスの自動検証：
+
+#### 🆕 Postman形式テストスクリプト
+Postman互換のテストスクリプトをサポート：
+
+```javascript
+pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("Response contains user data", function () {
+    const jsonData = pm.response.json();
+    pm.expect(jsonData.user).to.have.property('name');
+    pm.expect(jsonData.user.name).to.equal('John Doe');
+});
+
+pm.test("Response time is acceptable", function () {
+    pm.expect(pm.response.responseTime).to.be.below(1000);
+});
+
+pm.test("Content-Type header is correct", function () {
+    pm.response.to.have.header("Content-Type", "application/json");
+});
+
+// 環境変数に値を保存
+pm.test("Save auth token", function () {
+    const jsonData = pm.response.json();
+    pm.environment.set("authToken", jsonData.token);
+});
+```
+
+#### 従来形式テストコマンド
+シンプルなコマンド形式でのテスト：
 
 ```javascript
 // ステータスコードの確認
-statusEquals 200
+status 200
 
 // ヘッダーの確認
 headerEquals Content-Type application/json

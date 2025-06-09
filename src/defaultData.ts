@@ -152,14 +152,28 @@ removeHeader removeHeader
                 auth: { type: 'none' },
                 bodyType: "none",
                 preRequestScript: '',
-                testScript: `// reply.tukutano.jpエコーサイト用の結合テスト
-status 200
-echoRequestMethodEquals GET
-echoRequestHeaderEquals Accept application/json
-echoRequestHeaderEquals X-Test-Header test-value
-echoRequestUrlContains /api/users
-echoRequestUrlContains page=1
-echoRequestUrlContains limit=10`
+                testScript: `// Postman形式のテストスクリプト例
+pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("Response contains request echo", function () {
+    const responseJson = pm.response.json();
+    pm.expect(responseJson.method).to.equal("GET");
+    pm.expect(responseJson.url).to.include("/api/users");
+});
+
+pm.test("Headers are echoed correctly", function () {
+    const responseJson = pm.response.json();
+    pm.expect(responseJson.headers['accept']).to.equal('application/json');
+    pm.expect(responseJson.headers['x-test-header']).to.equal('test-value');
+});
+
+pm.test("Query parameters are included", function () {
+    const responseJson = pm.response.json();
+    pm.expect(responseJson.url).to.include("page=1");
+    pm.expect(responseJson.url).to.include("limit=10");
+});`
             },
             {
                 id: 'req_echo_post',
@@ -181,14 +195,35 @@ echoRequestUrlContains limit=10`
                 auth: { type: 'none' },
                 bodyType: "json",
                 preRequestScript: '',
-                testScript: `// POSTリクエストの結合テスト
-status 200
-echoRequestMethodEquals POST
-echoRequestHeaderEquals Content-Type application/json
-echoRequestHeaderEquals X-API-Key test-api-key
-echoRequestHeaderContains cookie loginSession=sess_abc123xyz; rememberMe=true; lastActivity=1640995200
-echoRequestBodyEquals {"username":"testuser","password":"testpass123","remember":true}
-echoRequestUrlContains /api/auth/login`
+                testScript: `// POSTリクエストのPostman形式テスト
+pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("Request method and URL are correct", function () {
+    const responseJson = pm.response.json();
+    pm.expect(responseJson.method).to.equal("POST");
+    pm.expect(responseJson.url).to.include("/api/auth/login");
+});
+
+pm.test("Request headers are correct", function () {
+    const responseJson = pm.response.json();
+    pm.expect(responseJson.headers['content-type']).to.equal('application/json');
+    pm.expect(responseJson.headers['x-api-key']).to.equal('test-api-key');
+});
+
+pm.test("Request body is correct", function () {
+    const responseJson = pm.response.json();
+    const requestBody = JSON.parse(responseJson.body);
+    pm.expect(requestBody.username).to.equal("testuser");
+    pm.expect(requestBody.password).to.equal("testpass123");
+    pm.expect(requestBody.remember).to.be.true;
+});
+
+pm.test("Save auth token for next request", function () {
+    // エコーAPIのため実際のトークンは返されないが、テスト例として
+    pm.environment.set("authToken", "mock-token-from-login");
+});`
             },
             {
                 id: 'req_echo_auth_test',
