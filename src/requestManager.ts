@@ -288,13 +288,19 @@ export function loadRequestIntoEditor(request: RequestData): void {
 
     // ③ Body Type の設定（既存のbody描画の代わりに、より適切な方法で設定）
     const bodyType = request.bodyType || 'none';
-    document.querySelectorAll('input[name="bodyType"]').forEach(radio => {
-        const radioElement = radio as HTMLInputElement;
-        radioElement.checked = radioElement.value === bodyType;
-    });
-
-    // Body Type に応じて表示を切り替え
-    handleBodyTypeChange({ target: { value: bodyType } } as any);
+    const bodyTypeRadio = document.querySelector(`input[name="bodyType"][value="${bodyType}"]`) as HTMLInputElement;
+    if (bodyTypeRadio) {
+        bodyTypeRadio.checked = true;
+        // Body Type に応じて表示を切り替え
+        handleBodyTypeChange({ target: { value: bodyType } } as any);
+    } else {
+        // デフォルトで'none'を選択
+        const noneRadio = document.querySelector('input[name="bodyType"][value="none"]') as HTMLInputElement;
+        if (noneRadio) {
+            noneRadio.checked = true;
+            handleBodyTypeChange({ target: { value: 'none' } } as any);
+        }
+    }
 
     // ⑤ Body の中身をセット
     const rawBodyTextarea = document.getElementById('rawBody') as HTMLTextAreaElement;
