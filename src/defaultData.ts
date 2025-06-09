@@ -271,6 +271,10 @@ export const sampleScenarios: Scenario[] = [
 addHeader test scriptadd1
 setBody setBodyWithScript1
                 `
+                ,
+                testScript: `
+bodyJsonPathEquals $.body setBodyWithScript1
+                `
             },
             {
                 id: 'req_sample_POST2',

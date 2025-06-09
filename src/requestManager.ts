@@ -3,6 +3,7 @@
 // リクエスト送受信・プリリクエストスクリプト・テストスクリプト・レスポンス表示をまとめる
 
 import type { RequestData, ResponseData, AuthConfig } from './types';
+import { JSONPath } from 'jsonpath-plus';
 import {
     state,
     saveCollectionsToStorage,
@@ -1859,6 +1860,70 @@ export function runTestCommand(commandString: string, responseData: ProcessedRes
                 }
             } catch (error) {
                 return { passed: false, error: `レスポンスボディの解析に失敗しました: ${error}` };
+            }
+        }
+
+        case 'bodyJsonPathEquals': {
+            // JSONPathを使ってレスポンスボディの特定の値をチェック
+            // 使用例: bodyJsonPathEquals $.data.status success
+            if (args.length < 2) {
+                return { passed: false, error: 'bodyJsonPathEquals requires JSONPath and expected value' };
+            }
+
+            const jsonPath = args[0];
+            const expectedValue = args.slice(1).join(' ');
+
+            try {
+                let jsonBody: any;
+
+                // レスポンスボディをJSONとしてパース
+                if (typeof responseData.body === 'string') {
+                    try {
+                        jsonBody = JSON.parse(responseData.body);
+                    } catch (e) {
+                        return { passed: false, error: 'レスポンスボディが有効なJSONではありません' };
+                    }
+                } else if (typeof responseData.bodyText === 'string') {
+                    try {
+                        jsonBody = JSON.parse(responseData.bodyText);
+                    } catch (e) {
+                        return { passed: false, error: 'レスポンスボディが有効なJSONではありません' };
+                    }
+                } else {
+                    jsonBody = responseData.body;
+                }
+
+                if (!jsonBody) {
+                    return { passed: false, error: 'レスポンスボディが空です' };
+                }
+
+                // JSONPathで値を取得
+                const result = JSONPath({ path: jsonPath, json: jsonBody });
+
+                if (!Array.isArray(result) || result.length === 0) {
+                    return { passed: false, error: `JSONPath "${jsonPath}" に一致する値が見つかりません` };
+                }
+
+                const actualValue = result[0];
+
+                // 期待値と実際の値を比較（文字列として比較）
+                const actualStr = String(actualValue);
+                const expectedStr = String(expectedValue);
+
+                if (actualStr !== expectedStr) {
+                    return { 
+                        passed: false, 
+                        error: `JSONPath "${jsonPath}" の値が期待値と異なります\n期待: ${expectedStr}\n実際: ${actualStr}` 
+                    };
+                }
+
+                return { passed: true };
+
+            } catch (error: any) {
+                return { 
+                    passed: false, 
+                    error: `JSONPath "${jsonPath}" の評価中にエラーが発生しました: ${error.message}` 
+                };
             }
         }
 
