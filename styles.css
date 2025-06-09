@@ -1574,9 +1574,10 @@ transition: all 0.2s ease;
 }
 
 .script-editor {
-    flex: 1;
-    min-height: 200px;
-    tab-size: 2;
+    resize: none;
+    overflow: hidden;
+    min-height: 4em;
+    /* お好みで初期行数分 */
 }
 
 /* ------------------------------------------------

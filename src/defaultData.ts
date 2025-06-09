@@ -269,7 +269,6 @@ export const sampleScenarios: Scenario[] = [
                 bodyType: "raw",
                 preRequestScript: `
 addHeader test scriptadd1
-setBody setBodyWithScript1
                 `
             },
             {
@@ -284,6 +283,8 @@ setBody setBodyWithScript1
                 bodyType: "json",
                 preRequestScript: `
 addHeader test scriptadd2
+addHeaderWithVar authorization \${"Sample post Flow"."サンプル POST"."response"."headers"."test"}
+setBodyWithVar \${"Sample post Flow"."サンプル POST"."response"."body".jsonPath("$.headers.authorization")}
                 `
             },
             {

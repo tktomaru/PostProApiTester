@@ -11,7 +11,8 @@ import {
     setupTabSwitching,
     renderAuthDetails,
     addKeyValueRow,
-    showError
+    showError,
+    autoResizeTextarea
 } from './utils';
 
 import {
@@ -200,6 +201,18 @@ function showDevToolsGuidance(): void {
     }
 }
 
+
+function setupPreRequestScript(): void {
+    const ta = document.getElementById('preRequestScript') as HTMLTextAreaElement | null;
+    if (!ta) return;
+
+    // 初期ロード時にも高さを合わせておく
+    autoResizeTextarea(ta);
+
+    // スクリプトをタイプしたり、loadRequestIntoEditor() 等で中身が set されたあとにも
+    ta.addEventListener('input', () => autoResizeTextarea(ta));
+}
+
 async function initializeApp(): Promise<void> {
     try {
         // ─────────────────────────────
@@ -208,6 +221,7 @@ async function initializeApp(): Promise<void> {
         setupEventListeners();
         setupTabSwitching();
         setupModalHandlers();
+        setupPreRequestScript();
 
         // Chrome拡張機能のランタイムメッセージを受け取る
         chrome.runtime.onMessage.addListener((message: any) => {

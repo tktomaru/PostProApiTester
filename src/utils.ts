@@ -933,3 +933,10 @@ export async function serializeBinaryFile(inputId: string): Promise<string | nul
         return null;
     }
 }
+
+export function autoResizeTextarea(textarea: HTMLTextAreaElement) {
+    // height をリセット → scrollHeight を正しく得る
+    textarea.style.height = 'auto';
+    // scrollHeight 分だけ伸ばす
+    textarea.style.height = textarea.scrollHeight + 'px';
+}

@@ -14,7 +14,8 @@ import {
     showError,
     showSuccess,
     escapeHtml,
-    formatBytes
+    formatBytes,
+    autoResizeTextarea
 } from './utils';
 
 import {
@@ -219,6 +220,12 @@ export function loadRequestIntoEditor(request: RequestData): void {
             state.currentRequest.params = { ...request.params };
             console.log('Updated state.currentRequest.params:', state.currentRequest.params);
         }
+
+        const preReqTa = document.getElementById('preRequestScript') as HTMLTextAreaElement;
+        preReqTa.value = request.preRequestScript || '';
+
+        // ここで高さを合わせる
+        autoResizeTextarea(preReqTa);
     } else {
         console.log('No params to load, adding empty row');
         addKeyValueRow(paramsContainer, 'param');
