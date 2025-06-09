@@ -233,17 +233,19 @@ export function loadRequestIntoEditor(request: RequestData): void {
             const formDataRadio = document.querySelector('input[name="bodyType"][value="form-data"]') as HTMLInputElement;
             formDataRadio.checked = true;
             handleBodyTypeChange({ target: { value: 'form-data' } } as any);
-            const formDataContainer = document.getElementById('formDataContainer') as HTMLElement;
-            formDataContainer.innerHTML = '';
-            Object.entries(request.body as Record<string, string>).forEach(([key, value]) => {
-                addKeyValueRow(formDataContainer, 'body');
-                const rows = formDataContainer.querySelectorAll('.key-value-row');
-                const lastRow = rows[rows.length - 1] as HTMLElement;
-                const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
-                const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
-                keyInput.value = key;
-                valueInput.value = value;
-            });
+            const formDataFieldsContainer = document.getElementById('formDataFieldsContainer') as HTMLElement;
+            if (formDataFieldsContainer) {
+                formDataFieldsContainer.innerHTML = '';
+                Object.entries(request.body as Record<string, string>).forEach(([key, value]) => {
+                    addKeyValueRow(formDataFieldsContainer, 'body');
+                    const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
+                    const lastRow = rows[rows.length - 1] as HTMLElement;
+                    const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
+                    const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
+                    keyInput.value = key;
+                    valueInput.value = value;
+                });
+            }
         }
     } else {
         const noneRadio = document.querySelector('input[name="bodyType"][value="none"]') as HTMLInputElement;
@@ -566,6 +568,60 @@ export async function sendRequest(
 }
 
 /**
+ * fileToBase64
+ * ファイルをBase64文字列に変換する
+ */
+function fileToBase64(file: any): Promise<string> {
+    return new Promise((resolve, reject) => {
+        console.log('🔍 [fileToBase64] 開始. file詳細:', {
+            file: file,
+            name: file?.name,
+            size: file?.size,
+            type: file?.type,
+            instanceof_File: file instanceof File,
+            instanceof_Blob: file instanceof Blob,
+            constructor: file?.constructor?.name,
+            typeof: typeof file
+        });
+        
+        // ファイルオブジェクトの詳細チェック
+        if (!file) {
+            console.error('🔍 [fileToBase64] ファイルオブジェクトがnullまたはundefined');
+            reject(new Error('File object is null or undefined'));
+            return;
+        }
+        
+        if (!(file instanceof File) && !(file instanceof Blob)) {
+            console.error('🔍 [fileToBase64] ファイルオブジェクトがFile/Blobインスタンスではありません');
+            reject(new Error(`File object is not a File or Blob instance. Type: ${typeof file}, Constructor: ${(file as any)?.constructor?.name}`));
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = () => {
+            console.log('🔍 [fileToBase64] FileReader.onload成功');
+            const result = reader.result as string;
+            // data:プレフィックスを除去してBase64部分のみ返す
+            const base64 = result.split(',')[1];
+            console.log('🔍 [fileToBase64] Base64変換完了. 長さ:', base64?.length || 0);
+            resolve(base64);
+        };
+        reader.onerror = (error) => {
+            console.error('🔍 [fileToBase64] FileReader.onerror:', error);
+            reject(error);
+        };
+        
+        try {
+            console.log('🔍 [fileToBase64] FileReader.readAsDataURL呼び出し開始');
+            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('🔍 [fileToBase64] FileReader.readAsDataURL呼び出しでエラー:', error);
+            reject(error);
+        }
+    });
+}
+
+/**
  * buildFetchOptions
  *  引数のリクエスト情報をもとに、XHR 送信用の { method, headers, bodyData } を返す
  */
@@ -601,19 +657,27 @@ export function buildFetchOptions(request: RequestData): FetchOptions | null {
             }
 
             case 'form-data': {
-                const formData = new FormData();
-                const formFields = collectKeyValues('formDataContainer');
-                Object.entries(formFields).forEach(([key, value]) => {
-                    formData.append(key, value);
-                });
-                bodyData = formData;
+                console.log('🔍 [buildFetchOptions] form-data処理. request.body:', request.body);
+                // ファイルを含む場合は元のbodyをそのまま使用（FormDataField[]配列）
+                if (Array.isArray(request.body)) {
+                    console.log('🔍 [buildFetchOptions] FormDataField[]配列をそのまま返す');
+                    bodyData = request.body as any;
+                } else {
+                    console.log('🔍 [buildFetchOptions] 古いロジック（collectKeyValues）を使用');
+                    const formData = new FormData();
+                    const formFields = collectKeyValues('formDataFieldsContainer');
+                    Object.entries(formFields).forEach(([key, value]) => {
+                        formData.append(key, value);
+                    });
+                    bodyData = formData;
+                }
                 break;
             }
 
             case 'urlencoded': {
                 // URLSearchParams を作成
                 const params = new URLSearchParams();
-                const urlEncodedFields = collectKeyValues('formDataContainer');
+                const urlEncodedFields = collectKeyValues('formDataFieldsContainer');
                 Object.entries(urlEncodedFields).forEach(([key, value]) => {
                     params.append(key, value);
                 });
@@ -643,55 +707,169 @@ async function sendRequestWithCookieSupport(options: {
 }): Promise<XhrResponse> {
     console.log('🍪 sendRequestWithCookieSupport called with:', options);
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         const startTime = Date.now();
 
-        const messageData = {
-            action: 'sendHttpRequest',
-            options: {
-                method: options.method,
-                url: options.url,
-                headers: options.headers,
-                body: typeof options.body === 'string' ? options.body :
-                    options.body?.toString() || null
-            }
-        };
-
-        console.log('Sending message to background script for Cookie handling:', messageData);
-
-        // Background Scriptにクッキー付きHTTPリクエストを要求
-        chrome.runtime.sendMessage(messageData, (response) => {
-            console.log('Received response from background script:', response);
-
-            if (chrome.runtime.lastError) {
-                console.error('Chrome runtime error:', chrome.runtime.lastError.message);
-                reject(new Error(chrome.runtime.lastError.message));
-                return;
-            }
-
-            if (response.success) {
-                const duration = Date.now() - startTime;
-                const xhrResponse: XhrResponse = {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: response.headers,
-                    text: async () => response.body,
-                    json: async () => {
-                        try {
-                            return JSON.parse(response.body);
-                        } catch {
-                            return {};
+        // bodyの処理
+        let processedBody: string | null = null;
+        let hasFiles = false;
+        
+        try {
+            console.log('🔍 [requestManager.ts] bodyの処理開始. options.body:', options.body);
+            console.log('🔍 [requestManager.ts] options.body type:', typeof options.body);
+            console.log('🔍 [requestManager.ts] options.body instanceof FormData:', options.body instanceof FormData);
+            console.log('🔍 [requestManager.ts] Array.isArray(options.body):', Array.isArray(options.body));
+            
+            if (options.body instanceof FormData) {
+                console.log('🔍 [requestManager.ts] FormDataオブジェクトとして処理');
+                // FormDataオブジェクトをkey-valueオブジェクトに変換
+                const formDataObj: Record<string, string> = {};
+                for (const [key, value] of options.body.entries()) {
+                    formDataObj[key] = value.toString();
+                }
+                processedBody = JSON.stringify(formDataObj);
+                console.log('🔍 [requestManager.ts] FormData処理完了:', formDataObj);
+            } else if (Array.isArray(options.body)) {
+                console.log('🔍 [requestManager.ts] FormDataField[]配列として処理');
+                // FormDataField[]配列の場合（ファイルを含む可能性あり）
+                const formDataFields = options.body as any[];
+                console.log('🔍 [requestManager.ts] formDataFields:', formDataFields);
+                const processedFields: any[] = [];
+                
+                for (const field of formDataFields) {
+                    console.log('🔍 [requestManager.ts] 処理中のfield:', field);
+                    console.log('🔍 [requestManager.ts] field.file詳細:', {
+                        file: field.file,
+                        fileType: typeof field.file,
+                        isBlob: field.file instanceof Blob,
+                        isFile: field.file instanceof File,
+                        constructor: field.file?.constructor?.name
+                    });
+                    
+                    if (field.type === 'file' && field.file) {
+                        // ファイルオブジェクトの型チェック
+                        if (!(field.file instanceof File) && !(field.file instanceof Blob)) {
+                            console.error('🔍 [requestManager.ts] field.fileがFile/Blobではありません:', field.file);
+                            // エラーをスキップしてテキストフィールドとして処理
+                            processedFields.push({
+                                key: field.key,
+                                type: 'text',
+                                value: `[File Error: ${field.file}]`
+                            });
+                            continue;
                         }
-                    },
-                    duration: duration
-                };
-                console.log('Constructed Cookie XhrResponse:', xhrResponse);
-                resolve(xhrResponse);
-            } else {
-                console.error('Background script returned error:', response.error);
-                reject(new Error(response.error || 'Cookie request failed'));
+                        
+                        console.log('🔍 [requestManager.ts] ファイルフィールドを処理:', {
+                            key: field.key,
+                            filename: field.file.name,
+                            size: field.file.size,
+                            type: field.file.type
+                        });
+                        hasFiles = true;
+                        // ファイルをBase64に変換
+                        console.log('🔍 [requestManager.ts] Base64変換開始...');
+                        console.log('🔍 [requestManager.ts] fileToBase64に渡すfile:', field.file);
+                        console.log('🔍 [requestManager.ts] fileToBase64に渡すfile詳細2:', {
+                            file: field.file,
+                            typeof: typeof field.file,
+                            instanceof_File: field.file instanceof File,
+                            instanceof_Blob: field.file instanceof Blob,
+                            constructor_name: field.file?.constructor?.name,
+                            Object_prototype_toString: Object.prototype.toString.call(field.file)
+                        });
+                        const fileData = await fileToBase64(field.file);
+                        console.log('🔍 [requestManager.ts] Base64変換完了. データ長:', fileData.length);
+                        processedFields.push({
+                            key: field.key,
+                            type: 'file',
+                            filename: field.file.name,
+                            contentType: field.file.type,
+                            data: fileData
+                        });
+                    } else {
+                        console.log('🔍 [requestManager.ts] テキストフィールドを処理:', {
+                            key: field.key,
+                            value: field.value
+                        });
+                        processedFields.push({
+                            key: field.key,
+                            type: 'text',
+                            value: field.value || ''
+                        });
+                    }
+                }
+                processedBody = JSON.stringify(processedFields);
+                console.log('🔍 [requestManager.ts] 配列処理完了. hasFiles:', hasFiles);
+                console.log('🔍 [requestManager.ts] processedFields:', processedFields);
+            } else if (typeof options.body === 'string') {
+                console.log('🔍 [requestManager.ts] 文字列として処理');
+                processedBody = options.body;
+            } else if (options.body?.toString && options.body.toString() !== '[object Object]') {
+                console.log('🔍 [requestManager.ts] toString()で処理');
+                processedBody = options.body.toString();
             }
-        });
+
+            const messageData = {
+                action: 'sendHttpRequest',
+                options: {
+                    method: options.method,
+                    url: options.url,
+                    headers: options.headers,
+                    body: processedBody,
+                    isFormData: options.body instanceof FormData || Array.isArray(options.body),
+                    hasFiles: hasFiles
+                }
+            };
+
+            console.log('🔍 [requestManager.ts] messageData作成完了:', {
+                action: messageData.action,
+                method: messageData.options.method,
+                url: messageData.options.url,
+                headers: messageData.options.headers,
+                bodyType: typeof messageData.options.body,
+                bodyLength: messageData.options.body?.length || 0,
+                isFormData: messageData.options.isFormData,
+                hasFiles: messageData.options.hasFiles
+            });
+            console.log('🔍 [requestManager.ts] Sending message to background script for Cookie handling');
+
+            // Background Scriptにクッキー付きHTTPリクエストを要求
+            chrome.runtime.sendMessage(messageData, (response) => {
+                console.log('Received response from background script:', response);
+
+                if (chrome.runtime.lastError) {
+                    console.error('Chrome runtime error:', chrome.runtime.lastError.message);
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+
+                if (response.success) {
+                    const duration = Date.now() - startTime;
+                    const xhrResponse: XhrResponse = {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers: response.headers,
+                        text: async () => response.body,
+                        json: async () => {
+                            try {
+                                return JSON.parse(response.body);
+                            } catch {
+                                return {};
+                            }
+                        },
+                        duration: duration
+                    };
+                    console.log('Constructed Cookie XhrResponse:', xhrResponse);
+                    resolve(xhrResponse);
+                } else {
+                    console.error('Background script returned error:', response.error);
+                    reject(new Error(response.error || 'Cookie request failed'));
+                }
+            });
+        } catch (error: any) {
+            console.error('Error processing request body:', error);
+            reject(new Error(`Request processing failed: ${error.message}`));
+        }
     });
 }
 
@@ -1732,7 +1910,27 @@ export function displayTestResults(results: TestResult[]): void {
  *  変数置換を行った結果を返す
  */
 export function processVariables(request: RequestData): RequestData {
-    const processed = JSON.parse(JSON.stringify(request));
+    // File objectsを含む場合はJSON.stringify/parseできないため、特別な処理が必要
+    const hasFiles = Array.isArray(request.body) && 
+        request.body.some((field: any) => field.type === 'file' && field.file);
+    
+    let processed: RequestData;
+    if (hasFiles) {
+        // Fileオブジェクトを含む場合は手動でクローン
+        console.log('🔍 [processVariables] File objects detected, using manual clone');
+        processed = {
+            ...request,
+            headers: { ...request.headers },
+            params: { ...request.params },
+            auth: { ...request.auth },
+            // bodyは元のオブジェクトを保持（File objectsを保護）
+            body: request.body
+        };
+    } else {
+        // 通常の場合はJSONクローン
+        console.log('🔍 [processVariables] No file objects, using JSON clone');
+        processed = JSON.parse(JSON.stringify(request));
+    }
 
     // URLの変数置換を最初に行う
     processed.url = replaceVariables(processed.url);
@@ -1770,6 +1968,22 @@ export function processVariables(request: RequestData): RequestData {
         if (processed.body) {
             if (typeof processed.body === 'string') {
                 processed.body = replaceVariables(processed.body);
+            } else if (hasFiles) {
+                // Fileオブジェクトを含む場合は変数置換をスキップ
+                console.log('🔍 [processVariables] Skipping variable replacement for body with files');
+                // File以外のフィールドのみ変数置換
+                if (Array.isArray(processed.body)) {
+                    processed.body = (processed.body as any[]).map((field: any) => {
+                        if (field.type === 'file') {
+                            return field; // Fileフィールドはそのまま
+                        } else {
+                            return {
+                                ...field,
+                                value: field.value ? replaceVariables(field.value) : field.value
+                            };
+                        }
+                    }) as any;
+                }
             } else {
                 processed.body = deepReplaceVariables(processed.body);
             }
@@ -1851,7 +2065,7 @@ export async function saveCurrentRequest(): Promise<void> {
             const jsonBody = document.getElementById('jsonBody') as HTMLTextAreaElement;
             req.body = jsonBody.value;
         } else if (selectedBodyType?.value === 'form-data') {
-            const formRows = document.querySelectorAll('#formDataContainer .key-value-row');
+            const formRows = document.querySelectorAll('#formDataFieldsContainer .key-value-row');
             const formDataObj: Record<string, string> = {};
             formRows.forEach(row => {
                 const rowElement = row as HTMLElement;

@@ -104,11 +104,92 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
         }
     }
 
+    // FormDataオブジェクトをmultipart/form-data文字列に変換
+    function serializeFormData(formDataObj: Record<string, string>): { body: string; boundary: string } {
+        const boundary = `----------------------------${Date.now().toString(16)}${Math.random().toString(16).substring(2)}`;
+        let body = '';
+        
+        Object.entries(formDataObj).forEach(([key, value]) => {
+            body += `--${boundary}\r\n`;
+            body += `Content-Disposition: form-data; name="${key}"\r\n`;
+            body += '\r\n';
+            body += `${value}\r\n`;
+        });
+        
+        body += `--${boundary}--\r\n`;
+        return { body, boundary };
+    }
+
+    // ファイルを含むFormDataフィールドをmultipart/form-data文字列に変換
+    function serializeFormDataWithFiles(fields: any[]): { body: Uint8Array; boundary: string } {
+        console.log('🔍 [background.ts] serializeFormDataWithFiles開始. fields:', fields);
+        const boundary = `----------------------------${Date.now().toString(16)}${Math.random().toString(16).substring(2)}`;
+        console.log('🔍 [background.ts] boundary生成:', boundary);
+        const encoder = new TextEncoder();
+        const parts: Uint8Array[] = [];
+        
+        fields.forEach((field, index) => {
+            console.log(`🔍 [background.ts] field[${index}]処理開始:`, field);
+            // パート境界
+            parts.push(encoder.encode(`--${boundary}\r\n`));
+            
+            if (field.type === 'file') {
+                console.log(`🔍 [background.ts] field[${index}]はファイル型. filename:${field.filename}, contentType:${field.contentType}`);
+                // ファイルのヘッダー
+                parts.push(encoder.encode(`Content-Disposition: form-data; name="${field.key}"; filename="${field.filename}"\r\n`));
+                parts.push(encoder.encode(`Content-Type: ${field.contentType || 'application/octet-stream'}\r\n\r\n`));
+                
+                // Base64デコードしてバイナリデータとして追加
+                console.log(`🔍 [background.ts] field[${index}] Base64データ長:`, field.data?.length || 0);
+                const binaryString = atob(field.data);
+                console.log(`🔍 [background.ts] field[${index}] バイナリ文字列長:`, binaryString.length);
+                const binaryArray = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    binaryArray[i] = binaryString.charCodeAt(i);
+                }
+                console.log(`🔍 [background.ts] field[${index}] バイナリ配列長:`, binaryArray.length);
+                parts.push(binaryArray);
+                parts.push(encoder.encode('\r\n'));
+            } else {
+                console.log(`🔍 [background.ts] field[${index}]はテキスト型. value:${field.value}`);
+                // テキストフィールド
+                parts.push(encoder.encode(`Content-Disposition: form-data; name="${field.key}"\r\n\r\n`));
+                parts.push(encoder.encode(`${field.value || ''}\r\n`));
+            }
+            console.log(`🔍 [background.ts] field[${index}]処理完了`);
+        });
+        
+        // 終了境界
+        parts.push(encoder.encode(`--${boundary}--\r\n`));
+        
+        // すべてのパートを結合
+        const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+        console.log('🔍 [background.ts] 全パート合計長:', totalLength);
+        const body = new Uint8Array(totalLength);
+        let offset = 0;
+        
+        parts.forEach((part, index) => {
+            console.log(`🔍 [background.ts] part[${index}]設定. 長さ:${part.length}, オフセット:${offset}`);
+            body.set(part, offset);
+            offset += part.length;
+        });
+        
+        console.log('🔍 [background.ts] serializeFormDataWithFiles完了. body長:', body.length, 'boundary:', boundary);
+        return { body, boundary };
+    }
+
     // HTTP Request handler for Cookie headers
     async function handleHttpRequest(options: any, sendResponse: (response?: any) => void): Promise<void> {
         try {
-            const { method, url, headers, body } = options;
-            console.log('🍪 handleHttpRequest with headers:', headers);
+            const { method, url, headers, body, isFormData, hasFiles } = options;
+            console.log('🔍 [background.ts] handleHttpRequest開始');
+            console.log('🔍 [background.ts] method:', method);
+            console.log('🔍 [background.ts] url:', url);
+            console.log('🔍 [background.ts] headers:', headers);
+            console.log('🔍 [background.ts] isFormData:', isFormData);
+            console.log('🔍 [background.ts] hasFiles:', hasFiles);
+            console.log('🔍 [background.ts] body type:', typeof body);
+            console.log('🔍 [background.ts] body length:', body?.length || 0);
 
             // ① Cookie ヘッダーを本物の Cookie としてセット
             if (headers.Cookie || headers.cookie) {
@@ -127,14 +208,53 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
 
             console.log('Fetch headers (without Cookie):', fetchHeaders);
 
+            // bodyの処理 - isFormDataフラグに基づいて処理
+            let processedBody: string | Uint8Array | undefined;
+            console.log('🔍 [background.ts] bodyの処理開始. isFormData && body:', isFormData && body);
+            
+            if (isFormData && body) {
+                try {
+                    console.log('🔍 [background.ts] body JSON.parse開始');
+                    const bodyData = JSON.parse(body);
+                    console.log('🔍 [background.ts] body JSON.parse完了:', bodyData);
+                    console.log('🔍 [background.ts] hasFiles && Array.isArray(bodyData):', hasFiles && Array.isArray(bodyData));
+                    
+                    if (hasFiles && Array.isArray(bodyData)) {
+                        console.log('🔍 [background.ts] ファイルを含むFormDataの処理開始');
+                        console.log('🔍 [background.ts] bodyData配列:', bodyData);
+                        // ファイルを含むFormDataの場合
+                        const { body: serializedBody, boundary } = serializeFormDataWithFiles(bodyData);
+                        processedBody = serializedBody;
+                        fetchHeaders['Content-Type'] = `multipart/form-data; boundary=${boundary}`;
+                        console.log('🔍 [background.ts] ファイル含むFormData処理完了:', { boundary, bodyLength: serializedBody.length });
+                    } else if (typeof bodyData === 'object' && !Array.isArray(bodyData)) {
+                        console.log('🔍 [background.ts] 通常のFormDataの処理開始');
+                        // 通常のFormDataの場合
+                        const { body: serializedBody, boundary } = serializeFormData(bodyData);
+                        processedBody = serializedBody;
+                        fetchHeaders['Content-Type'] = `multipart/form-data; boundary=${boundary}`;
+                        console.log('🔍 [background.ts] 通常FormData処理完了:', { boundary });
+                    } else {
+                        console.log('🔍 [background.ts] その他の場合、bodyをそのまま使用');
+                        processedBody = body;
+                    }
+                } catch (e) {
+                    console.error('🔍 [background.ts] Error parsing FormData body:', e);
+                    processedBody = body;
+                }
+            } else {
+                console.log('🔍 [background.ts] FormDataではない、またはbodyが空');
+                processedBody = body || undefined;
+            }
+
             const fetchOptions: RequestInit = {
                 method: method,
                 headers: fetchHeaders,
                 credentials: 'include', // ブラウザが自動的にCookieヘッダーを付加
-                body: body || undefined
+                body: processedBody
             };
 
-            console.log('Fetch options:', fetchOptions);
+            console.log('Fetch options:', { ...fetchOptions, body: processedBody instanceof Uint8Array ? `[Uint8Array ${processedBody.length} bytes]` : processedBody });
             const response = await fetch(url, fetchOptions);
             const responseBody = await response.text();
             const responseHeaders: Record<string, string> = {};
@@ -146,12 +266,28 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
 
             console.log('Response received:', { status: response.status, headers: responseHeaders });
 
+            // エコーAPI用にbody内容をレスポンスに含める（デバッグ用）
+            let debugBody = '';
+            if (processedBody instanceof Uint8Array) {
+                // Uint8Arrayを文字列表現に変換（エコー確認用）
+                const decoder = new TextDecoder('utf-8', { fatal: false });
+                debugBody = decoder.decode(processedBody.slice(0, Math.min(500, processedBody.length))) + '...';
+            } else {
+                debugBody = processedBody || '';
+            }
+
             sendResponse({
                 success: true,
                 status: response.status,
                 statusText: response.statusText,
                 headers: responseHeaders,
-                body: responseBody
+                body: responseBody,
+                debugInfo: {
+                    sentBodyType: processedBody instanceof Uint8Array ? 'Uint8Array' : typeof processedBody,
+                    sentBodyPreview: debugBody,
+                    boundary: fetchHeaders['Content-Type']?.includes('boundary=') ? 
+                        fetchHeaders['Content-Type'].split('boundary=')[1] : null
+                }
             });
         } catch (error: any) {
             console.error('HTTP Request error:', error);

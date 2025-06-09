@@ -73,15 +73,36 @@ export function getValueByPath(obj: any, path: string): any {
 export function addKeyValueRow(container: HTMLElement, type: string): void {
     const row = document.createElement('div');
     row.className = 'key-value-row';
-    row.innerHTML = `
-        <input type="text" placeholder="Key" class="key-input">
-        <input type="text" placeholder="Value" class="value-input">
-        <input type="text" placeholder="Description" class="description-input">
-        <button type="button" class="delete-btn">×</button>
-    `;
+    
+    // form-dataの場合はファイル選択オプションも追加
+    if (type === 'body' && container.id === 'formDataFieldsContainer') {
+        row.innerHTML = `
+            <input type="text" placeholder="Key" class="key-input">
+            <div class="value-input-container">
+                <select class="value-type-select">
+                    <option value="text">Text</option>
+                    <option value="file">File</option>
+                </select>
+                <input type="text" placeholder="Value" class="value-input">
+                <input type="file" class="file-input" style="display: none;">
+            </div>
+            <input type="text" placeholder="Description" class="description-input">
+            <button type="button" class="delete-btn">×</button>
+        `;
+    } else {
+        row.innerHTML = `
+            <input type="text" placeholder="Key" class="key-input">
+            <input type="text" placeholder="Value" class="value-input">
+            <input type="text" placeholder="Description" class="description-input">
+            <button type="button" class="delete-btn">×</button>
+        `;
+    }
+    
     const keyInput = row.querySelector('.key-input') as HTMLInputElement;
     const valueInput = row.querySelector('.value-input') as HTMLInputElement;
     const deleteBtn = row.querySelector('.delete-btn') as HTMLButtonElement;
+    const valueTypeSelect = row.querySelector('.value-type-select') as HTMLSelectElement;
+    const fileInput = row.querySelector('.file-input') as HTMLInputElement;
 
     keyInput.addEventListener('input', async () => await updateRequestData(type));
     valueInput.addEventListener('input', async () => await updateRequestData(type));
@@ -89,6 +110,26 @@ export function addKeyValueRow(container: HTMLElement, type: string): void {
         row.remove();
         updateRequestData(type);
     });
+
+    // form-dataの場合のイベントリスナー
+    if (valueTypeSelect && fileInput) {
+        valueTypeSelect.addEventListener('change', () => {
+            if (valueTypeSelect.value === 'file') {
+                valueInput.style.display = 'none';
+                fileInput.style.display = 'block';
+                valueInput.value = '';
+            } else {
+                valueInput.style.display = 'block';
+                fileInput.style.display = 'none';
+                fileInput.value = '';
+            }
+            updateRequestData(type);
+        });
+
+        fileInput.addEventListener('change', () => {
+            updateRequestData(type);
+        });
+    }
 
     container.appendChild(row);
 }
@@ -109,6 +150,73 @@ export function collectKeyValues(containerId: string): Record<string, string> {
             result[key] = value;
         }
     });
+    return result;
+}
+
+/** collectFormDataWithFiles - ファイルを含むform-dataの収集 */
+export interface FormDataField {
+    key: string;
+    type: 'text' | 'file';
+    value?: string;
+    file?: File;
+}
+
+export function collectFormDataWithFiles(containerId: string): FormDataField[] {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    
+    const rows = container.querySelectorAll('.key-value-row');
+    const result: FormDataField[] = [];
+    
+    rows.forEach(row => {
+        const keyInput = row.querySelector('.key-input') as HTMLInputElement;
+        const valueTypeSelect = row.querySelector('.value-type-select') as HTMLSelectElement;
+        const valueInput = row.querySelector('.value-input') as HTMLInputElement;
+        const fileInput = row.querySelector('.file-input') as HTMLInputElement;
+        
+        const key = keyInput?.value?.trim();
+        if (!key) return;
+        
+        console.log('Collecting field:', { 
+            key, 
+            valueTypeSelect: valueTypeSelect?.value, 
+            hasFile: !!fileInput?.files?.[0],
+            textValue: valueInput?.value 
+        });
+        
+        if (valueTypeSelect && valueTypeSelect.value === 'file') {
+            const file = fileInput?.files?.[0];
+            if (file) {
+                console.log('Adding file field:', { 
+                    key, 
+                    filename: file.name, 
+                    type: file.type, 
+                    size: file.size,
+                    fileObjectType: typeof file,
+                    isBlob: file instanceof Blob,
+                    isFile: file instanceof File,
+                    constructor: file.constructor.name
+                });
+                result.push({
+                    key,
+                    type: 'file',
+                    file
+                });
+            } else {
+                console.log('File field has no file selected:', key);
+            }
+        } else {
+            const value = valueInput?.value || '';
+            console.log('Adding text field:', { key, value });
+            result.push({
+                key,
+                type: 'text',
+                value
+            });
+        }
+    });
+    
+    console.log('collectFormDataWithFiles result:', result);
     return result;
 }
 
@@ -231,7 +339,17 @@ export function setupEventListeners(): void {
                     requestObj.body = jsonBody?.value || '';
                     break;
                 case 'form-data':
+                    // form-data の場合はファイルを含む特別な収集処理
+                    console.log('🔍 [utils.ts] form-data処理開始');
+                    const formDataFields = collectFormDataWithFiles('formDataFieldsContainer');
+                    console.log('🔍 [utils.ts] 収集されたformDataFields:', formDataFields);
+                    requestObj.body = formDataFields as any;
+                    console.log('🔍 [utils.ts] requestObj.bodyに設定完了:', requestObj.body);
+                    break;
                 case 'urlencoded':
+                    // urlencoded の場合は従来通り
+                    const urlEncodedFields = collectKeyValues('formDataFieldsContainer');
+                    requestObj.body = urlEncodedFields;
                     break;
                 default:
                     break;
@@ -347,6 +465,7 @@ export function setupEventListeners(): void {
             }
         });
     }
+
 }
 
 /**
@@ -603,9 +722,10 @@ export function handleBodyTypeChange(event: Event & { target: { value: string } 
         case 'form-data':
         case 'urlencoded':
             formDataContainer.style.display = 'block';
-            if (!formDataContainer.children.length) {
+            const formDataFieldsContainer = document.getElementById('formDataFieldsContainer');
+            if (formDataFieldsContainer && !formDataFieldsContainer.children.length) {
                 // 最初にキー・バリュー行がなければ追加
-                addKeyValueRow(formDataContainer, 'body');
+                addKeyValueRow(formDataFieldsContainer, 'body');
             }
             break;
 

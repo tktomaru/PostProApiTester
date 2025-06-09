@@ -133,6 +133,14 @@ function setupAddButtons(): void {
             addKeyValueRow(container, 'header');
         }
     });
+
+    const addFormDataBtn = document.querySelector('.add-form-data');
+    addFormDataBtn?.addEventListener('click', function () {
+        const container = document.getElementById('formDataFieldsContainer') as HTMLElement;
+        if (container) {
+            addKeyValueRow(container, 'body');
+        }
+    });
 }
 
 /**
@@ -166,15 +174,15 @@ function showDevToolsGuidance(): void {
                 <span>Press F12 for better debugging experience</span>
             </div>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         // アニメーション表示
         setTimeout(() => {
             notification.style.opacity = '1';
             notification.style.transform = 'translateX(0)';
         }, 100);
-        
+
         // 4秒後に自動的に削除
         setTimeout(() => {
             notification.style.opacity = '0';
@@ -185,7 +193,7 @@ function showDevToolsGuidance(): void {
                 }
             }, 300);
         }, 4000);
-        
+
         console.log('Developer tools guidance shown');
     } catch (error) {
         console.warn('Failed to show developer tools guidance:', error);
@@ -260,7 +268,7 @@ async function initializeApp(): Promise<void> {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await initializeApp();
-    
+
     // 設定機能の初期化
     try {
         initializeSettingsUI();
