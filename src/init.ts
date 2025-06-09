@@ -213,6 +213,17 @@ function setupPreRequestScript(): void {
     ta.addEventListener('input', () => autoResizeTextarea(ta));
 }
 
+function setupTestScript(): void {
+    const ta = document.getElementById('testScript') as HTMLTextAreaElement | null;
+    if (!ta) return;
+
+    // 初期ロード時にも高さを合わせておく
+    autoResizeTextarea(ta);
+
+    // スクリプトをタイプしたり、loadRequestIntoEditor() 等で中身が set されたあとにも
+    ta.addEventListener('input', () => autoResizeTextarea(ta));
+}
+
 async function initializeApp(): Promise<void> {
     try {
         // ─────────────────────────────
@@ -222,6 +233,7 @@ async function initializeApp(): Promise<void> {
         setupTabSwitching();
         setupModalHandlers();
         setupPreRequestScript();
+        setupTestScript();
 
         // Chrome拡張機能のランタイムメッセージを受け取る
         chrome.runtime.onMessage.addListener((message: any) => {

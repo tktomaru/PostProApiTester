@@ -64,7 +64,7 @@ export function showError(message: string, details?: string): void {
  */
 export function showNetworkError(url: string, error: any): void {
     let message = 'Network request failed: ';
-    
+
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
         message += 'Unable to connect to the server. Please check your internet connection and verify the URL is correct.';
     } else if (error.message.includes('CORS')) {
@@ -76,13 +76,13 @@ export function showNetworkError(url: string, error: any): void {
     } else {
         message += error.message || 'Unknown network error occurred.';
     }
-    
+
     showError(message, `URL: ${url}\nError Type: ${error.name || 'Unknown'}`);
 }
 
 export function showVariableError(varName: string, error: any): void {
     let message = 'Variable resolution failed: ';
-    
+
     if (error.message.includes('not found') || error.message.includes('見つかりません')) {
         message += `Variable "${varName}" was not found. Please check the variable name and ensure it exists in your environment, global, or collection variables.`;
     } else if (error.message.includes('JSONPath')) {
@@ -92,13 +92,13 @@ export function showVariableError(varName: string, error: any): void {
     } else {
         message += error.message || 'Unknown variable error occurred.';
     }
-    
+
     showError(message, `Variable: ${varName}`);
 }
 
 export function showFileError(fileName: string, error: any): void {
     let message = 'File operation failed: ';
-    
+
     if (error.message.includes('too large') || error.message.includes('size')) {
         message += `File "${fileName}" is too large. Maximum file size is 10MB.`;
     } else if (error.message.includes('type') || error.message.includes('format')) {
@@ -108,13 +108,13 @@ export function showFileError(fileName: string, error: any): void {
     } else {
         message += error.message || 'Unknown file error occurred.';
     }
-    
+
     showError(message, `File: ${fileName}`);
 }
 
 export function showStorageError(operation: string, error: any): void {
     let message = 'Storage operation failed: ';
-    
+
     if (error.message.includes('QUOTA_BYTES') || error.message.includes('quota')) {
         message += 'Storage quota exceeded. Please export your data and clear some collections or history to free up space.';
     } else if (error.message.includes('permission')) {
@@ -122,7 +122,7 @@ export function showStorageError(operation: string, error: any): void {
     } else {
         message += `Unable to ${operation}. ${error.message || 'Unknown storage error occurred.'}`;
     }
-    
+
     showError(message, `Operation: ${operation}`);
 }
 
@@ -354,7 +354,7 @@ function fileToBase64(file: File): Promise<string> {
             'image/', 'video/', 'audio/', 'application/octet-stream'
         ];
         const isAllowedType = allowedTypes.some(type => file.type.startsWith(type)) || file.type === '';
-        
+
         if (!isAllowedType) {
             console.warn(`File type ${file.type} may not be supported, but proceeding anyway.`);
         }
@@ -805,6 +805,7 @@ export function switchMainTab(tabName: string): void {
 
     if (tabBtn) tabBtn.classList.add('active');
     if (tabContent) tabContent.classList.add('active');
+
 }
 
 /**
@@ -820,6 +821,20 @@ export function switchSubTab(subtabName: string): void {
 
     if (subTabBtn) subTabBtn.classList.add('active');
     if (subTabContent) subTabContent.classList.add('active');
+    // Pre-requestまたはTestsタブが表示されたときにtextareaの高さを調整
+    setTimeout(() => {
+        if (subtabName === 'pre-request') {
+            const preRequestTextarea = document.getElementById('preRequestScript') as HTMLTextAreaElement;
+            if (preRequestTextarea) {
+                autoResizeTextarea(preRequestTextarea);
+            }
+        } else if (subtabName === 'tests') {
+            const testTextarea = document.getElementById('testScript') as HTMLTextAreaElement;
+            if (testTextarea) {
+                autoResizeTextarea(testTextarea);
+            }
+        }
+    }, 10); // 少し遅延させてDOM更新を確実にする
 }
 
 /**
@@ -1051,5 +1066,5 @@ export function autoResizeTextarea(textarea: HTMLTextAreaElement) {
     // height をリセット → scrollHeight を正しく得る
     textarea.style.height = 'auto';
     // scrollHeight 分だけ伸ばす
-    textarea.style.height = textarea.scrollHeight + 'px';
+    textarea.style.height = (textarea.scrollHeight + 100) + 'px';
 }
