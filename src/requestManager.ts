@@ -13,6 +13,8 @@ import {
     showLoading,
     showError,
     showSuccess,
+    showNetworkError,
+    showVariableError,
     escapeHtml,
     formatBytes,
     autoResizeTextarea
@@ -634,16 +636,31 @@ export async function sendRequest(
     { response: ProcessedResponse; testResults: TestResult[] }
 > {
     showLoading(true);
+    let req: RequestData = requestObj; // Declare outside try block for access in catch
+    
     try {
         // 1. URL が空でないかチェック
         if (!requestObj.url?.trim()) {
-            showError('URL is required');
+            showError('URL is required', 'Please enter a valid URL in the format: http://example.com or https://example.com');
             return '';
         }
 
         // 2. 変数置換 & プリリクエストスクリプトの実行
-        let req = processVariables(requestObj);
-        req = executePreRequestScript(req.preRequestScript || '', req);
+        try {
+            req = processVariables(requestObj);
+        } catch (error: any) {
+            console.error('Variable processing error:', error);
+            showVariableError('Request processing', error);
+            return '';
+        }
+
+        try {
+            req = executePreRequestScript(req.preRequestScript || '', req);
+        } catch (error: any) {
+            console.error('Pre-request script error:', error);
+            showError('Pre-request script execution failed', `Error: ${error.message}\n\nPlease check your pre-request script syntax and variable references.`);
+            return '';
+        }
         // リクエスト実行結果を保存
         const requestExecution = {
             timestamp: new Date().toISOString(),
@@ -705,8 +722,21 @@ export async function sendRequest(
         }
 
     } catch (error: any) {
-        showError('Request failed: ' + error.message);
         console.error('Request error:', error);
+        
+        // Provide more specific error messages based on error type
+        if (error.message.includes('Network') || error.message.includes('fetch') || 
+            error.message.includes('CORS') || error.message.includes('timeout')) {
+            showNetworkError(req.url || requestObj.url, error);
+        } else if (error.message.includes('Variable') || error.message.includes('変数')) {
+            showVariableError('Request execution', error);
+        } else if (error.message.includes('Invalid URL')) {
+            showError('Invalid URL format', `The URL "${req.url || requestObj.url}" is not valid. Please check the URL format and ensure all variables are properly resolved.`);
+        } else if (error.message.includes('JSON') || error.message.includes('parse')) {
+            showError('Response parsing failed', `Unable to parse the response as JSON. The server may have returned invalid JSON or a different content type.\n\nError: ${error.message}`);
+        } else {
+            showError('Request failed', `An unexpected error occurred while processing your request.\n\nError: ${error.message}\n\nPlease check your request configuration and try again.`);
+        }
     } finally {
         showLoading(false);
     }

@@ -18,7 +18,7 @@ import {
     state
 } from './state';
 
-import { showError, showSuccess, escapeHtml } from './utils';
+import { showError, showSuccess, escapeHtml, showVariableError } from './utils';
 import { JSONPath } from 'jsonpath-plus';
 
 /**
@@ -787,8 +787,12 @@ export function replaceVariables(text: string): string {
                             } else {
                                 index = end + 1;
                             }
-                        } catch (error) {
+                        } catch (error: any) {
                             console.warn('Variable replacement failed for:', varExpression, error);
+                            // Show user-friendly error for variable resolution issues
+                            if (error.message.includes('見つかりません') || error.message.includes('not found')) {
+                                showVariableError(varExpression, error);
+                            }
                             index = end + 1;
                         }
                         break;

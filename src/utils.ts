@@ -54,8 +54,76 @@ export function showSuccess(message: string): void {
     showNotification(message, 'success');
 }
 
-export function showError(message: string): void {
-    showNotification(message, 'error');
+export function showError(message: string, details?: string): void {
+    const fullMessage = details ? `${message}\n\nDetails: ${details}` : message;
+    showNotification(fullMessage, 'error');
+}
+
+/**
+ * Enhanced error handling with categorization
+ */
+export function showNetworkError(url: string, error: any): void {
+    let message = 'Network request failed: ';
+    
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        message += 'Unable to connect to the server. Please check your internet connection and verify the URL is correct.';
+    } else if (error.message.includes('CORS')) {
+        message += 'Cross-origin request blocked. The server may not allow requests from this browser extension.';
+    } else if (error.message.includes('timeout')) {
+        message += 'Request timed out. The server may be slow or unreachable.';
+    } else if (error.message.includes('SSL') || error.message.includes('certificate')) {
+        message += 'SSL/TLS error. The server certificate may be invalid or expired.';
+    } else {
+        message += error.message || 'Unknown network error occurred.';
+    }
+    
+    showError(message, `URL: ${url}\nError Type: ${error.name || 'Unknown'}`);
+}
+
+export function showVariableError(varName: string, error: any): void {
+    let message = 'Variable resolution failed: ';
+    
+    if (error.message.includes('not found') || error.message.includes('見つかりません')) {
+        message += `Variable "${varName}" was not found. Please check the variable name and ensure it exists in your environment, global, or collection variables.`;
+    } else if (error.message.includes('JSONPath')) {
+        message += `JSONPath expression error in "${varName}". Please verify your JSONPath syntax.`;
+    } else if (error.message.includes('構文が不正')) {
+        message += `Invalid variable syntax in "${varName}". Please check the format: \${"scenarios"."Name"."Request"."response"."property"}`;
+    } else {
+        message += error.message || 'Unknown variable error occurred.';
+    }
+    
+    showError(message, `Variable: ${varName}`);
+}
+
+export function showFileError(fileName: string, error: any): void {
+    let message = 'File operation failed: ';
+    
+    if (error.message.includes('too large') || error.message.includes('size')) {
+        message += `File "${fileName}" is too large. Maximum file size is 10MB.`;
+    } else if (error.message.includes('type') || error.message.includes('format')) {
+        message += `File "${fileName}" has an unsupported format or is corrupted.`;
+    } else if (error.message.includes('read')) {
+        message += `Unable to read file "${fileName}". The file may be corrupted or in use by another application.`;
+    } else {
+        message += error.message || 'Unknown file error occurred.';
+    }
+    
+    showError(message, `File: ${fileName}`);
+}
+
+export function showStorageError(operation: string, error: any): void {
+    let message = 'Storage operation failed: ';
+    
+    if (error.message.includes('QUOTA_BYTES') || error.message.includes('quota')) {
+        message += 'Storage quota exceeded. Please export your data and clear some collections or history to free up space.';
+    } else if (error.message.includes('permission')) {
+        message += 'Storage permission denied. Please check browser extension permissions.';
+    } else {
+        message += `Unable to ${operation}. ${error.message || 'Unknown storage error occurred.'}`;
+    }
+    
+    showError(message, `Operation: ${operation}`);
 }
 
 /**
@@ -211,8 +279,9 @@ export async function collectFormDataWithFiles(containerId: string): Promise<For
                         fileSize: file.size,
                         fileContent
                     };
-                } catch (error) {
+                } catch (error: any) {
                     console.error('Failed to convert file to base64:', error);
+                    showFileError(file.name, error);
                     return {
                         key,
                         type: 'file' as const,
@@ -272,30 +341,74 @@ export async function collectFormDataWithFiles(containerId: string): Promise<For
 // ファイルをBase64に変換する関数
 function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
+        // Validate file size (10MB limit)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            reject(new Error(`File too large: ${formatBytes(file.size)}. Maximum size is ${formatBytes(maxSize)}.`));
+            return;
+        }
+
+        // Validate file type (allow most common types)
+        const allowedTypes = [
+            'text/', 'application/json', 'application/xml', 'application/pdf',
+            'image/', 'video/', 'audio/', 'application/octet-stream'
+        ];
+        const isAllowedType = allowedTypes.some(type => file.type.startsWith(type)) || file.type === '';
+        
+        if (!isAllowedType) {
+            console.warn(`File type ${file.type} may not be supported, but proceeding anyway.`);
+        }
+
         const reader = new FileReader();
         reader.onload = () => {
-            const result = reader.result as string;
-            // data:プレフィックスを除去してBase64部分のみ返す
-            const base64 = result.split(',')[1];
-            resolve(base64);
+            try {
+                const result = reader.result as string;
+                if (!result || typeof result !== 'string') {
+                    reject(new Error('Failed to read file content'));
+                    return;
+                }
+                // data:プレフィックスを除去してBase64部分のみ返す
+                const base64 = result.split(',')[1];
+                if (!base64) {
+                    reject(new Error('Invalid file format or empty file'));
+                    return;
+                }
+                resolve(base64);
+            } catch (error: any) {
+                reject(new Error(`Failed to process file "${file.name}": ${error.message}`));
+            }
         };
-        reader.onerror = reject;
+        reader.onerror = () => {
+            reject(new Error(`Failed to read file "${file.name}". The file may be corrupted or in use by another application.`));
+        };
         reader.readAsDataURL(file);
     });
 }
 
 // Base64からFileオブジェクトを復元する関数
 export function base64ToFile(base64: string, fileName: string, fileType: string): File {
-    const byteString = atob(base64);
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
+    try {
+        if (!base64 || typeof base64 !== 'string') {
+            throw new Error('Invalid Base64 data');
+        }
 
-    for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
+        const byteString = atob(base64);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+
+        const blob = new Blob([ab], { type: fileType });
+        return new File([blob], fileName, { type: fileType });
+    } catch (error: any) {
+        console.error('Failed to restore file from Base64:', error);
+        if (error.name === 'InvalidCharacterError') {
+            throw new Error(`Invalid Base64 data for file "${fileName}". The file data may be corrupted.`);
+        }
+        throw new Error(`Failed to restore file "${fileName}": ${error.message}`);
     }
-
-    const blob = new Blob([ab], { type: fileType });
-    return new File([blob], fileName, { type: fileType });
 }
 
 

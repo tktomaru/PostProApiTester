@@ -156,14 +156,21 @@ export async function loadAllStoredData(): Promise<void> {
  *  state.collections を chrome.storage.local に保存
  */
 export async function saveCollectionsToStorage(): Promise<void> {
-    await chrome.storage.local.set({ collections: state.collections });
+    try {
+        await chrome.storage.local.set({ collections: state.collections });
 
-    const stored = await chrome.storage.local.get(['collections']);
-    state.collections.splice(0, state.collections.length, ...stored.collections);
-    // リクエスト実行結果の保存時はUI更新不要
-    // renderCollectionsTree();
-    // コレクション変数セレクタも更新
-    updateCollectionVarSelector();
+        const stored = await chrome.storage.local.get(['collections']);
+        state.collections.splice(0, state.collections.length, ...stored.collections);
+        // リクエスト実行結果の保存時はUI更新不要
+        // renderCollectionsTree();
+        // コレクション変数セレクタも更新
+        updateCollectionVarSelector();
+    } catch (error: any) {
+        console.error('Failed to save collections to storage:', error);
+        const { showStorageError } = await import('./utils');
+        showStorageError('save collections', error);
+        throw error; // Re-throw to allow caller to handle if needed
+    }
 }
 
 /**
@@ -171,7 +178,14 @@ export async function saveCollectionsToStorage(): Promise<void> {
  *  state.history を chrome.storage.local に保存
  */
 export async function saveHistoryToStorage(): Promise<void> {
-    await chrome.storage.local.set({ history: state.history });
+    try {
+        await chrome.storage.local.set({ history: state.history });
+    } catch (error: any) {
+        console.error('Failed to save history to storage:', error);
+        const { showStorageError } = await import('./utils');
+        showStorageError('save history', error);
+        throw error;
+    }
 }
 
 /**
