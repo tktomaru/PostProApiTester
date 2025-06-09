@@ -262,13 +262,14 @@ export const sampleScenarios: Scenario[] = [
                 name: 'サンプル POST',
                 method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=1',
-                headers: {},
+                headers: { "dummyHeader": "dummyHeaderValue" },
                 params: {},
-                body: null,
-                auth: { type: 'none' },
+                body: "defaultBodyValue",
+                auth: { type: 'bearer', token: "dummyToken" },
                 bodyType: "raw",
                 preRequestScript: `
 addHeader test scriptadd1
+setBody setBodyWithScript1
                 `
             },
             {
@@ -276,15 +277,19 @@ addHeader test scriptadd1
                 name: 'サンプル POST',
                 method: 'POST',
                 url: 'https://reply.tukutano.jp/items?page=2',
-                headers: {},
-                params: {},
-                body: "{\"jsonKey\" : \"jsonValue\"}",
+                headers: {
+                    "dummyBody": `\${"scenarios"."Sample post Flow"."サンプル POST"."response"."body".jsonPath("$.body")}`,
+                },
+                params: {
+                    "dummyBody": `\${"scenarios"."Sample post Flow"."サンプル POST"."response"."body".jsonPath("$.body")}`,
+                },
+                body: "{\"jsonKey\" : \"\${\"scenarios\".\"Sample post Flow\".\"サンプル POST\".\"response\".\"body\".jsonPath(\"$.headers.authorization\")} \"}",
                 auth: { type: 'none' },
                 bodyType: "json",
                 preRequestScript: `
 addHeader test scriptadd2
 addHeaderWithVar authorization \${"scenarios"."Sample post Flow"."サンプル POST"."response"."headers"."test"}
-setBodyWithVar \${"scenarios"."Sample post Flow"."サンプル POST"."response"."body".jsonPath("$.headers.authorization")}
+//setBodyWithVar \${"scenarios"."Sample post Flow"."サンプル POST"."response"."body".jsonPath("$.headers.authorization")}
                 `
             },
             {

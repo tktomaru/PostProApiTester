@@ -740,28 +740,87 @@ export function getVariable(varName: string): any {
 export function replaceVariables(text: string): string {
     if (typeof text !== 'string') return text;
 
-    // {{apiUrl}}形式の置換
-    text = text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-        const trimmedName = varName.trim();
-        const value = getVariable(trimmedName);
-        return value !== undefined ? value : match;
-    });
+    // Use a more robust approach for ${...} pattern matching
+    let result = text;
+    
+    // Handle complex ${...} variables with proper bracket matching
+    let index = 0;
+    while (index < result.length) {
+        const start = result.indexOf('${', index);
+        if (start === -1) break;
+        
+        // Find the matching closing brace
+        let braceCount = 0;
+        let end = start + 2; // Start after '${' 
+        let inQuotes = false;
+        let escapeNext = false;
+        
+        while (end < result.length) {
+            const char = result[end];
+            
+            if (escapeNext) {
+                escapeNext = false;
+                end++;
+                continue;
+            }
+            
+            if (char === '\\') {
+                escapeNext = true;
+                end++;
+                continue;
+            }
+            
+            if (char === '"' && !escapeNext) {
+                inQuotes = !inQuotes;
+            } else if (!inQuotes) {
+                if (char === '{') {
+                    braceCount++;
+                } else if (char === '}') {
+                    if (braceCount === 0) {
+                        // Found the matching closing brace
+                        const varExpression = result.substring(start, end + 1);
+                        try {
+                            const value = getVariable(varExpression);
+                            if (value !== undefined) {
+                                result = result.substring(0, start) + value + result.substring(end + 1);
+                                index = start + String(value).length;
+                            } else {
+                                index = end + 1;
+                            }
+                        } catch (error) {
+                            console.warn('Variable replacement failed for:', varExpression, error);
+                            index = end + 1;
+                        }
+                        break;
+                    } else {
+                        braceCount--;
+                    }
+                }
+            }
+            end++;
+        }
+        
+        if (end >= result.length) {
+            // No matching brace found
+            index = start + 2;
+        }
+    }
 
-    // ${apiUrl}形式の置換
-    text = text.replace(/\${([^}]+)}/g, (match, varName) => {
+    // {{apiUrl}}形式の置換
+    result = result.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
         const trimmedName = varName.trim();
         const value = getVariable(trimmedName);
         return value !== undefined ? value : match;
     });
 
     // {petId}形式の置換
-    text = text.replace(/\{([^}]+)\}/g, (match, varName) => {
+    result = result.replace(/\{([^}]+)\}/g, (match, varName) => {
         const trimmedName = varName.trim();
         const value = getVariable(trimmedName);
         return value !== undefined ? value : match;
     });
 
-    return text;
+    return result;
 }
 
 export function deepReplaceVariables(obj: any): any {

@@ -2071,16 +2071,15 @@ export function processVariables(request: RequestData): RequestData {
 
     // URLの変数置換を最初に行う
     processed.url = replaceVariables(processed.url);
-
     // URLの有効性チェック
     if (!processed.url || !processed.url.trim()) {
         throw new Error('URL is required');
     }
 
     // URLが変数置換後も変数を含む場合はエラー
-    if (processed.url.includes('{') || processed.url.includes('}')) {
-        throw new Error(`Invalid URL: ${processed.url} - Variables not resolved`);
-    }
+    // if (processed.url.includes('{') || processed.url.includes('}')) {
+    //     throw new Error(`Invalid URL: ${processed.url} - Variables not resolved`);
+    // }
 
     try {
         const url = new URL(processed.url);
@@ -2324,7 +2323,7 @@ export async function saveCurrentRequest(): Promise<void> {
  */
 function getValueFromVarString(varString: string): any {
     console.log('🔍 [getValueFromVarString] Processing variable string:', varString);
-    
+
     // Use the new getVariable function from variableManager.ts
     try {
         const value = getVariable(varString);
