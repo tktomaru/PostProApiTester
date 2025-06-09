@@ -2197,6 +2197,33 @@ export function processVariables(request: RequestData): RequestData {
 
         // その他のプロパティの変数置換
         processed.headers = deepReplaceVariables(processed.headers);
+        // ─── (B) 変数置換：認証情報にも適用 ─────────────────────────
+        switch (processed.auth.type) {
+            case 'basic':
+                if (processed.auth.username) {
+                    processed.auth.username = replaceVariables(processed.auth.username);
+                }
+                if (processed.auth.password) {
+                    processed.auth.password = replaceVariables(processed.auth.password);
+                }
+                break;
+
+            case 'bearer':
+                if (processed.auth.token) {
+                    processed.auth.token = replaceVariables(processed.auth.token);
+                }
+                break;
+
+            case 'apikey':
+                if (processed.auth.key) {
+                    processed.auth.key = replaceVariables(processed.auth.key);
+                }
+                if (processed.auth.value) {
+                    processed.auth.value = replaceVariables(processed.auth.value);
+                }
+                break;
+        }
+        // ──────────────────────────────────────────────────────────────
         if (processed.body) {
             if (typeof processed.body === 'string') {
                 processed.body = replaceVariables(processed.body);
