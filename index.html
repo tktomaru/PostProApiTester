@@ -191,7 +191,7 @@
                                     <h4>Pre-request Script</h4>
                                     <p class="script-description">This script runs before the request is sent</p>
                                     <textarea id="preRequestScript" class="script-editor"
-                                        placeholder="// Example: pm.variables.set('timestamp', Date.now());"></textarea>
+                                        placeholder="// Example: addHeader X-Request-Source integration-test"></textarea>
                                 </div>
                             </div>
 
@@ -202,7 +202,7 @@
                                     <p class="script-description">This script runs after the response is received
                                     </p>
                                     <textarea id="testScript" class="script-editor"
-                                        placeholder="// Example: pm.test('Status is 200', () => pm.response.to.have.status(200));"></textarea>
+                                        placeholder="// Example: status 200"></textarea>
                                 </div>
                             </div>
                         </div>
