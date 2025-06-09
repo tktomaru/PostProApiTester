@@ -17,7 +17,7 @@ import {
     formatBytes
 } from './utils';
 
-import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues } from './utils';
+import { switchMainTab, addKeyValueRow, handleBodyTypeChange, updateAuthData, renderAuthDetails, collectKeyValues, collectFormDataWithFiles, base64ToFile } from './utils';
 import { getVariable, replaceVariables, deepReplaceVariables, renderVariables, setVariable } from './variableManager';
 import { saveToHistory as saveToHistoryFn } from './historyManager';
 
@@ -236,15 +236,61 @@ export function loadRequestIntoEditor(request: RequestData): void {
             const formDataFieldsContainer = document.getElementById('formDataFieldsContainer') as HTMLElement;
             if (formDataFieldsContainer) {
                 formDataFieldsContainer.innerHTML = '';
-                Object.entries(request.body as Record<string, string>).forEach(([key, value]) => {
-                    addKeyValueRow(formDataFieldsContainer, 'body');
-                    const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
-                    const lastRow = rows[rows.length - 1] as HTMLElement;
-                    const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
-                    const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
-                    keyInput.value = key;
-                    valueInput.value = value;
-                });
+                
+                // FormDataField[]形式の場合（ファイルを含む可能性）
+                if (Array.isArray(request.body)) {
+                    console.log('🔍 [loadRequestIntoEditor] FormDataField[]形式で復元:', request.body);
+                    (request.body as any[]).forEach((field: any) => {
+                        addKeyValueRow(formDataFieldsContainer, 'body');
+                        const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
+                        const lastRow = rows[rows.length - 1] as HTMLElement;
+                        const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
+                        const valueTypeSelect = lastRow.querySelector('.value-type-select') as HTMLSelectElement;
+                        const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
+                        const fileInput = lastRow.querySelector('.file-input') as HTMLInputElement;
+                        
+                        keyInput.value = field.key;
+                        
+                        if (field.type === 'file') {
+                            valueTypeSelect.value = 'file';
+                            valueInput.style.display = 'none';
+                            fileInput.style.display = 'block';
+                            
+                            // ファイル情報を表示し、データも保存
+                            if (field.fileName) {
+                                const fileInfo = document.createElement('span');
+                                fileInfo.textContent = `Saved: ${field.fileName}`;
+                                fileInfo.style.color = '#666';
+                                fileInfo.style.fontSize = '12px';
+                                fileInfo.style.marginLeft = '8px';
+                                fileInfo.dataset.fileInfo = JSON.stringify({
+                                    fileName: field.fileName,
+                                    fileType: field.fileType,
+                                    fileSize: field.fileSize,
+                                    fileContent: field.fileContent
+                                });
+                                fileInput.parentNode?.appendChild(fileInfo);
+                            }
+                        } else {
+                            valueTypeSelect.value = 'text';
+                            valueInput.style.display = 'block';
+                            fileInput.style.display = 'none';
+                            valueInput.value = field.value || '';
+                        }
+                    });
+                } else {
+                    // 従来のRecord<string, string>形式
+                    console.log('🔍 [loadRequestIntoEditor] Record形式で復元:', request.body);
+                    Object.entries(request.body as Record<string, string>).forEach(([key, value]) => {
+                        addKeyValueRow(formDataFieldsContainer, 'body');
+                        const rows = formDataFieldsContainer.querySelectorAll('.key-value-row');
+                        const lastRow = rows[rows.length - 1] as HTMLElement;
+                        const keyInput = lastRow.querySelector('.key-input') as HTMLInputElement;
+                        const valueInput = lastRow.querySelector('.value-input') as HTMLInputElement;
+                        keyInput.value = key;
+                        valueInput.value = value;
+                    });
+                }
             }
         }
     } else {
@@ -1777,6 +1823,12 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         showError('setBody requires a body content');
                         continue;
                     }
+                    // ファイルデータが含まれている場合は警告を表示
+                    if (Array.isArray(requestObj.body) && requestObj.body.some((field: any) => field.type === 'file')) {
+                        console.warn('⚠️ setBody: Request contains file data. setBody command will be ignored to preserve file data.');
+                        showError('setBody command ignored: Request contains file data');
+                        continue;
+                    }
                     requestObj.body = argsString;
                     // Content-Typeが設定されていない場合はapplication/jsonを設定
                     if (!requestObj.headers['Content-Type'] && !requestObj.headers['content-type']) {
@@ -1860,6 +1912,12 @@ export function executePreRequestScript(script: string, requestObj: RequestData)
                         showError('setBodyWithVar requires a variable name');
                         continue;
                     }
+                    // ファイルデータが含まれている場合は警告を表示
+                    if (Array.isArray(requestObj.body) && requestObj.body.some((field: any) => field.type === 'file')) {
+                        console.warn('⚠️ setBodyWithVar: Request contains file data. setBodyWithVar command will be ignored to preserve file data.');
+                        showError('setBodyWithVar command ignored: Request contains file data');
+                        continue;
+                    }
 
                     try {
                         const value = getValueFromVarString(argsString);
@@ -1912,7 +1970,7 @@ export function displayTestResults(results: TestResult[]): void {
 export function processVariables(request: RequestData): RequestData {
     // File objectsを含む場合はJSON.stringify/parseできないため、特別な処理が必要
     const hasFiles = Array.isArray(request.body) && 
-        request.body.some((field: any) => field.type === 'file' && field.file);
+        request.body.some((field: any) => field.type === 'file' && (field.file || field.fileContent));
     
     let processed: RequestData;
     if (hasFiles) {
@@ -1924,7 +1982,19 @@ export function processVariables(request: RequestData): RequestData {
             params: { ...request.params },
             auth: { ...request.auth },
             // bodyは元のオブジェクトを保持（File objectsを保護）
-            body: request.body
+            body: Array.isArray(request.body) ? request.body.map((field: any) => {
+                if (field.type === 'file' && field.fileContent && !field.file) {
+                    // Base64からFileオブジェクトを復元
+                    try {
+                        const restoredFile = base64ToFile(field.fileContent, field.fileName, field.fileType);
+                        return { ...field, file: restoredFile };
+                    } catch (error) {
+                        console.error('Failed to restore file from base64:', error);
+                        return field;
+                    }
+                }
+                return field;
+            }) as any : request.body
         };
     } else {
         // 通常の場合はJSONクローン
@@ -2065,17 +2135,31 @@ export async function saveCurrentRequest(): Promise<void> {
             const jsonBody = document.getElementById('jsonBody') as HTMLTextAreaElement;
             req.body = jsonBody.value;
         } else if (selectedBodyType?.value === 'form-data') {
-            const formRows = document.querySelectorAll('#formDataFieldsContainer .key-value-row');
-            const formDataObj: Record<string, string> = {};
-            formRows.forEach(row => {
-                const rowElement = row as HTMLElement;
-                const keyInput = rowElement.querySelector('.key-input') as HTMLInputElement;
-                const valueInput = rowElement.querySelector('.value-input') as HTMLInputElement;
-                const key = keyInput.value.trim();
-                const value = valueInput.value.trim();
-                if (key) formDataObj[key] = value;
+            // ファイル情報を含めて保存するため、collectFormDataWithFilesを使用してからファイル情報のみ保存
+            const formDataFields = await collectFormDataWithFiles('formDataFieldsContainer');
+            
+            // Fileオブジェクトは保存できないため、ファイル情報のみを保存
+            const serializableFields = formDataFields.map(field => {
+                if (field.type === 'file') {
+                    return {
+                        key: field.key,
+                        type: field.type,
+                        fileName: field.fileName,
+                        fileType: field.fileType,
+                        fileSize: field.fileSize,
+                        fileContent: field.fileContent
+                    };
+                } else {
+                    return {
+                        key: field.key,
+                        type: field.type,
+                        value: field.value
+                    };
+                }
             });
-            req.body = formDataObj;
+            
+            console.log('🔍 [saveCurrentRequest] 保存するform-dataフィールド:', serializableFields);
+            req.body = serializableFields as any;
         } else if (selectedBodyType?.value === 'urlencoded') {
             const urlRows = document.querySelectorAll('#urlEncodedContainer .key-value-row');
             const urlObj: Record<string, string> = {};

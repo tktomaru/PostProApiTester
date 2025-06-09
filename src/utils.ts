@@ -159,23 +159,27 @@ export interface FormDataField {
     type: 'text' | 'file';
     value?: string;
     file?: File;
+    fileName?: string; // ファイル名
+    fileType?: string; // ファイルタイプ
+    fileSize?: number; // ファイルサイズ
+    fileContent?: string; // ファイル内容をBase64で保存
 }
 
-export function collectFormDataWithFiles(containerId: string): FormDataField[] {
+export async function collectFormDataWithFiles(containerId: string): Promise<FormDataField[]> {
     const container = document.getElementById(containerId);
     if (!container) return [];
     
     const rows = container.querySelectorAll('.key-value-row');
-    const result: FormDataField[] = [];
     
-    rows.forEach(row => {
+    // 非同期処理のためPromise.allを使用
+    const promises = Array.from(rows).map(async (row) => {
         const keyInput = row.querySelector('.key-input') as HTMLInputElement;
         const valueTypeSelect = row.querySelector('.value-type-select') as HTMLSelectElement;
         const valueInput = row.querySelector('.value-input') as HTMLInputElement;
         const fileInput = row.querySelector('.file-input') as HTMLInputElement;
         
         const key = keyInput?.value?.trim();
-        if (!key) return;
+        if (!key) return null;
         
         console.log('Collecting field:', { 
             key, 
@@ -187,38 +191,113 @@ export function collectFormDataWithFiles(containerId: string): FormDataField[] {
         if (valueTypeSelect && valueTypeSelect.value === 'file') {
             const file = fileInput?.files?.[0];
             if (file) {
-                console.log('Adding file field:', { 
-                    key, 
-                    filename: file.name, 
-                    type: file.type, 
-                    size: file.size,
-                    fileObjectType: typeof file,
-                    isBlob: file instanceof Blob,
-                    isFile: file instanceof File,
-                    constructor: file.constructor.name
-                });
-                result.push({
-                    key,
-                    type: 'file',
-                    file
-                });
+                try {
+                    // ファイル内容をBase64に変換
+                    const fileContent = await fileToBase64(file);
+                    console.log('Adding file field:', { 
+                        key, 
+                        filename: file.name,
+                        type: file.type, 
+                        size: file.size,
+                        contentLength: fileContent.length
+                    });
+                    
+                    return {
+                        key,
+                        type: 'file' as const,
+                        file,
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        fileContent
+                    };
+                } catch (error) {
+                    console.error('Failed to convert file to base64:', error);
+                    return {
+                        key,
+                        type: 'file' as const,
+                        fileName: file.name + ' (conversion failed)'
+                    };
+                }
             } else {
+                // ファイルが選択されていない場合、復元情報があるかチェック
+                const fileInfoSpan = row.querySelector('span[data-file-info]') as HTMLElement;
+                if (fileInfoSpan) {
+                    const savedFileData = JSON.parse(fileInfoSpan.dataset.fileInfo || '{}');
+                    if (savedFileData.fileContent) {
+                        // 保存されたファイル内容からFileオブジェクトを復元
+                        const restoredFile = base64ToFile(
+                            savedFileData.fileContent,
+                            savedFileData.fileName,
+                            savedFileData.fileType
+                        );
+                        console.log('Restored file from saved data:', savedFileData.fileName);
+                        return {
+                            key,
+                            type: 'file' as const,
+                            file: restoredFile,
+                            fileName: savedFileData.fileName,
+                            fileType: savedFileData.fileType,
+                            fileSize: savedFileData.fileSize,
+                            fileContent: savedFileData.fileContent
+                        };
+                    }
+                }
+                
                 console.log('File field has no file selected:', key);
+                return {
+                    key,
+                    type: 'file' as const,
+                    fileName: 'No file selected'
+                };
             }
         } else {
             const value = valueInput?.value || '';
             console.log('Adding text field:', { key, value });
-            result.push({
+            return {
                 key,
-                type: 'text',
+                type: 'text' as const,
                 value
-            });
+            };
         }
     });
     
-    console.log('collectFormDataWithFiles result:', result);
-    return result;
+    const results = await Promise.all(promises);
+    const filteredResults = results.filter(item => item !== null) as FormDataField[];
+    
+    console.log('collectFormDataWithFiles result:', filteredResults);
+    return filteredResults;
 }
+
+// ファイルをBase64に変換する関数
+function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result as string;
+            // data:プレフィックスを除去してBase64部分のみ返す
+            const base64 = result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// Base64からFileオブジェクトを復元する関数
+export function base64ToFile(base64: string, fileName: string, fileType: string): File {
+    const byteString = atob(base64);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+    
+    const blob = new Blob([ab], { type: fileType });
+    return new File([blob], fileName, { type: fileType });
+}
+
 
 /** updateRequestData を async 関数に変更 */
 export async function updateRequestData(type: string): Promise<void> {
@@ -341,7 +420,7 @@ export function setupEventListeners(): void {
                 case 'form-data':
                     // form-data の場合はファイルを含む特別な収集処理
                     console.log('🔍 [utils.ts] form-data処理開始');
-                    const formDataFields = collectFormDataWithFiles('formDataFieldsContainer');
+                    const formDataFields = await collectFormDataWithFiles('formDataFieldsContainer');
                     console.log('🔍 [utils.ts] 収集されたformDataFields:', formDataFields);
                     requestObj.body = formDataFields as any;
                     console.log('🔍 [utils.ts] requestObj.bodyに設定完了:', requestObj.body);
