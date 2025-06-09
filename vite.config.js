@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import { copyFileSync } from 'fs';
 
 export default defineConfig({
     build: {
@@ -27,7 +28,18 @@ export default defineConfig({
         nodeResolve({
             browser: true
         }),
-        commonjs()
+        commonjs(),
+        {
+            name: 'copy-files',
+            writeBundle() {
+                // Copy manifest.json
+                copyFileSync('manifest.json', 'dist/manifest.json');
+                // Copy index.html
+                copyFileSync('index.html', 'dist/index.html');
+                // Copy styles.css
+                copyFileSync('styles.css', 'dist/styles.css');
+            }
+        }
     ],
     resolve: {
         alias: {
