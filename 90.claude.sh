@@ -26,7 +26,7 @@ jq -c '.[]' "$TASKS_FILE" | while read -r task; do
   echo "▶ 処理中: $id ($(date))"
 
   # ブランチ作成
-  git checkout -b "$branch"
+#   git checkout -b "$branch"
 
   # Claude 実行（レート制限対応）
   while true; do
@@ -54,18 +54,18 @@ jq -c '.[]' "$TASKS_FILE" | while read -r task; do
     # 変更をコミット＆プッシュ
     git add .
     git commit -m "[${id}] ${prompt}"
-    git push -u origin "$branch"
+    # git push -u origin "$branch"
 
     # プルリクエスト作成
-    gh pr create \
-        --title "[${id}] ${prompt}" \
-        --body "自動生成された PR です。\n\n**タスク**: $prompt" \
-        --base main \
-        --head "$branch" \
-        --label "autogen"
+    # gh pr create \
+    #     --title "[${id}] ${prompt}" \
+    #     --body "自動生成された PR です。\n\n**タスク**: $prompt" \
+    #     --base main \
+    #     --head "$branch" \
+    #     --label "autogen"
 
     # main ブランチに戻る
-    git checkout main
+    # git checkout main
   done
 
   echo "✔ 完了: $id ($(date))"
