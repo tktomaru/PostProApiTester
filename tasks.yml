@@ -1,13 +1,19 @@
 tasks:
-  - id: feature-pm-test
-    prompt: |
-      12.testが正常に実行されるようにしてほしい
   - id: feature-unit-test
     prompt: |
       単体テストコードを実装して、13-unit-test.shで実行されるようにしてほしい。13-unit-test.shにはエラーがないようにしてほしい。
   - id: feature-refact
     prompt: |
       リファクタリングして、人にとって見やすいようにしてほしい。
+  - id: sp
+    prompt: |
+      システム企画文書を作成する。ドキュメントはmarkdown形式とする。生成先は./docs/1.sp.mdファイルとする。
+  - id: sa
+    prompt: |
+      要求定義文書を作成する。ドキュメントはmarkdown形式とする。生成先は./docs/2.sa.mdファイルとする。システム企画文書を参照して作成する。
+  - id: rd
+    prompt: |
+      要件定義文書を作成する。ドキュメントはmarkdown形式とする。生成先は./docs/3.rd.mdファイルとする。要求定義文書を参照して作成する。
 
 
 

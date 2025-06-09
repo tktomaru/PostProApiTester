@@ -4,13 +4,17 @@ module.exports = {
     '!src/**/*.d.ts',
   ],
   maxWorkers: 1,
-  testTimeout: 90000,
   projects: [
     {
       displayName: 'unit',
       testMatch: ['<rootDir>/tests/unit/**/*.test.ts'],
       testEnvironment: 'jsdom',
       preset: 'ts-jest',
+      globals: {
+        'ts-jest': {
+          tsconfig: 'tsconfig.json'
+        }
+      },
       testTimeout: 90000
     },
     {
@@ -19,6 +23,11 @@ module.exports = {
       testEnvironment: 'node',
       preset: 'ts-jest',
       setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+      globals: {
+        'ts-jest': {
+          tsconfig: 'tsconfig.json'
+        }
+      },
       testTimeout: 90000,
       maxWorkers: 1
     }

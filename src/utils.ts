@@ -509,89 +509,10 @@ function setupSaveButton(): void {
     }
 }
 
-/**
- * 送信ボタンのイベントリスナーを設定
- */
-function setupSendButton(): void {
-    const sendBtn = document.getElementById('sendBtn');
-    if (sendBtn) {
-        sendBtn.addEventListener('click', async (e: Event) => {
-            e.preventDefault();
-            await handleSendButtonClick();
-        });
-    }
-}
 
-/**
- * 送信ボタンクリック時の処理
- */
-async function handleSendButtonClick(): Promise<void> {
-    const requestObj = state.currentRequest;
-    if (!requestObj) return;
 
-    updateRequestFromFormInputs(requestObj);
-    
-    // requestManager.sendRequestに委譲
-    const { sendRequest } = await import('./requestManager');
-    await sendRequest(requestObj);
-}
 
-/**
- * フォーム入力からリクエストオブジェクトを更新
- */
-function updateRequestFromFormInputs(requestObj: any): void {
-    updateBasicRequestFields(requestObj);
-    updateRequestHeaders(requestObj);
-    updateRequestParams(requestObj);
-}
 
-/**
- * 基本的なリクエストフィールドを更新
- */
-function updateBasicRequestFields(requestObj: any): void {
-    const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
-    const nameInput = document.getElementById('nameInput') as HTMLInputElement;
-    const urlInput = document.getElementById('urlInput') as HTMLInputElement;
-
-    requestObj.method = methodSelect?.value || requestObj.method;
-    requestObj.name = nameInput?.value?.trim() || requestObj.name;
-    requestObj.url = urlInput?.value?.trim() || requestObj.url;
-}
-
-/**
- * リクエストヘッダーを収集して更新
- */
-function updateRequestHeaders(requestObj: any): void {
-    const newHeaders = collectKeyValuePairs('#headersContainer');
-    requestObj.headers = newHeaders;
-}
-
-/**
- * リクエストパラメータを収集して更新
- */
-function updateRequestParams(requestObj: any): void {
-    const newParams = collectKeyValuePairs('#paramsContainer');
-    requestObj.params = newParams;
-}
-
-/**
- * 指定されたコンテナからキー・バリューペアを収集
- */
-function collectKeyValuePairs(containerSelector: string): Record<string, string> {
-    const rows = document.querySelectorAll(`${containerSelector} .key-value-row`);
-    const result: Record<string, string> = {};
-    
-    rows.forEach(row => {
-        const rowElement = row as HTMLElement;
-        const keyInput = rowElement.querySelector('.key-input') as HTMLInputElement;
-        const valueInput = rowElement.querySelector('.value-input') as HTMLInputElement;
-        const key = keyInput?.value?.trim();
-        const value = valueInput?.value?.trim();
-        if (key) result[key] = value || '';
-    });
-    
-    return result;
-}
 
 /**
  * メソッドとURL入力のイベントリスナーを設定
@@ -616,6 +537,19 @@ function setupDataManagementEventListeners(): void {
     // インポート・エクスポート、履歴管理などのイベントリスナー
     // 既存のコードから分離予定
 }
+
+/**
+ * 送信ボタンのイベントリスナーを設定
+ */
+export function setupSendButton(): void {
+    const sendBtn = document.getElementById('sendBtn') as HTMLElement;
+    if (sendBtn) {
+        sendBtn.addEventListener('click', async (e: Event) => {
+            e.preventDefault();
+            if (!state.currentRequest) return;
+
+            const requestObj = { ...state.currentRequest };
+            const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
             const nameInput = document.getElementById('nameInput') as HTMLInputElement;
             const urlInput = document.getElementById('urlInput') as HTMLInputElement;
 
@@ -854,7 +788,6 @@ function setupDataManagementEventListeners(): void {
             }
         });
     }
-
 }
 
 /**

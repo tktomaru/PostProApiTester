@@ -4,7 +4,9 @@
       "Bash(grep:*)",
       "Bash(npm run build:*)",
       "Bash(npx tsc:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(bash:*)",
+      "Bash(yq:*)"
     ],
     "deny": []
   }

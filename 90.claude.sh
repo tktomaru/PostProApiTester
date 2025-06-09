@@ -19,13 +19,17 @@ git checkout main
 
 # ── YAML を1件ずつ読み込む（Python版 yq 向け） ──
 # tasks.yml の tasks 配列を compact JSON で展開
-yq -c '.tasks[]' "$TASKS_FILE" | while read -r task; do
+# パイプを使わずに配列で処理して、exit の問題を回避
+readarray -t tasks < <(yq -c '.tasks[]' "$TASKS_FILE")
+
+for task in "${tasks[@]}"; do
   id=$(echo "$task" | yq -r '.id' -)
   prompt=$(echo "$task" | yq -r '.prompt' -)
 
   echo "▶ [$id] 実行開始: $(date)"
 
   # Claude 実行（リアルタイムログ＆レート制限対応）
+  task_success=false
   while true; do
     start_line=$(wc -l < "$LOG_FILE")
 
@@ -40,6 +44,7 @@ yq -c '.tasks[]' "$TASKS_FILE" | while read -r task; do
 
     if [ "$exit_code" -eq 0 ]; then
       echo "✔ Claude 実行成功: $(date)"
+      task_success=true
       break
     fi
 
@@ -51,18 +56,22 @@ yq -c '.tasks[]' "$TASKS_FILE" | while read -r task; do
       echo "⏱ 再試行: $(date)"
     else
       echo "❌ Claude 実行エラー。ログ参照: $LOG_FILE"
-      exit 1
+      echo "❌ タスク [$id] をスキップして次のタスクに進みます"
+      break
     fi
   done
 
-  # コミット＆プッシュ（main 上で 1コミットずつ）
-  git add .
-  # prompt の最初の行だけを取り出してコミットメッセージに
-  first_line=$(echo "$prompt" | head -n1)
-  git commit -m "[${id}] ${first_line}"
-  git push origin main
-
-  echo "✔ [$id] コミット完了 & プッシュ: $(date)"
+  # タスクが成功した場合のみコミット＆プッシュ
+  if [ "$task_success" = true ]; then
+    git add .
+    # prompt の最初の行だけを取り出してコミットメッセージに
+    first_line=$(echo "$prompt" | head -n1)
+    git commit -m "[${id}] ${first_line}"
+    git push origin main
+    echo "✔ [$id] コミット完了 & プッシュ: $(date)"
+  else
+    echo "⚠️ [$id] エラーのためコミットをスキップ: $(date)"
+  fi
   echo
 done
 
