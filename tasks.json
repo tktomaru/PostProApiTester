@@ -1,14 +1,10 @@
 [
     {
-        "id": "create-11.sh",
-        "prompt": "11.shでビルドができるようにしてください"
-    },
-    {
-        "id": "create-12.sh",
-        "prompt": "12.shでテストができるようにしてください"
+        "id": "test-12.sh",
+        "prompt": "Puppeteer で「拡張機能を読み込んだブラウザを起動 → popup／background／content script を操作する」テストを書いてください"
     },
     {
         "id": "test-12.sh",
-        "prompt": "Puppeteer で「拡張機能を読み込んだブラウザを起動 → popup／background／content script を操作する」テストを書いてください"
+        "prompt": "test-12.shを実行して、自動テストがすべて完了するようにしてください"
     }
 ]
