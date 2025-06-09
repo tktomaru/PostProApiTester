@@ -35,6 +35,7 @@
   ],
   "action": {
     "default_title": "Advanced API Tester",
+    "default_popup": "index.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

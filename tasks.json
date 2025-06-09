@@ -6,5 +6,9 @@
     {
         "id": "test-12.sh",
         "prompt": "test-12.shを実行して、自動テストがすべて完了するようにしてください"
+    },
+    {
+        "id": "feature-pm-test",
+        "prompt": ""
     }
 ]

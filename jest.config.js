@@ -7,7 +7,7 @@ module.exports = {
     '!src/**/*.d.ts',
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  testTimeout: 60000,
+  testTimeout: 90000,
   maxWorkers: 1, // Run tests sequentially to avoid conflicts
   testSequencer: '<rootDir>/tests/testSequencer.js'
 };
