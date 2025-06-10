@@ -1,0 +1,462 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>API Tester</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body><!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <h1>API Tester</h1>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-outline btn-sm" id="importBtn">Import</button>
+            <button class="btn btn-outline btn-sm" id="exportBtn">Export</button>
+            <button class="btn btn-outline btn-sm" id="settingsBtn">Settings</button>
+        </div>
+    </div>
+    <div class="app-container">
+        <!-- 左サイドバー：コレクション一覧＋シナリオ一覧 -->
+        <aside class="sidebar" id="collectionsSidebar">
+            <!-- コレクション セクション -->
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <h3>Collections</h3>
+                    <button class="btn btn-sm" id="createCollectionBtn">＋ New</button>
+                </div>
+                <div id="collectionsTree">
+                    <!-- JS で動的にコレクションおよびそのリクエスト一覧をここに描画 -->
+                </div>
+            </div>
+
+            <!-- シナリオ セクション -->
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <h3>Scenarios</h3>
+                    <button class="btn btn-sm" id="createScenarioFromSidebarBtn">＋ New</button>
+                </div>
+                <div id="scenariosTree">
+                    <!-- JS で動的にシナリオおよびそのリクエスト一覧をここに描画 -->
+                </div>
+            </div>
+        </aside>
+
+
+        <main class="main-content">
+            <!-- Main Navigation -->
+            <div class="nav-tabs">
+                <button class="tab-btn active" data-tab="request">Request</button>
+                <button class="tab-btn" data-tab="history">History</button>
+                <button class="tab-btn" data-tab="interceptor">Interceptor</button>
+                <button class="tab-btn" data-tab="variables">Variables</button>
+                <button class="tab-btn" data-tab="scenarios">Scenarios</button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div class="tab-contents">
+                <!-- Request Tab -->
+                <div id="request-tab" class="tab-content active"><!-- ① ここにリクエスト ID を表示するエリアを追加 -->
+                    <div id="request-name-display" class="request-name-display">
+                        <!-- 初期状態では非表示か「No Request Selected」などにしておいてもOK -->
+                        <span>Request Name: <em>未選択</em></span>
+                    </div>
+                    <div id="request-id-display" class="request-id-display">
+                        <!-- 初期状態では非表示か「No Request Selected」などにしておいてもOK -->
+                        <span>Request ID: <em>未選択</em></span>
+                    </div>
+                    <div class="request-section">
+                        <div class="request-line">
+                            <select id="methodSelect" class="method-select">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="HEAD">HEAD</option>
+                                <option value="OPTIONS">OPTIONS</option>
+                            </select>
+                            <input type="text" id="urlInput" class="url-input" placeholder="Enter request URL">
+                            <!-- 保存 ボタン -->
+                            <button id="saveBtn" class="btn btn-secondary">Save</button>
+                            <!-- 送信 ボタン -->
+                            <button id="sendBtn" class="btn btn-primary">Send</button>
+                        </div>
+
+                        <!-- Request Sub-tabs -->
+                        <div class="sub-tabs">
+                            <button class="sub-tab-btn active" data-subtab="params">Params</button>
+                            <button class="sub-tab-btn" data-subtab="headers">Headers</button>
+                            <button class="sub-tab-btn" data-subtab="body">Body</button>
+                            <button class="sub-tab-btn" data-subtab="auth">Auth</button>
+                            <button class="sub-tab-btn" data-subtab="pre-request">Pre-request</button>
+                            <button class="sub-tab-btn" data-subtab="tests">Tests</button>
+                        </div>
+
+                        <!-- Sub Tab Contents -->
+                        <div class="sub-tab-contents">
+                            <!-- Params -->
+                            <div id="params-subtab" class="sub-tab-content active">
+                                <div class="key-value-editor">
+                                    <div class="key-value-header">
+                                        <span>Key</span>
+                                        <span>Value</span>
+                                        <span>Description</span>
+                                        <span></span>
+                                    </div>
+                                    <div id="paramsContainer" class="key-value-container"></div>
+                                    <button class="btn btn-sm add-param">Add Param</button>
+                                </div>
+                            </div>
+
+                            <!-- Headers -->
+                            <div id="headers-subtab" class="sub-tab-content">
+                                <div class="key-value-editor">
+                                    <div class="key-value-header">
+                                        <span>Key</span>
+                                        <span>Value</span>
+                                        <span>Description</span>
+                                        <span></span>
+                                    </div>
+                                    <div id="headersContainer" class="key-value-container"></div>
+                                    <button class="btn btn-sm add-header">Add Header</button>
+                                </div>
+                            </div>
+
+                            <!-- Body -->
+                            <div id="body-subtab" class="sub-tab-content">
+                                <div class="body-type-selector">
+                                    <label><input type="radio" name="bodyType" value="none" checked> None</label>
+                                    <label><input type="radio" name="bodyType" value="raw"> Raw</label>
+                                    <label><input type="radio" name="bodyType" value="json"> Json</label>
+                                    <label><input type="radio" name="bodyType" value="form-data"> Form Data</label>
+                                    <label><input type="radio" name="bodyType" value="urlencoded"> URL
+                                        Encoded</label>
+                                    <label><input type="radio" name="bodyType" value="binary"> Binary</label>
+                                </div>
+                                <div id="bodyEditor">
+                                    <textarea id="rawBody" class="raw-body" placeholder="Enter request body"></textarea>
+
+                                    <!-- JSON 用エリア（最初は非表示）-->
+                                    <div id="jsonEditor" style="display: none;">
+                                        <textarea id="jsonBody" class="json-body"
+                                            placeholder="{ key : value }"></textarea>
+                                    </div>
+
+                                    <!-- Form Data 用エリア（最初は非表示）-->
+                                    <div id="formDataContainer" class="key-value-container" style="display: none;">
+                                        <div class="key-value-header">
+                                            <span>Key</span>
+                                            <span>Type</span>
+                                            <span>Value</span>
+                                            <span>Description</span>
+                                            <span></span>
+                                        </div>
+                                        <div id="formDataFieldsContainer" class="key-value-fields-container"></div>
+                                        <button class="btn btn-sm add-form-data">Add Form Data</button>
+                                    </div>
+
+                                    <!-- Binary 用エリア（最初は非表示）-->
+                                    <div id="binaryContainer" style="display: none;">
+                                        <div class="binary-upload-area">
+                                            <label for="binaryFileInput">Select Binary File:</label>
+                                            <input type="file" id="binaryFileInput" class="binary-file-input">
+                                            <div id="binaryFileInfo" class="binary-file-info"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                            </div>
+
+                            <!-- Auth -->
+                            <div id="auth-subtab" class="sub-tab-content">
+                                <div class="auth-type-selector">
+                                    <label>Type:</label>
+                                    <select id="authType">
+                                        <option value="none">None</option>
+                                        <option value="basic">Basic Auth</option>
+                                        <option value="bearer">Bearer Token</option>
+                                        <option value="apikey">API Key</option>
+                                        <option value="oauth2">OAuth 2.0</option>
+                                    </select>
+                                </div>
+                                <div id="authDetails" class="auth-details"></div>
+                            </div>
+
+                            <!-- Pre-request Script -->
+                            <div id="pre-request-subtab" class="sub-tab-content">
+                                <div class="script-section">
+                                    <h4>Pre-request Script</h4>
+                                    <p class="script-description">This script runs before the request is sent</p>
+                                    <textarea id="preRequestScript" class="script-editor"
+                                        placeholder="// Example: addHeader X-Request-Source integration-test"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Test Script -->
+                            <div id="tests-subtab" class="sub-tab-content">
+                                <div class="script-section">
+                                    <h4>Test Script</h4>
+                                    <p class="script-description">This script runs after the response is received
+                                    </p>
+                                    <textarea id="testScript" class="script-editor"
+                                        placeholder="// Example: status 200"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Response Section -->
+                    <div class="response-section">
+                        <div class="response-header">
+                            <h3>Response</h3>
+                            <div id="responseStats" class="response-stats"></div>
+                        </div>
+
+                        <div class="response-tabs">
+                            <button class="response-tab-btn active" data-restab="body">Body</button>
+                            <button class="response-tab-btn" data-restab="headers">Headers</button>
+                            <button class="response-tab-btn" data-restab="cookies">Cookies</button>
+                            <button class="response-tab-btn" data-restab="tests">Test Results</button>
+                        </div>
+
+                        <div class="response-content">
+                            <div id="response-body" class="response-tab-content active">
+                                <div class="response-format-selector">
+                                    <button class="format-btn active" data-format="pretty">Pretty</button>
+                                    <button class="format-btn" data-format="raw">Raw</button>
+                                    <button class="format-btn" data-format="preview">Preview</button>
+                                </div>
+                                <div id="responseBody" class="response-body-content"></div>
+                            </div>
+                            <div id="response-headers" class="response-tab-content"></div>
+                            <div id="response-cookies" class="response-tab-content"></div>
+                            <div id="response-tests" class="response-tab-content"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scenarios Tab -->
+                <div id="scenarios-tab" class="tab-content">
+                    <div class="scenarios-header">
+                        <h3>Scenarios</h3>
+                        <button class="btn btn-sm" id="newScenarioBtn">+ New Scenario</button>
+                    </div>
+                    <div class="scenarios-body">
+                        <!-- 左列：シナリオ一覧 -->
+                        <aside class="scenario-list">
+                            <ul id="scenarioList">
+                                <!-- JavaScript で <li data-id="scenario1">シナリオ名</li> を描画 -->
+                            </ul>
+                        </aside>
+
+                        <!-- 右列：シナリオ編集エリア -->
+                        <section class="scenario-editor">
+                            <h4 id="scenarioTitle">Select a scenario</h4>
+
+                            <!-- シナリオ内リクエスト一覧 -->
+                            <ul id="scenarioRequestsList" class="scenario-requests">
+                                <!-- JavaScript で描画 -->
+                            </ul>
+
+                            <!-- ボタン群 -->
+                            <div class="scenario-actions">
+                                <button class="btn btn-primary" id="runScenarioBtn" disabled>Run Scenario</button>
+                            </div>
+
+                            <!-- 実行結果表示エリア -->
+                            <div id="scenarioResultContainer" class="scenario-results">
+                                <!-- 各リクエストの実行ステータスやレスポンスをここに表示 -->
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div id="history-tab" class="tab-content">
+                    <div class="history-header">
+                        <h3>Request History</h3>
+                        <div class="history-actions">
+                            <input type="text" id="historySearch" class="search-input" placeholder="Search history...">
+                            <button id="clearHistoryBtn" class="btn btn-sm">Clear All</button>
+                        </div>
+                    </div>
+                    <div id="historyContainer" class="history-container"></div>
+                </div>
+
+                <!-- Interceptor Tab -->
+                <div id="interceptor-tab" class="tab-content">
+                    <div class="interceptor-header">
+                        <h3>Request Interceptor</h3>
+                        <div class="interceptor-controls">
+                            <button id="startInterceptorBtn" class="btn btn-primary btn-sm">Start Capture</button>
+                            <button id="stopInterceptorBtn" class="btn btn-sm" disabled>Stop</button>
+                        </div>
+                    </div>
+                    <div class="interceptor-filters">
+                        <div class="filter-group">
+                            <label>Filter by Method:</label>
+                            <div class="method-filters">
+                                <label><input type="checkbox" value="GET" checked> GET</label>
+                                <label><input type="checkbox" value="POST" checked> POST</label>
+                                <label><input type="checkbox" value="PUT" checked> PUT</label>
+                                <label><input type="checkbox" value="DELETE" checked> DELETE</label>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <label>Domain Filter:</label>
+                            <input type="text" id="domainFilter" class="filter-input"
+                                placeholder="e.g. api.example.com">
+                        </div>
+                    </div>
+                    <div id="interceptorContainer" class="interceptor-container"></div>
+                </div>
+
+                <!-- Variables Tab -->
+                <div id="variables-tab" class="tab-content">
+                    <div class="variables-header">
+                        <h3>Variables Management</h3>
+                    </div>
+
+                    <div class="variables-content">
+                        <!-- Global Variables -->
+                        <div class="variable-section">
+                            <div class="variable-section-header">
+                                <h4>Global Variables</h4>
+                                <button class="btn btn-sm" id="addGlobalVarBtn">Add</button>
+                            </div>
+                            <div id="globalVariablesContainer" class="variables-container"></div>
+                        </div>
+
+                        <!-- Environment Variables -->
+                        <div class="variable-section">
+                            <div class="variable-section-header">
+                                <h4>Environment Variables</h4>
+                                <select id="environmentSelect">
+                                    <option value="">No Environment</option>
+                                </select>
+                                <button class="btn btn-sm" id="newEnvironmentBtn">New</button>
+                                <button class="btn btn-sm" id="editEnvironmentBtn">Edit</button>
+                                <button class="btn btn-sm" id="addEnvVarBtn">Add</button>
+                            </div>
+                            <div id="envVariablesContainer" class="variables-container"></div>
+                        </div>
+
+                        <!-- Collection Variables -->
+                        <div class="variable-section">
+                            <div class="variable-section-header">
+                                <h4>Collection Variables</h4>
+                                <select id="collectionVarSelect">
+                                    <option value="">Select Collection</option>
+                                </select>
+                                <button class="btn btn-sm" id="addCollectionVarBtn">Add</button>
+                            </div>
+                            <div id="collectionVariablesContainer" class="variables-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+
+    <!-- Import/Export Modal -->
+    <div id="importExportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Import</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="import-options">
+                    <label>Import from:</label>
+                    <select id="importType">
+                        <option value="postman">Postman Collection</option>
+                        <option value="openapi">OpenAPI/Swagger</option>
+                        <option value="har">HAR File</option>
+                        <option value="curl">cURL Command</option>
+                        <option value="apitester">PostPro API Tester Format</option>
+                        <option value="talentedapitester">Talented API Tester Format</option>
+                    </select>
+                </div>
+                <div class="file-input-area">
+                    <div id="fileDropZone" class="file-drop-zone">
+                        <p>Drop file here or click to browse</p>
+                    </div>
+                    <input type="file" id="importFile" accept=".json,.har,.txt" style="display:none;">
+                </div>
+                <textarea id="importText" class="import-textarea" placeholder="Or paste content here..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="importSubmitBtn">Import</button>
+                <button class="btn modal-close">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Area -->
+    <div id="notificationArea" class="notification-area"></div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>General Settings</h4>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="openDevTools">
+                            Show Developer Tools reminder
+                        </label>
+                        <small style="color: #666; display: block; margin-top: 4px; margin-left: 20px;">
+                            Shows a gentle reminder to press F12 for better debugging experience when opening the
+                            extension.
+                        </small>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            Request Timeout (ms):
+                            <input type="number" id="requestTimeout" min="1000" step="1000">
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="followRedirects">
+                            Follow Redirects
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="validateSSL">
+                            Validate SSL Certificates
+                        </label>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h4>History Settings</h4>
+                    <div class="setting-item">
+                        <label>
+                            Max History Items:
+                            <input type="number" id="maxHistoryItems" min="10" step="10">
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="resetSettings">Reset to Default</button>
+                <button class="btn btn-primary" id="saveSettings">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- バンドルされたスクリプトを読み込む -->
+    <script type="module" src="index.bundle.js"></script>
+</body>
+
+</html>
