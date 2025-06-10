@@ -177,7 +177,7 @@ export class EnhancedRequestManager {
       };
       
     } catch (error) {
-      logger.error('Pre-request phase failed', error, {
+      logger.error('Pre-request phase failed', error as Error, {
         requestId: context.requestId,
         requestName: request.name
       });
@@ -209,7 +209,7 @@ export class EnhancedRequestManager {
     } catch (error) {
       const endTimestamp = performance.now();
       
-      logger.error('HTTP request failed', error, {
+      logger.error('HTTP request failed', error as Error, {
         url: request.url,
         method: request.method,
         duration: endTimestamp - startTimestamp
@@ -224,7 +224,7 @@ export class EnhancedRequestManager {
   private async executePostRequestPhase(
     request: ProcessedRequest,
     response: ResponseData,
-    context: RequestContext
+    _context: RequestContext
   ): Promise<any> {
     
     const phaseTimer = performanceMonitor.startTimer('post_request_phase');
@@ -244,7 +244,7 @@ export class EnhancedRequestManager {
       return { success: true };
       
     } catch (error) {
-      logger.error('Post-request phase failed', error);
+      logger.error('Post-request phase failed', error as Error);
       throw error;
     } finally {
       performanceMonitor.endTimer(phaseTimer);
@@ -269,7 +269,7 @@ export class EnhancedRequestManager {
           field
         );
       } catch (error) {
-        logger.warn(`Variable processing failed for field: ${field}`, error);
+        logger.warn(`Variable processing failed for field: ${field}`, error as Record<string, any>);
         
         // Continue with non-critical errors
         if (!this.isCriticalField(field)) {
@@ -286,7 +286,7 @@ export class EnhancedRequestManager {
   private async processFieldVariables(
     fieldValue: any, 
     context: VariableContext,
-    fieldName: string
+    _fieldName: string
   ): Promise<any> {
     
     if (typeof fieldValue === 'string') {
@@ -302,7 +302,7 @@ export class EnhancedRequestManager {
   
   private async processStringVariables(
     text: string, 
-    context: VariableContext
+    _context: VariableContext
   ): Promise<string> {
     // Variable reference pattern: {{variableName}}
     return replaceVariables(text);
@@ -427,17 +427,17 @@ export class EnhancedRequestManager {
           get: (name: string) => getVariable(name),
           set: (name: string, value: any) => setVariable(name, value, 'collection')
         },
-        test: (name: string, fn: () => void) => {
+        test: (_name: string, _fn: () => void) => {
           // Test execution logic
         },
-        expect: (actual: any) => {
+        expect: (_actual: any) => {
           // Chai-compatible assertions
         }
       }
     };
   }
   
-  private async buildVariableContext(request: RequestData): Promise<VariableContext> {
+  private async buildVariableContext(_request: RequestData): Promise<VariableContext> {
     return {
       global: {},
       environment: {},
@@ -567,8 +567,6 @@ export class EnhancedRequestManager {
 
 class HttpClient {
   private defaultTimeout = 30000;
-  private requestInterceptors: RequestInterceptor[] = [];
-  private responseInterceptors: ResponseInterceptor[] = [];
   
   async send(
     request: ProcessedRequest, 
@@ -603,7 +601,7 @@ class HttpClient {
           try {
             xhr.setRequestHeader(name, value);
           } catch (error) {
-            logger.warn(`Invalid header: ${name}`, error);
+            logger.warn(`Invalid header: ${name}`, error as Record<string, any>);
           }
         }
       }
@@ -654,13 +652,6 @@ interface RequestQueueItem {
   reject: (error: any) => void;
 }
 
-interface RequestInterceptor {
-  process(request: ProcessedRequest): Promise<ProcessedRequest>;
-}
-
-interface ResponseInterceptor {
-  process(response: ResponseData): Promise<ResponseData>;
-}
 
 // Global instance
 export const enhancedRequestManager = new EnhancedRequestManager();

@@ -77,6 +77,7 @@ export interface ResponseData {
   body: any;
   bodyText: string;
   testResults?: TestResult[];
+  timestamp?: string;
 }
 
 export interface HistoryItem {
@@ -268,6 +269,7 @@ export interface ScriptContext {
   variables?: Record<string, any>;
   environment?: Record<string, any>;
   globals?: Record<string, any>;
+  pm?: any;
 }
 
 export interface ScriptResult {

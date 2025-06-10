@@ -49,7 +49,7 @@ export class GlobalErrorHandler {
     } catch (handlingError) {
       // エラーハンドリング自体が失敗した場合
       console.error('Error handler failed', handlingError);
-      this.fallbackErrorHandling(error, handlingError);
+      this.fallbackErrorHandling(error, handlingError as Error);
     }
   }
   
@@ -128,7 +128,7 @@ export class GlobalErrorHandler {
     }
   }
   
-  private shouldNotifyUser(error: Error, category: ErrorCategory): boolean {
+  private shouldNotifyUser(_error: Error, category: ErrorCategory): boolean {
     // セキュリティエラーやネットワークエラーは通知
     return category === ErrorCategory.SECURITY || 
            category === ErrorCategory.NETWORK ||
@@ -145,7 +145,7 @@ export class GlobalErrorHandler {
     }
   }
   
-  private getUserFriendlyMessage(error: Error, category: ErrorCategory): string {
+  private getUserFriendlyMessage(_error: Error, category: ErrorCategory): string {
     switch (category) {
       case ErrorCategory.NETWORK:
         return 'Network connection error. Please check your internet connection and try again.';
@@ -175,7 +175,7 @@ export class GlobalErrorHandler {
   private setupExtensionErrorHandling(): void {
     // Chrome拡張機能特有のエラーハンドリング設定
     if (chrome.runtime.onMessage) {
-      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
         if (message.type === 'ERROR_REPORT') {
           this.handleError(new Error(message.error));
         }

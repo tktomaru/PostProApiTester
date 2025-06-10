@@ -9,7 +9,7 @@ describe('PostPro API Tester Chrome Extension', () => {
 
   beforeAll(async () => {
     // Build the extension first
-    const extensionPath = path.resolve(__dirname, '../dist');
+    const extensionPath = path.resolve(__dirname, '../../dist');
     
     // Verify extension build exists
     if (!fs.existsSync(extensionPath)) {

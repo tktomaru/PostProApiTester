@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 describe('Extension Build Tests', () => {
-  const distPath = path.resolve(__dirname, '../dist');
+  const distPath = path.resolve(__dirname, '../../dist');
 
   test('Build directory should exist', () => {
     expect(fs.existsSync(distPath)).toBe(true);

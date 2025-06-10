@@ -6,7 +6,13 @@
       "Bash(npx tsc:*)",
       "Bash(rg:*)",
       "Bash(bash:*)",
-      "Bash(yq:*)"
+      "Bash(yq:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(touch:*)",
+      "Bash(chmod:*)",
+      "Bash(./13-unit-test.sh:*)",
+      "Bash(./14-it-test.sh:*)"
     ],
     "deny": []
   }

@@ -2,7 +2,7 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // リクエスト送受信・プリリクエストスクリプト・テストスクリプト・レスポンス表示をまとめる
 
-import type { RequestData, ResponseData, AuthConfig, ProcessedRequest, RequestResult, ScriptContext, ScriptResult } from './types';
+import type { RequestData, ResponseData, AuthConfig } from './types';
 import { JSONPath } from 'jsonpath-plus';
 import {
     state,
@@ -10,9 +10,6 @@ import {
     saveScenariosToStorage
 } from './state';
 import { executePostmanTestScript, isPostmanStyleScript } from './postmanTestAPI';
-import { globalErrorHandler, logger } from './errorHandler';
-import { performanceMonitor } from './performanceMonitor';
-import { securityValidator, scriptSandbox } from './securityValidator';
 
 import {
     showLoading,

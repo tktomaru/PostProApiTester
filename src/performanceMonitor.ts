@@ -105,7 +105,7 @@ export class PerformanceMonitor {
             const navEntry = entry as PerformanceNavigationTiming;
             this.recordMetric('navigation', {
               name: 'page_load',
-              value: navEntry.loadEventEnd - navEntry.navigationStart,
+              value: navEntry.loadEventEnd - navEntry.fetchStart,
               timestamp: Date.now()
             });
           }
@@ -186,4 +186,311 @@ export class PerformanceMonitor {
         });
       }
     }, 30000); // 30秒ごと
-  }\n  \n  private setupAlertThresholds(): void {\n    // パフォーマンスアラートのしきい値設定\n    this.alertManager.setThreshold('request_execution', {\n      metric: 'request_execution',\n      warning: 5000,  // 5秒\n      critical: 30000  // 30秒\n    });\n    \n    this.alertManager.setThreshold('memory', {\n      metric: 'memory',\n      warning: 50 * 1024 * 1024,  // 50MB\n      critical: 100 * 1024 * 1024  // 100MB\n    });\n    \n    this.alertManager.setThreshold('script_execution', {\n      metric: 'script_execution',\n      warning: 5000,   // 5秒\n      critical: 10000  // 10秒\n    });\n  }\n  \n  private getResourceType(url: string): string {\n    const extension = url.split('.').pop()?.toLowerCase();\n    \n    switch (extension) {\n      case 'js':\n        return 'script';\n      case 'css':\n        return 'stylesheet';\n      case 'png':\n      case 'jpg':\n      case 'jpeg':\n      case 'gif':\n      case 'webp':\n        return 'image';\n      case 'woff':\n      case 'woff2':\n      case 'ttf':\n      case 'otf':\n        return 'font';\n      default:\n        return 'other';\n    }\n  }\n  \n  private generateTimerId(category: string): string {\n    return `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;\n  }\n  \n  // リソースクリーンアップ\n  cleanup(): void {\n    for (const observer of this.observers) {\n      observer.disconnect();\n    }\n    this.observers.length = 0;\n    this.metrics.clear();\n    this.timers.clear();\n  }\n  \n  // メトリクスエクスポート\n  exportMetrics(): Record<string, MetricData[]> {\n    const exported: Record<string, MetricData[]> = {};\n    for (const [category, metrics] of this.metrics.entries()) {\n      exported[category] = [...metrics];\n    }\n    return exported;\n  }\n}\n\nclass AlertManager {\n  private thresholds = new Map<string, AlertThreshold>();\n  private alertCallbacks = new Map<string, AlertCallback[]>();\n  \n  setThreshold(metric: string, threshold: AlertThreshold): void {\n    this.thresholds.set(metric, threshold);\n  }\n  \n  onAlert(metric: string, callback: AlertCallback): void {\n    const callbacks = this.alertCallbacks.get(metric) || [];\n    callbacks.push(callback);\n    this.alertCallbacks.set(metric, callbacks);\n  }\n  \n  checkMetric(metric: string, value: number): void {\n    const threshold = this.thresholds.get(metric);\n    if (!threshold) return;\n    \n    const alert = this.evaluateThreshold(threshold, value);\n    if (alert) {\n      this.triggerAlert(metric, alert);\n    }\n  }\n  \n  private evaluateThreshold(threshold: AlertThreshold, value: number): Alert | null {\n    if (threshold.critical && value >= threshold.critical) {\n      return {\n        level: 'critical',\n        metric: threshold.metric,\n        value,\n        threshold: threshold.critical,\n        message: `Critical threshold exceeded: ${value} >= ${threshold.critical}`\n      };\n    }\n    \n    if (threshold.warning && value >= threshold.warning) {\n      return {\n        level: 'warning',\n        metric: threshold.metric,\n        value,\n        threshold: threshold.warning,\n        message: `Warning threshold exceeded: ${value} >= ${threshold.warning}`\n      };\n    }\n    \n    return null;\n  }\n  \n  private triggerAlert(metric: string, alert: Alert): void {\n    const callbacks = this.alertCallbacks.get(metric) || [];\n    \n    for (const callback of callbacks) {\n      try {\n        callback(alert);\n      } catch (error) {\n        logger.error('Alert callback failed', error);\n      }\n    }\n    \n    // ログ出力\n    if (alert.level === 'critical') {\n      logger.error(`Performance alert: ${alert.message}`, undefined, { alert });\n    } else {\n      logger.warn(`Performance alert: ${alert.message}`, { alert });\n    }\n  }\n}\n\ninterface AlertThreshold {\n  metric: string;\n  warning?: number;\n  critical?: number;\n}\n\ninterface Alert {\n  level: 'warning' | 'critical';\n  metric: string;\n  value: number;\n  threshold: number;\n  message: string;\n}\n\ntype AlertCallback = (alert: Alert) => void;\n\n// メモリプール実装\nexport class ObjectPool<T> {\n  private pool: T[] = [];\n  private factory: () => T;\n  private resetFunction: (item: T) => void;\n  private maxSize: number;\n  \n  constructor(\n    factory: () => T,\n    resetFunction: (item: T) => void,\n    maxSize: number = 100\n  ) {\n    this.factory = factory;\n    this.resetFunction = resetFunction;\n    this.maxSize = maxSize;\n  }\n  \n  acquire(): T {\n    if (this.pool.length > 0) {\n      return this.pool.pop()!;\n    }\n    \n    return this.factory();\n  }\n  \n  release(item: T): void {\n    if (this.pool.length < this.maxSize) {\n      this.resetFunction(item);\n      this.pool.push(item);\n    }\n  }\n  \n  clear(): void {\n    this.pool.length = 0;\n  }\n  \n  getPoolSize(): number {\n    return this.pool.length;\n  }\n}\n\n// 仮想スクロール実装\nexport class VirtualScrollManager {\n  private container: HTMLElement;\n  private itemHeight: number;\n  private bufferSize: number = 5;\n  private visibleItems = new Map<number, HTMLElement>();\n  private itemRenderer: (item: any, index: number) => HTMLElement;\n  \n  constructor(\n    container: HTMLElement, \n    itemHeight: number,\n    itemRenderer: (item: any, index: number) => HTMLElement\n  ) {\n    this.container = container;\n    this.itemHeight = itemHeight;\n    this.itemRenderer = itemRenderer;\n    this.setupScrollListener();\n  }\n  \n  renderItems(items: any[]): void {\n    const scrollTop = this.container.scrollTop;\n    const containerHeight = this.container.clientHeight;\n    \n    // 表示範囲の計算\n    const startIndex = Math.max(\n      0, \n      Math.floor(scrollTop / this.itemHeight) - this.bufferSize\n    );\n    const endIndex = Math.min(\n      items.length - 1,\n      Math.ceil((scrollTop + containerHeight) / this.itemHeight) + this.bufferSize\n    );\n    \n    // 不要なアイテムの削除\n    this.cleanupInvisibleItems(startIndex, endIndex);\n    \n    // 必要なアイテムの追加\n    this.renderVisibleItems(items, startIndex, endIndex);\n    \n    // コンテナの高さ設定\n    this.updateContainerHeight(items.length);\n  }\n  \n  private cleanupInvisibleItems(startIndex: number, endIndex: number): void {\n    for (const [index, element] of this.visibleItems.entries()) {\n      if (index < startIndex || index > endIndex) {\n        element.remove();\n        this.visibleItems.delete(index);\n      }\n    }\n  }\n  \n  private renderVisibleItems(\n    items: any[], \n    startIndex: number, \n    endIndex: number\n  ): void {\n    \n    for (let i = startIndex; i <= endIndex; i++) {\n      if (!this.visibleItems.has(i) && items[i]) {\n        const element = this.itemRenderer(items[i], i);\n        \n        // 位置設定\n        element.style.position = 'absolute';\n        element.style.top = `${i * this.itemHeight}px`;\n        element.style.height = `${this.itemHeight}px`;\n        element.style.width = '100%';\n        \n        this.container.appendChild(element);\n        this.visibleItems.set(i, element);\n      }\n    }\n  }\n  \n  private updateContainerHeight(itemCount: number): void {\n    this.container.style.height = `${itemCount * this.itemHeight}px`;\n  }\n  \n  private setupScrollListener(): void {\n    let scrollTimer: number;\n    \n    this.container.addEventListener('scroll', () => {\n      clearTimeout(scrollTimer);\n      scrollTimer = setTimeout(() => {\n        this.handleScroll();\n      }, 16); // 60fps\n    });\n  }\n  \n  private handleScroll(): void {\n    const event = new CustomEvent('virtualscroll', {\n      detail: {\n        scrollTop: this.container.scrollTop,\n        scrollLeft: this.container.scrollLeft\n      }\n    });\n    this.container.dispatchEvent(event);\n  }\n}\n\n// グローバルインスタンス\nexport const performanceMonitor = new PerformanceMonitor();\n\n// 自動監視開始\nif (typeof window !== 'undefined') {\n  performanceMonitor.startMonitoring();\n  \n  // ページアンロード時のクリーンアップ\n  window.addEventListener('beforeunload', () => {\n    performanceMonitor.cleanup();\n  });\n}"
+  }
+
+  private setupAlertThresholds(): void {
+    // パフォーマンスアラートのしきい値設定
+    this.alertManager.setThreshold('request_execution', {
+      metric: 'request_execution',
+      warning: 5000,  // 5秒
+      critical: 30000  // 30秒
+    });
+    
+    this.alertManager.setThreshold('memory', {
+      metric: 'memory',
+      warning: 50 * 1024 * 1024,  // 50MB
+      critical: 100 * 1024 * 1024  // 100MB
+    });
+    
+    this.alertManager.setThreshold('script_execution', {
+      metric: 'script_execution',
+      warning: 5000,   // 5秒
+      critical: 10000  // 10秒
+    });
+  }
+  
+  private getResourceType(url: string): string {
+    const extension = url.split('.').pop()?.toLowerCase();
+    
+    switch (extension) {
+      case 'js':
+        return 'script';
+      case 'css':
+        return 'stylesheet';
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'webp':
+        return 'image';
+      case 'woff':
+      case 'woff2':
+      case 'ttf':
+      case 'otf':
+        return 'font';
+      default:
+        return 'other';
+    }
+  }
+  
+  private generateTimerId(category: string): string {
+    return `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  // リソースクリーンアップ
+  cleanup(): void {
+    for (const observer of this.observers) {
+      observer.disconnect();
+    }
+    this.observers.length = 0;
+    this.metrics.clear();
+    this.timers.clear();
+  }
+  
+  // メトリクスエクスポート
+  exportMetrics(): Record<string, MetricData[]> {
+    const exported: Record<string, MetricData[]> = {};
+    this.metrics.forEach((metrics, category) => {
+      exported[category] = [...metrics];
+    });
+    return exported;
+  }
+}
+
+class AlertManager {
+  private thresholds = new Map<string, AlertThreshold>();
+  private alertCallbacks = new Map<string, AlertCallback[]>();
+  
+  setThreshold(metric: string, threshold: AlertThreshold): void {
+    this.thresholds.set(metric, threshold);
+  }
+  
+  onAlert(metric: string, callback: AlertCallback): void {
+    const callbacks = this.alertCallbacks.get(metric) || [];
+    callbacks.push(callback);
+    this.alertCallbacks.set(metric, callbacks);
+  }
+  
+  checkMetric(metric: string, value: number): void {
+    const threshold = this.thresholds.get(metric);
+    if (!threshold) return;
+    
+    const alert = this.evaluateThreshold(threshold, value);
+    if (alert) {
+      this.triggerAlert(metric, alert);
+    }
+  }
+  
+  private evaluateThreshold(threshold: AlertThreshold, value: number): Alert | null {
+    if (threshold.critical && value >= threshold.critical) {
+      return {
+        level: 'critical',
+        metric: threshold.metric,
+        value,
+        threshold: threshold.critical,
+        message: `Critical threshold exceeded: ${value} >= ${threshold.critical}`
+      };
+    }
+    
+    if (threshold.warning && value >= threshold.warning) {
+      return {
+        level: 'warning',
+        metric: threshold.metric,
+        value,
+        threshold: threshold.warning,
+        message: `Warning threshold exceeded: ${value} >= ${threshold.warning}`
+      };
+    }
+    
+    return null;
+  }
+  
+  private triggerAlert(metric: string, alert: Alert): void {
+    const callbacks = this.alertCallbacks.get(metric) || [];
+    
+    for (const callback of callbacks) {
+      try {
+        callback(alert);
+      } catch (error) {
+        logger.error('Alert callback failed', error as Error);
+      }
+    }
+    
+    // ログ出力
+    if (alert.level === 'critical') {
+      logger.error(`Performance alert: ${alert.message}`, undefined, { alert });
+    } else {
+      logger.warn(`Performance alert: ${alert.message}`, { alert });
+    }
+  }
+}
+
+interface AlertThreshold {
+  metric: string;
+  warning?: number;
+  critical?: number;
+}
+
+interface Alert {
+  level: 'warning' | 'critical';
+  metric: string;
+  value: number;
+  threshold: number;
+  message: string;
+}
+
+type AlertCallback = (alert: Alert) => void;
+
+// メモリプール実装
+export class ObjectPool<T> {
+  private pool: T[] = [];
+  private factory: () => T;
+  private resetFunction: (item: T) => void;
+  private maxSize: number;
+  
+  constructor(
+    factory: () => T,
+    resetFunction: (item: T) => void,
+    maxSize: number = 100
+  ) {
+    this.factory = factory;
+    this.resetFunction = resetFunction;
+    this.maxSize = maxSize;
+  }
+  
+  acquire(): T {
+    if (this.pool.length > 0) {
+      return this.pool.pop()!;
+    }
+    
+    return this.factory();
+  }
+  
+  release(item: T): void {
+    if (this.pool.length < this.maxSize) {
+      this.resetFunction(item);
+      this.pool.push(item);
+    }
+  }
+  
+  clear(): void {
+    this.pool.length = 0;
+  }
+  
+  getPoolSize(): number {
+    return this.pool.length;
+  }
+}
+
+// 仮想スクロール実装
+export class VirtualScrollManager {
+  private container: HTMLElement;
+  private itemHeight: number;
+  private bufferSize: number = 5;
+  private visibleItems = new Map<number, HTMLElement>();
+  private itemRenderer: (item: any, index: number) => HTMLElement;
+  
+  constructor(
+    container: HTMLElement, 
+    itemHeight: number,
+    itemRenderer: (item: any, index: number) => HTMLElement
+  ) {
+    this.container = container;
+    this.itemHeight = itemHeight;
+    this.itemRenderer = itemRenderer;
+    this.setupScrollListener();
+  }
+  
+  renderItems(items: any[]): void {
+    const scrollTop = this.container.scrollTop;
+    const containerHeight = this.container.clientHeight;
+    
+    // 表示範囲の計算
+    const startIndex = Math.max(
+      0, 
+      Math.floor(scrollTop / this.itemHeight) - this.bufferSize
+    );
+    const endIndex = Math.min(
+      items.length - 1,
+      Math.ceil((scrollTop + containerHeight) / this.itemHeight) + this.bufferSize
+    );
+    
+    // 不要なアイテムの削除
+    this.cleanupInvisibleItems(startIndex, endIndex);
+    
+    // 必要なアイテムの追加
+    this.renderVisibleItems(items, startIndex, endIndex);
+    
+    // コンテナの高さ設定
+    this.updateContainerHeight(items.length);
+  }
+  
+  private cleanupInvisibleItems(startIndex: number, endIndex: number): void {
+    this.visibleItems.forEach((element, index) => {
+      if (index < startIndex || index > endIndex) {
+        element.remove();
+        this.visibleItems.delete(index);
+      }
+    });
+  }
+  
+  private renderVisibleItems(
+    items: any[], 
+    startIndex: number, 
+    endIndex: number
+  ): void {
+    
+    for (let i = startIndex; i <= endIndex; i++) {
+      if (!this.visibleItems.has(i) && items[i]) {
+        const element = this.itemRenderer(items[i], i);
+        
+        // 位置設定
+        element.style.position = 'absolute';
+        element.style.top = `${i * this.itemHeight}px`;
+        element.style.height = `${this.itemHeight}px`;
+        element.style.width = '100%';
+        
+        this.container.appendChild(element);
+        this.visibleItems.set(i, element);
+      }
+    }
+  }
+  
+  private updateContainerHeight(itemCount: number): void {
+    this.container.style.height = `${itemCount * this.itemHeight}px`;
+  }
+  
+  private setupScrollListener(): void {
+    let scrollTimer: any;
+    
+    this.container.addEventListener('scroll', () => {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        this.handleScroll();
+      }, 16); // 60fps
+    });
+  }
+  
+  private handleScroll(): void {
+    const event = new CustomEvent('virtualscroll', {
+      detail: {
+        scrollTop: this.container.scrollTop,
+        scrollLeft: this.container.scrollLeft
+      }
+    });
+    this.container.dispatchEvent(event);
+  }
+}
+
+// グローバルインスタンス
+export const performanceMonitor = new PerformanceMonitor();
+
+// 自動監視開始
+if (typeof window !== 'undefined') {
+  performanceMonitor.startMonitoring();
+  
+  // ページアンロード時のクリーンアップ
+  window.addEventListener('beforeunload', () => {
+    performanceMonitor.cleanup();
+  });
+}

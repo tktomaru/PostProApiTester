@@ -8,7 +8,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
 
   beforeAll(async () => {
     // Build the extension first
-    const extensionPath = path.resolve(__dirname, '../dist');
+    const extensionPath = path.resolve(__dirname, '../../dist');
     
     // Verify extension build exists
     if (!fs.existsSync(extensionPath)) {
@@ -44,7 +44,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
   });
 
   test('Extension files should be built correctly', () => {
-    const distPath = path.resolve(__dirname, '../dist');
+    const distPath = path.resolve(__dirname, '../../dist');
     const requiredFiles = [
       'index.bundle.js',
       'background.bundle.js',
@@ -72,7 +72,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
 
   test('Extension popup should be accessible via file URL', async () => {
     // Test direct access to the extension popup HTML file
-    const extensionPath = path.resolve(__dirname, '../dist');
+    const extensionPath = path.resolve(__dirname, '../../dist');
     const indexPath = path.join(extensionPath, 'index.html');
     const fileUrl = `file://${indexPath}`;
     
@@ -91,7 +91,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
   });
 
   test('Extension popup UI elements should be present', async () => {
-    const extensionPath = path.resolve(__dirname, '../dist');
+    const extensionPath = path.resolve(__dirname, '../../dist');
     const indexPath = path.join(extensionPath, 'index.html');
     const fileUrl = `file://${indexPath}`;
     
@@ -113,7 +113,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
   });
 
   test('Extension should handle basic form interaction', async () => {
-    const extensionPath = path.resolve(__dirname, '../dist');
+    const extensionPath = path.resolve(__dirname, '../../dist');
     const indexPath = path.join(extensionPath, 'index.html');
     const fileUrl = `file://${indexPath}`;
     
@@ -134,7 +134,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
 
   test('Extension background script should be present', async () => {
     // Check if background script bundle exists
-    const backgroundPath = path.resolve(__dirname, '../dist/background.bundle.js');
+    const backgroundPath = path.resolve(__dirname, '../../dist/background.bundle.js');
     expect(fs.existsSync(backgroundPath)).toBe(true);
     
     // Check file is not empty
@@ -144,7 +144,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
 
   test('Extension content script should be present', async () => {
     // Check if content script bundle exists
-    const contentPath = path.resolve(__dirname, '../dist/content.bundle.js');
+    const contentPath = path.resolve(__dirname, '../../dist/content.bundle.js');
     expect(fs.existsSync(contentPath)).toBe(true);
     
     // Check file is not empty
