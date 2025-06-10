@@ -12,7 +12,8 @@
       "Bash(touch:*)",
       "Bash(chmod:*)",
       "Bash(./13-unit-test.sh:*)",
-      "Bash(./14-it-test.sh:*)"
+      "Bash(./14-it-test.sh:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }

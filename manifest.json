@@ -19,7 +19,7 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "dist/background.bundle.js",
+    "service_worker": "background.bundle.js",
     "type": "module"
   },
   "content_scripts": [
@@ -28,7 +28,7 @@
         "<all_urls>"
       ],
       "js": [
-        "dist/content.bundle.js"
+        "content.bundle.js"
       ],
       "run_at": "document_start"
     }
@@ -45,7 +45,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "dist/injected.bundle.js"
+        "injected.bundle.js"
       ],
       "matches": [
         "<all_urls>"

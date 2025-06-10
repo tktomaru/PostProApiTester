@@ -3,7 +3,8 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import { copyFileSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
 
 export default defineConfig({
     build: {
@@ -38,6 +39,26 @@ export default defineConfig({
                 copyFileSync('index.html', 'dist/index.html');
                 // Copy styles.css
                 copyFileSync('styles.css', 'dist/styles.css');
+                
+                // Copy icons directory
+                const iconsSourceDir = 'icons';
+                const iconsDestDir = 'dist/icons';
+                
+                if (existsSync(iconsSourceDir)) {
+                    if (!existsSync(iconsDestDir)) {
+                        mkdirSync(iconsDestDir, { recursive: true });
+                    }
+                    
+                    const files = readdirSync(iconsSourceDir);
+                    files.forEach(file => {
+                        const sourcePath = join(iconsSourceDir, file);
+                        const destPath = join(iconsDestDir, file);
+                        
+                        if (statSync(sourcePath).isFile()) {
+                            copyFileSync(sourcePath, destPath);
+                        }
+                    });
+                }
             }
         }
     ],
