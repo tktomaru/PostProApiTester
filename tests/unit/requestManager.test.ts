@@ -1,4 +1,9 @@
-// Unit tests for Request Manager
+/**
+ * Request Manager Unit Tests
+ * 
+ * リクエスト管理機能の単体テスト
+ * HTTPリクエストのオプション構築機能（buildFetchOptions）をテストする
+ */
 import type { RequestData } from '../../src/types';
 
 // Mock implementation to avoid circular dependencies
@@ -9,6 +14,13 @@ interface FetchOptions {
     url: string;
 }
 
+/**
+ * HTTPリクエストオプション構築関数
+ * RequestDataからfetch APIで使用するオプションを生成する
+ * 
+ * @param request - リクエストデータ
+ * @returns FetchOptions または null
+ */
 function buildFetchOptions(request: RequestData): FetchOptions | null {
     const method = (request.method || 'GET').toUpperCase();
     const headers: Record<string, string> = {};
@@ -70,7 +82,21 @@ function buildFetchOptions(request: RequestData): FetchOptions | null {
 }
 
 describe('Request Manager Unit Tests', () => {
+    /**
+     * buildFetchOptions関数のテストスイート
+     * 
+     * 様々なリクエストタイプとオプションについて
+     * 正しいFetchOptionsが生成されるかをテストする
+     */
     describe('buildFetchOptions', () => {
+        /**
+         * 基本的なGETリクエストのオプション構築テスト
+         * 
+         * - HTTPメソッドがGETに設定される
+         * - URLが正しく設定される
+         * - カスタムヘッダーが追加される
+         * - ボディデータがnullになる（GETリクエストのため）
+         */
         test('should build basic GET request options', () => {
             const requestData: RequestData = {
                 id: 'test-1',
@@ -94,6 +120,14 @@ describe('Request Manager Unit Tests', () => {
             expect(options!.bodyData).toBeNull();
         });
 
+        /**
+         * JSONボディ付きPOSTリクエストのテスト
+         * 
+         * - HTTPメソッドがPOSTに設定される
+         * - JSONボディが文字列化される
+         * - Content-Typeヘッダーが自動設定される
+         * - オブジェクトが正しくJSON文字列に変換される
+         */
         test('should build POST request with JSON body', () => {
             const requestData: RequestData = {
                 id: 'test-2',
@@ -116,6 +150,13 @@ describe('Request Manager Unit Tests', () => {
             expect(options!.bodyData).toBe('{"name":"John","age":30}');
         });
 
+        /**
+         * Bearer認証付きリクエストのテスト
+         * 
+         * - Authorizationヘッダーが正しく設定される
+         * - Bearer トークンが適切にフォーマットされる
+         * - 他のヘッダーに影響しない
+         */
         test('should build request with Bearer authentication', () => {
             const requestData: RequestData = {
                 id: 'test-3',
@@ -139,6 +180,13 @@ describe('Request Manager Unit Tests', () => {
             expect(options!.headers['Authorization']).toBe('Bearer test-token-123');
         });
 
+        /**
+         * Basic認証付きリクエストのテスト
+         * 
+         * - ユーザー名とパスワードがBase64エンコードされる
+         * - Authorizationヘッダーが正しいフォーマットで設定される
+         * - エンコーディングが標準に準拠している
+         */
         test('should build request with Basic authentication', () => {
             const requestData: RequestData = {
                 id: 'test-4',
@@ -165,6 +213,13 @@ describe('Request Manager Unit Tests', () => {
             expect(options!.headers['Authorization']).toBe(`Basic ${expectedAuth}`);
         });
 
+        /**
+         * APIキー認証付きリクエストのテスト
+         * 
+         * - カスタムヘッダー名でAPIキーが設定される
+         * - ヘッダー値が正しく設定される
+         * - addToプロパティがheaderの場合のみ動作する
+         */
         test('should build request with API key authentication', () => {
             const requestData: RequestData = {
                 id: 'test-5',
@@ -190,6 +245,13 @@ describe('Request Manager Unit Tests', () => {
             expect(options!.headers['X-API-Key']).toBe('api-key-123');
         });
 
+        /**
+         * 生テキストボディ付きリクエストのテスト
+         * 
+         * - 生のテキストデータがそのまま設定される
+         * - Content-Typeヘッダーがユーザー指定値になる
+         * - データの変換が行われない
+         */
         test('should build request with raw body', () => {
             const requestData: RequestData = {
                 id: 'test-6',
@@ -211,6 +273,13 @@ describe('Request Manager Unit Tests', () => {
             expect(options!.headers['Content-Type']).toBe('text/plain');
         });
 
+        /**
+         * URLエンコードボディ付きリクエストのテスト
+         * 
+         * - オブジェクトがURLSearchParamsに変換される
+         * - Content-Typeが適切に設定される
+         * - フォーム形式のデータエンコーディング
+         */
         test('should build request with URL encoded body', () => {
             const requestData: RequestData = {
                 id: 'test-7',
@@ -232,6 +301,13 @@ describe('Request Manager Unit Tests', () => {
             expect(options!.bodyData).toBeInstanceOf(URLSearchParams);
         });
 
+        /**
+         * GETリクエストでのボディ無視テスト
+         * 
+         * - GETメソッドではボディが設定されていても無視される
+         * - HTTPメソッドの仕様に準拠した動作
+         * - セキュリティ上の配慮（GETリクエストにボディを含めない）
+         */
         test('should handle GET request without body', () => {
             const requestData: RequestData = {
                 id: 'test-8',
