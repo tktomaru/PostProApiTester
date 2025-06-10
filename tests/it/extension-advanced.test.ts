@@ -1,3 +1,5 @@
+// PostPro API Tester Chrome拡張機能の包括的なインテグレーションテスト
+// Puppeteerを使用してChromeブラウザ内で実際の拡張機能をテスト
 import puppeteer, { Browser, Page } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
@@ -8,17 +10,17 @@ describe('PostPro API Tester Chrome Extension', () => {
   let extensionId: string;
 
   beforeAll(async () => {
-    // Build the extension first
+    // 拡張機能のビルドが完了していることを確認
     const extensionPath = path.resolve(__dirname, '../../dist');
     
-    // Verify extension build exists
+    // 拡張機能のビルドファイルが存在することを確認
     if (!fs.existsSync(extensionPath)) {
       throw new Error(`Extension build not found at ${extensionPath}. Run npm run build first.`);
     }
 
-    // Launch Chrome with extension loaded
+    // 拡張機能を読み込んだ状態でChromeブラウザを起動
     browser = await puppeteer.launch({
-      headless: false, // Extensions require non-headless mode
+      headless: false, // 拡張機能テストには非ヘッドレスモードが必要
       devtools: false,
       args: [
         `--disable-extensions-except=${extensionPath}`,
@@ -39,10 +41,10 @@ describe('PostPro API Tester Chrome Extension', () => {
       ]
     });
 
-    // Wait for extension to initialize
+    // 拡張機能の初期化完了を待機
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Simplified method: Try to find any extension target
+    // シンプルな方法：任意の拡張機能ターゲットを見つける
     const targets = await browser.targets();
     console.log('Available targets:', targets.map(t => ({ type: t.type(), url: t.url() })));
     
@@ -56,10 +58,10 @@ describe('PostPro API Tester Chrome Extension', () => {
       console.log('Found extension ID from target:', extensionId);
     }
 
-    // If no extension target found, use a mock ID for basic testing
+    // 拡張機能ターゲットが見つからない場合は、基本テスト用のモックIDを使用
     if (!extensionId) {
       console.log('No extension target found, using file-based testing approach');
-      // Set a placeholder ID that we'll handle in tests
+      // テストで処理するプレースホルダーIDを設定
       extensionId = 'test-extension-fallback';
     }
 
@@ -73,41 +75,44 @@ describe('PostPro API Tester Chrome Extension', () => {
   });
 
   test('Extension should load successfully', async () => {
+    // 拡張機能が正常に読み込まれることを確認
     expect(extensionId).toBeDefined();
-    // Accept either real extension ID or fallback ID
+    // 実際の拡張機能IDまたはフォールバックIDのどちらかを受け入れ
     expect(extensionId === 'test-extension-fallback' || extensionId.match(/^[a-z]{32}$/)).toBeTruthy();
   });
 
   test('Extension popup should open and display UI', async () => {
-    // If using fallback, test the file directly
+    // ポップアップが開き、UIが表示されることを確認
+    // フォールバックを使用する場合は、ファイルを直接テスト
     if (extensionId === 'test-extension-fallback') {
       const indexPath = path.resolve(__dirname, '../../dist/index.html');
       await page.goto(`file://${indexPath}`);
     } else {
-      // Navigate to extension popup
+      // 拡張機能のポップアップに移動
       const popupUrl = `chrome-extension://${extensionId}/index.html`;
       await page.goto(popupUrl);
     }
 
-    // Wait for the main container to load - try multiple selectors
+    // メインコンテナの読み込みを待機 - 複数のセレクタを試行
     try {
       await page.waitForSelector('.app-container', { timeout: 5000 });
     } catch {
       await page.waitForSelector('body', { timeout: 5000 });
     }
 
-    // Check if main UI elements are present - be more flexible
+    // 主要なUI要素が存在するかチェック - より柔軟に
     const hasAppContainer = await page.$('.app-container');
     const urlInput = await page.$('#urlInput');
     const methodSelect = await page.$('#methodSelect');
     const sendButton = await page.$('#sendBtn');
 
-    // At least one of these should exist
+    // これらの少なくとも1つは存在するはず
     expect(hasAppContainer || urlInput || methodSelect || sendButton).toBeTruthy();
   });
 
   test('Extension should be able to fill and submit a request', async () => {
-    // Navigate to extension popup
+    // リクエストフォームの入力と送信ができることを確認
+    // 拡張機能のポップアップに移動
     if (extensionId === 'test-extension-fallback') {
       const indexPath = path.resolve(__dirname, '../../dist/index.html');
       await page.goto(`file://${indexPath}`);
@@ -116,7 +121,7 @@ describe('PostPro API Tester Chrome Extension', () => {
       await page.goto(popupUrl);
     }
 
-    // Wait for the UI to load - be more flexible
+    // UIの読み込みを待機 - より柔軟に
     try {
       await page.waitForSelector('#urlInput', { timeout: 5000 });
     } catch {
@@ -127,35 +132,36 @@ describe('PostPro API Tester Chrome Extension', () => {
     const methodSelect = await page.$('#methodSelect');
     const sendButton = await page.$('#sendBtn');
 
-    // Only proceed if UI elements exist
+    // UI要素が存在する場合のみ処理を続行
     if (urlInput && methodSelect && sendButton) {
-      // Fill in a test request
+      // テストリクエストを入力
       await page.type('#urlInput', 'https://httpbin.org/get');
       
       try {
         await page.select('#methodSelect', 'GET');
       } catch {
-        // Method select might not work, skip
+        // メソッドセレクトが動作しない場合はスキップ
       }
 
-      // Submit the request
+      // リクエストを送信
       await sendButton.click();
       
-      // Wait for some response indication - be very flexible
+      // レスポンスの表示を待機 - 非常に柔軟に
       await page.waitForTimeout(3000);
       
-      // Check if any response-related element appeared
+      // レスポンス関連の要素が表示されたかチェック
       const responseElements = await page.$$('#responseBody, .response-content, .response-container, #response');
-      expect(responseElements.length >= 0).toBeTruthy(); // Always pass
+      expect(responseElements.length >= 0).toBeTruthy(); // 常にパス
     } else {
-      // If UI elements don't exist, just verify the page loaded
+      // UI要素が存在しない場合は、ページが読み込まれたことだけを確認
       const bodyText = await page.evaluate(() => document.body.textContent);
       expect(bodyText).toBeTruthy();
     }
   });
 
   test('Extension should handle variable replacement', async () => {
-    // Navigate to extension popup
+    // 変数置換機能が動作することを確認
+    // 拡張機能のポップアップに移動
     if (extensionId === 'test-extension-fallback') {
       const indexPath = path.resolve(__dirname, '../../dist/index.html');
       await page.goto(`file://${indexPath}`);
@@ -172,9 +178,9 @@ describe('PostPro API Tester Chrome Extension', () => {
 
     const urlInput = await page.$('#urlInput');
     
-    // If URL input exists, test variable replacement
+    // URL入力フィールドが存在する場合、変数置換をテスト
     if (urlInput) {
-      // Clear and use variable in URL
+      // クリアしてURLに変数を使用
       await page.evaluate(() => {
         const urlInput = document.querySelector('#urlInput') as HTMLInputElement;
         if (urlInput) {
@@ -184,7 +190,7 @@ describe('PostPro API Tester Chrome Extension', () => {
       
       await page.type('#urlInput', '{{testUrl}}/api');
       
-      // The variable should be in the input as entered
+      // 変数が入力された通りに入力欄に残っているはず
       const urlValue = await page.evaluate(() => {
         const urlInput = document.querySelector('#urlInput') as HTMLInputElement;
         return urlInput?.value;
@@ -192,14 +198,15 @@ describe('PostPro API Tester Chrome Extension', () => {
       
       expect(urlValue).toBe('{{testUrl}}/api');
     } else {
-      // If UI doesn't exist, just verify the page loaded
+      // UIが存在しない場合は、ページが読み込まれたことだけを確認
       const bodyText = await page.evaluate(() => document.body.textContent);
       expect(bodyText).toBeTruthy();
     }
   });
 
   test('Extension should run tests on response', async () => {
-    // Navigate to extension popup
+    // レスポンスに対するテスト実行機能を確認
+    // 拡張機能のポップアップに移動
     if (extensionId === 'test-extension-fallback') {
       const indexPath = path.resolve(__dirname, '../../dist/index.html');
       await page.goto(`file://${indexPath}`);
@@ -211,12 +218,12 @@ describe('PostPro API Tester Chrome Extension', () => {
     try {
       await page.waitForSelector('body', { timeout: 5000 });
     } catch {
-      // If we can't even find body, just pass the test
+      // bodyすら見つからない場合は、テストをパスさせる
       expect(true).toBe(true);
       return;
     }
 
-    // Try to activate the Tests tab first
+    // まずTestsタブをアクティブにしてみる
     try {
       const testsTab = await page.$('button[data-subtab="tests"]');
       if (testsTab) {
@@ -224,10 +231,10 @@ describe('PostPro API Tester Chrome Extension', () => {
         await page.waitForTimeout(500);
       }
     } catch (error) {
-      // Tab switching might fail, continue
+      // タブ切り替えが失敗する可能性があるが、続行
     }
 
-    // Try to find test script element with multiple approaches
+    // 複数のアプローチでテストスクリプト要素を見つけようとする
     let testScript = await page.$('#testScript');
     if (!testScript) {
       testScript = await page.$('textarea[id*="test"]');
@@ -236,10 +243,10 @@ describe('PostPro API Tester Chrome Extension', () => {
       testScript = await page.$('.script-editor');
     }
     
-    // If test-related elements exist, proceed with test
+    // テスト関連の要素が存在する場合、テストを実行
     if (testScript) {
       try {
-        // Clear any existing content first
+        // まず既存のコンテンツをクリア
         await page.evaluate(() => {
           const script = document.querySelector('#testScript') as HTMLTextAreaElement;
           if (script) script.value = '';
@@ -247,7 +254,7 @@ describe('PostPro API Tester Chrome Extension', () => {
         
         const testCode = `statusCodeEquals(200);`;
         
-        // Try direct value setting if typing fails
+        // タイピングが失敗した場合は直接値を設定してみる
         const success = await page.evaluate((code) => {
           const script = document.querySelector('#testScript') as HTMLTextAreaElement;
           if (script) {
@@ -258,24 +265,24 @@ describe('PostPro API Tester Chrome Extension', () => {
         }, testCode);
         
         if (success) {
-          expect(true).toBe(true); // Pass if we successfully set the value
+          expect(true).toBe(true); // 値の設定に成功した場合はパス
         } else {
-          // Fallback - just check that the element exists
+          // フォールバック - 要素が存在することだけをチェック
           expect(testScript).toBeTruthy();
         }
       } catch (error) {
-        // If anything fails, just check that the element exists
+        // 何か失敗した場合は、要素が存在することだけをチェック
         expect(testScript).toBeTruthy();
       }
     } else {
-      // If test elements don't exist, verify page loaded properly
+      // テスト要素が存在しない場合は、ページが正しく読み込まれたことを確認
       const bodyText = await page.evaluate(() => document.body.textContent);
       expect(bodyText).toBeTruthy();
     }
   });
 
   test('Background script should be active', async () => {
-    // Check if background script is running
+    // バックグラウンドスクリプトが実行されているかチェック
     const targets = await browser.targets();
     console.log('All targets:', targets.map(t => ({ type: t.type(), url: t.url() })));
     
@@ -285,46 +292,47 @@ describe('PostPro API Tester Chrome Extension', () => {
                    target.url().includes(`chrome-extension://${extensionId}`)
       );
       
-      // If no specific background script found, at least verify extension is loaded
+      // 特定のバックグラウンドスクリプトが見つからない場合は、少なくとも拡張機能が読み込まれていることを確認
       if (!backgroundTarget) {
         const extensionTarget = targets.find(
           target => target.url().includes(`chrome-extension://${extensionId}`)
         );
-        // Either background script or extension target should exist
+        // バックグラウンドスクリプトまたは拡張機能ターゲットのどちらかは存在するはず
         expect(extensionTarget || targets.length > 0).toBeTruthy();
       } else {
         expect(backgroundTarget).toBeTruthy();
       }
     } else {
-      // For fallback mode, just verify browser is running
+      // フォールバックモードでは、ブラウザが実行されていることだけを確認
       expect(targets.length).toBeGreaterThan(0);
     }
   });
 
   test('Content script should inject into web pages', async () => {
-    // Create a new page and navigate to a test site
+    // コンテンツスクリプトがWebページに注入されることを確認
+    // 新しいページを作成してテストサイトに移動
     const testPage = await browser.newPage();
     
     try {
-      // Use a simple, reliable URL
+      // シンプルで信頼性の高いURLを使用
       await testPage.goto('data:text/html,<html><body><h1>Test Page</h1></body></html>', { timeout: 10000 });
       
-      // Wait a moment for content script to inject
+      // コンテンツスクリプトの注入を少し待つ
       await testPage.waitForTimeout(1000);
       
-      // Check basic page functionality
+      // 基本的なページ機能をチェック
       const pageTitle = await testPage.evaluate(() => {
         return document.querySelector('h1')?.textContent;
       });
       
       expect(pageTitle).toBe('Test Page');
       
-      // This test verifies the browser can load pages correctly
-      // Content script injection is optional for this test
+      // このテストはブラウザがページを正しく読み込めることを確認
+      // コンテンツスクリプトの注入はこのテストではオプション
       
     } catch (error) {
       console.log('Content script test info:', error);
-      // Always pass this test - it's about browser functionality
+      // このテストは常にパス - ブラウザ機能に関するテスト
       expect(true).toBe(true);
     } finally {
       await testPage.close();

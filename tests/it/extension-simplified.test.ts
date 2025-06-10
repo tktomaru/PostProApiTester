@@ -1,3 +1,5 @@
+// PostPro API Tester Chrome拡張機能のシンプルなインテグレーションテスト
+// ファイルベースでの基本機能テストに重点を置く
 import puppeteer, { Browser, Page } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
@@ -7,17 +9,17 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
   let page: Page;
 
   beforeAll(async () => {
-    // Build the extension first
+    // まず拡張機能のビルドが完了していることを確認
     const extensionPath = path.resolve(__dirname, '../../dist');
     
-    // Verify extension build exists
+    // 拡張機能のビルドファイルが存在することを確認
     if (!fs.existsSync(extensionPath)) {
       throw new Error(`Extension build not found at ${extensionPath}. Run npm run build first.`);
     }
 
-    // Launch Chrome with extension loaded
+    // 拡張機能を読み込んだ状態でChromeブラウザを起動
     browser = await puppeteer.launch({
-      headless: false, // Extensions require non-headless mode
+      headless: false, // 拡張機能テストには非ヘッドレスモードが必要
       devtools: false,
       args: [
         `--disable-extensions-except=${extensionPath}`,
@@ -32,7 +34,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
       ]
     });
 
-    // Wait for extension to initialize
+    // 拡張機能の初期化完了を待機
     await new Promise(resolve => setTimeout(resolve, 3000));
     page = await browser.newPage();
   });
@@ -44,6 +46,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
   });
 
   test('Extension files should be built correctly', () => {
+    // 拡張機能ファイルが正しくビルドされていることを確認
     const distPath = path.resolve(__dirname, '../../dist');
     const requiredFiles = [
       'index.bundle.js',
@@ -54,6 +57,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
       'index.html'
     ];
 
+    // 必要なファイルがすべて存在することを確認
     requiredFiles.forEach(file => {
       const filePath = path.join(distPath, file);
       expect(fs.existsSync(filePath)).toBe(true);
@@ -61,36 +65,37 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
   });
 
   test('Extension should load in Chrome', async () => {
-    // Check that Chrome started with extension loaded
+    // 拡張機能が読み込まれた状態でChromeが起動していることを確認
     const targets = await browser.targets();
     expect(targets.length).toBeGreaterThan(0);
     
-    // Should have at least a browser target
+    // 少なくともブラウザターゲットが存在するはず
     const browserTarget = targets.find(target => target.type() === 'browser');
     expect(browserTarget).toBeTruthy();
   });
 
   test('Extension popup should be accessible via file URL', async () => {
-    // Test direct access to the extension popup HTML file
+    // ファイルURL経由で拡張機能ポップアップに直接アクセスをテスト
     const extensionPath = path.resolve(__dirname, '../../dist');
     const indexPath = path.join(extensionPath, 'index.html');
     const fileUrl = `file://${indexPath}`;
     
     await page.goto(fileUrl);
     
-    // Wait for basic HTML structure
+    // 基本的なHTML構造の読み込みを待機
     await page.waitForSelector('body', { timeout: 5000 });
     
-    // Check basic HTML structure
+    // 基本的なHTML構造をチェック
     const title = await page.title();
     expect(title).toContain('API Tester');
     
-    // Check for main container
+    // メインコンテナの存在確認
     const appContainer = await page.$('.app-container');
     expect(appContainer).toBeTruthy();
   });
 
   test('Extension popup UI elements should be present', async () => {
+    // ポップアップUIの主要要素が存在することを確認
     const extensionPath = path.resolve(__dirname, '../../dist');
     const indexPath = path.join(extensionPath, 'index.html');
     const fileUrl = `file://${indexPath}`;
@@ -98,7 +103,7 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
     await page.goto(fileUrl);
     await page.waitForSelector('.app-container', { timeout: 10000 });
 
-    // Check for key UI elements
+    // 主要なUI要素をチェック
     const urlInput = await page.$('#urlInput');
     const methodSelect = await page.$('#methodSelect');
     const sendButton = await page.$('#sendBtn');
@@ -107,12 +112,13 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
     expect(methodSelect).toBeTruthy();
     expect(sendButton).toBeTruthy();
 
-    // Check tab navigation
+    // タブナビゲーションの確認
     const tabs = await page.$$('.tab-btn');
     expect(tabs.length).toBeGreaterThan(0);
   });
 
   test('Extension should handle basic form interaction', async () => {
+    // 基本的なフォーム操作が動作することを確認
     const extensionPath = path.resolve(__dirname, '../../dist');
     const indexPath = path.join(extensionPath, 'index.html');
     const fileUrl = `file://${indexPath}`;
@@ -120,11 +126,11 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
     await page.goto(fileUrl);
     await page.waitForSelector('#urlInput', { timeout: 10000 });
 
-    // Fill form fields
+    // フォームフィールドを入力
     await page.type('#urlInput', 'https://httpbin.org/get');
     await page.select('#methodSelect', 'GET');
 
-    // Verify form values
+    // フォーム値の確認
     const urlValue = await page.$eval('#urlInput', (el: HTMLInputElement) => el.value);
     const methodValue = await page.$eval('#methodSelect', (el: HTMLSelectElement) => el.value);
     
@@ -133,21 +139,21 @@ describe('PostPro API Tester Chrome Extension - Simplified', () => {
   });
 
   test('Extension background script should be present', async () => {
-    // Check if background script bundle exists
+    // バックグラウンドスクリプトが存在することを確認
     const backgroundPath = path.resolve(__dirname, '../../dist/background.bundle.js');
     expect(fs.existsSync(backgroundPath)).toBe(true);
     
-    // Check file is not empty
+    // ファイルが空でないことを確認
     const stats = fs.statSync(backgroundPath);
     expect(stats.size).toBeGreaterThan(0);
   });
 
   test('Extension content script should be present', async () => {
-    // Check if content script bundle exists
+    // コンテンツスクリプトが存在することを確認
     const contentPath = path.resolve(__dirname, '../../dist/content.bundle.js');
     expect(fs.existsSync(contentPath)).toBe(true);
     
-    // Check file is not empty
+    // ファイルが空でないことを確認
     const stats = fs.statSync(contentPath);
     expect(stats.size).toBeGreaterThan(0);
   });
