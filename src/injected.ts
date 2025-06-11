@@ -24,15 +24,15 @@ declare global {
     }
 }
 
-// injected.js
+// injected.ts
 // ───────────────────────────────────────────────────────────────────────────────
-// Injected script for API Tester Chrome Extension
-// Runs in the page context to monitor network requests
+// API Tester Chrome拡張機能のインジェクトスクリプト
+// ページコンテキストで実行され、ネットワークリクエストを監視する
 
 (function () {
     'use strict';
 
-    // Prevent multiple injection
+    // 重複インジェクションの防止
     if (window.apiTesterInjected) {
         return;
     }
@@ -40,25 +40,28 @@ declare global {
 
     console.log('API Tester injected script loaded');
 
-    // Configuration
+    // 設定オブジェクト
     let config = {
-        interceptFetch: true,
-        interceptXHR: true,
-        logRequests: false,
-        autoCapture: false
+        interceptFetch: true,    // fetchのインターセプトを有効にする
+        interceptXHR: true,      // XMLHttpRequestのインターセプトを有効にする
+        logRequests: false,      // リクエストをコンソールにログ出力するか
+        autoCapture: false       // 自動キャプチャを有効にするか
     };
 
-    // Request tracking
-    let requestCounter = 0;
-    const pendingRequests = new Map();
+    // リクエスト追跡管理
+    let requestCounter = 0;                    // リクエストIDカウンター
+    const pendingRequests = new Map();         // 処理中リクエストのマップ
 
-    // Store original functions
-    const originalFetch = window.fetch;
-    const originalXHROpen = XMLHttpRequest.prototype.open;
-    const originalXHRSend = XMLHttpRequest.prototype.send;
-    const originalWebSocket = window.WebSocket;
+    // 元の関数の保存
+    const originalFetch = window.fetch;                           // 元のfetch関数
+    const originalXHROpen = XMLHttpRequest.prototype.open;        // 元のXHR open関数
+    const originalXHRSend = XMLHttpRequest.prototype.send;        // 元のXHR send関数
+    const originalWebSocket = window.WebSocket;                   // 元のWebSocket関数
 
-    // Message communication with content script
+    /**
+     * コンテンツスクリプトとのメッセージ通信
+     * window.postMessageを使用してコンテンツスクリプトにデータを送信
+     */
     function sendMessage(type: string, payload: any): void {
         window.postMessage({
             type: type,
@@ -67,7 +70,10 @@ declare global {
         }, '*');
     }
 
-    // Listen for configuration updates
+    /**
+     * 設定更新メッセージの受信
+     * コンテンツスクリプトからの設定変更を監視
+     */
     window.addEventListener('message', function (event) {
         if (event.data.type === 'API_TESTER_CONFIG') {
             config = { ...config, ...event.data.payload };
@@ -75,19 +81,22 @@ declare global {
         }
     });
 
-    // Override fetch function
+    /**
+     * fetch関数のオーバーライド
+     * 全てのfetchリクエストを監視し、リクエスト・レスポンス情報をキャプチャ
+     */
     function overrideFetch() {
         window.fetch = function (...args) {
             const requestId = ++requestCounter;
             const startTime = performance.now();
 
-            // Extract request information
+            // リクエスト情報の抽出
             const requestInfo = extractFetchRequestInfo(args, requestId, startTime);
 
-            // Store pending request
+            // 処理中リクエストの保存
             pendingRequests.set(requestId, requestInfo);
 
-            // Send request notification
+            // リクエスト通知の送信
             sendMessage('API_TESTER_REQUEST', requestInfo);
 
             if (config.logRequests) {
@@ -98,15 +107,15 @@ declare global {
                 console.log('Body:', requestInfo.body);
             }
 
-            // Call original fetch
+            // 元のfetch関数の呼び出し
             const fetchPromise = originalFetch.apply(this, args);
 
-            // Handle response
+            // レスポンス処理
             return fetchPromise.then(response => {
                 const endTime = performance.now();
                 const responseInfo = extractFetchResponseInfo(response, requestId, endTime - startTime);
 
-                // Send response notification
+                // レスポンス通知の送信
                 sendMessage('API_TESTER_RESPONSE', responseInfo);
 
                 if (config.logRequests) {
@@ -117,7 +126,7 @@ declare global {
                     console.groupEnd();
                 }
 
-                // Clean up
+                // クリーンアップ
                 pendingRequests.delete(requestId);
 
                 return response;
@@ -144,7 +153,10 @@ declare global {
         };
     }
 
-    // Override XMLHttpRequest
+    /**
+     * XMLHttpRequestのオーバーライド
+     * XMLHttpRequestを使用したリクエストを監視し、詳細情報をキャプチャ
+     */
     function overrideXHR() {
         XMLHttpRequest.prototype.open = function (method: string, url: string | URL, async: boolean = true, username?: string | null, password?: string | null): void {
             const requestId = ++requestCounter;
@@ -159,7 +171,7 @@ declare global {
                 body: null
             };
 
-            // Override setRequestHeader to capture headers
+            // setRequestHeaderをオーバーライドしてヘッダーをキャプチャ
             const originalSetRequestHeader = this.setRequestHeader;
             this.setRequestHeader = function (header, value) {
                 if (this._apiTesterInfo) {
@@ -175,10 +187,10 @@ declare global {
             if (this._apiTesterInfo) {
                 this._apiTesterInfo.body = body;
 
-                // Store pending request
+                // 処理中リクエストの保存
                 pendingRequests.set(this._apiTesterInfo.requestId, this._apiTesterInfo);
 
-                // Send request notification
+                // リクエスト通知の送信
                 sendMessage('API_TESTER_REQUEST', {
                     requestId: this._apiTesterInfo.requestId,
                     url: this._apiTesterInfo.url,
@@ -196,7 +208,7 @@ declare global {
                     console.log('Body:', this._apiTesterInfo.body);
                 }
 
-                // Add event listeners
+                // イベントリスナーの追加
                 const self = this;
                 this.addEventListener('loadend', function () {
                     if (!self._apiTesterInfo) return;
@@ -236,7 +248,10 @@ declare global {
         };
     }
 
-    // Override WebSocket for WebSocket API monitoring
+    /**
+     * WebSocket APIの監視用オーバーライド
+     * WebSocket接続とメッセージ送受信を監視
+     */
     function overrideWebSocket() {
         window.WebSocket = new Proxy(originalWebSocket, {
             construct(target, args: [string | URL, (string | string[])?]) {
@@ -244,7 +259,7 @@ declare global {
                 const startTime = performance.now();
                 const ws = new target(...args);
 
-                // Send WebSocket connection notification
+                // WebSocket接続通知の送信
                 sendMessage('API_TESTER_REQUEST', {
                     requestId: requestId,
                     url: args[0],
@@ -261,7 +276,7 @@ declare global {
                     console.log('Protocols:', args[1]);
                 }
 
-                // Override send method to monitor messages
+                // メッセージ監視のためsendメソッドをオーバーライド
                 const originalSend = ws.send;
                 ws.send = function (data) {
                     if (config.logRequests) {
@@ -277,7 +292,7 @@ declare global {
                     return originalSend.call(this, data);
                 };
 
-                // Monitor WebSocket events
+                // WebSocketイベントの監視
                 ws.addEventListener('open', function () {
                     const duration = performance.now() - startTime;
 
@@ -339,7 +354,7 @@ declare global {
             }
         });
 
-        // Copy static properties
+        // 静的プロパティのコピー
         Object.setPrototypeOf(window.WebSocket, originalWebSocket);
         window.WebSocket.prototype = originalWebSocket.prototype;
         Object.defineProperty(window.WebSocket, 'CONNECTING', { value: originalWebSocket.CONNECTING });
@@ -348,7 +363,11 @@ declare global {
         Object.defineProperty(window.WebSocket, 'CLOSED', { value: originalWebSocket.CLOSED });
     }
 
-    // Helper functions
+    /**
+     * ヘルパー関数群
+     * fetchリクエスト情報の抽出
+     * fetch APIの引数からリクエストの詳細情報を抽出して正規化
+     */
     function extractFetchRequestInfo(args: [URL | RequestInfo, RequestInit?], requestId: number, startTime: number) {
         const [input, init = {}] = args;
 
@@ -384,6 +403,10 @@ declare global {
         };
     }
 
+    /**
+     * fetchレスポンス情報の抽出
+     * Responseオブジェクトから必要なレスポンス情報を抽出
+     */
     function extractFetchResponseInfo(response: Response, requestId: number, duration: number) {
         return {
             requestId: requestId,
@@ -398,6 +421,10 @@ declare global {
         };
     }
 
+    /**
+     * ヘッダー情報の抽出
+     * 様々なヘッダー形式から正規化されたオブジェクトを作成
+     */
     function extractHeaders(headers: HeadersInit | undefined): Record<string, string> {
         if (!headers) return {};
 
@@ -414,6 +441,10 @@ declare global {
         return result;
     }
 
+    /**
+     * XHRレスポンスヘッダーのパース
+     * XMLHttpRequest.getAllResponseHeaders()の文字列をオブジェクトに変換
+     */
     function parseXHRResponseHeaders(headerString: string): Record<string, string> {
         const headers: Record<string, string> = {};
         if (!headerString) return headers;
@@ -428,6 +459,10 @@ declare global {
         return headers;
     }
 
+    /**
+     * URLの解決
+     * 相対パスや不完全なURLを絶対パスに変換
+     */
     function resolveURL(url: string | URL): string {
         if (url instanceof URL) {
             url = url.href;
@@ -444,6 +479,10 @@ declare global {
         return new URL(url, window.location.href).href;
     }
 
+    /**
+     * リクエストボディのシリアライズ
+     * 様々なタイプのボディデータを文字列に変換
+     */
     function serializeBody(body: string | FormData | URLSearchParams | ArrayBuffer | Uint8Array | Blob | object | null): string | null {
         if (!body) return null;
 
@@ -478,7 +517,10 @@ declare global {
         }
     }
 
-    // GraphQL detection and monitoring
+    /**
+     * GraphQLリクエストの検出と監視
+     * DOM変更を監視してGraphQLクエリを検出
+     */
     function detectGraphQLRequests() {
         const observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
@@ -507,7 +549,10 @@ declare global {
         });
     }
 
-    // Monitor console for API-related logs
+    /**
+     * API関連ログのコンソール監視
+     * console.log/error/warnをオーバーライドしてAPI関連メッセージをキャプチャ
+     */
     function monitorConsole() {
         const originalLog = console.log;
         const originalError = console.error;
@@ -529,6 +574,10 @@ declare global {
         };
     }
 
+    /**
+     * API関連ログのチェック
+     * コンソールメッセージがAPI関連かどうかを判定
+     */
     function checkForAPILogs(level: 'log' | 'error' | 'warn', args: any[]): void {
         const message = args.join(' ').toLowerCase();
         if (message.includes('api') || message.includes('xhr') || message.includes('fetch') ||
@@ -542,7 +591,10 @@ declare global {
         }
     }
 
-    // Performance monitoring
+    /**
+     * パフォーマンス監視
+     * PerformanceObserverを使用してリソースのロード時間を監視
+     */
     function monitorPerformance() {
         if ('PerformanceObserver' in window) {
             const observer = new PerformanceObserver(function (list) {
@@ -572,7 +624,10 @@ declare global {
         }
     }
 
-    // Cookie monitoring
+    /**
+     * Cookieの監視
+     * document.cookieの設定を監視してクッキーの変更を追跡
+     */
     function monitorCookies() {
         const originalCookie = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie') ||
             Object.getOwnPropertyDescriptor(HTMLDocument.prototype, 'cookie');
@@ -593,7 +648,10 @@ declare global {
         }
     }
 
-    // Local/Session Storage monitoring
+    /**
+     * ローカルストレージとセッションストレージの監視
+     * StorageのsetItem/removeItem/clearメソッドをオーバーライドして監視
+     */
     function monitorStorage() {
         const originalSetItem = Storage.prototype.setItem;
         const originalRemoveItem = Storage.prototype.removeItem;
@@ -627,7 +685,10 @@ declare global {
         };
     }
 
-    // Initialize all monitoring
+    /**
+     * 全監視機能の初期化
+     * 設定に応じて各種監視機能を有効化
+     */
     function initialize() {
         if (config.interceptFetch) {
             overrideFetch();
@@ -644,7 +705,7 @@ declare global {
         monitorCookies();
         monitorStorage();
 
-        // Send initialization complete message
+        // 初期化完了メッセージの送信
         sendMessage('API_TESTER_INITIALIZED', {
             url: window.location.href,
             timestamp: Date.now(),
@@ -652,21 +713,27 @@ declare global {
         });
     }
 
-    // Expose API for manual testing
+    /**
+     * 手動テスト用APIの公開
+     * コンソールから手動でテストや設定変更ができるようにAPIを公開
+     */
     window.apiTester = {
-        getConfig: () => config,
-        setConfig: (newConfig) => {
+        getConfig: () => config,                                    // 現在の設定を取得
+        setConfig: (newConfig) => {                                 // 設定を更新
             config = { ...config, ...newConfig };
             sendMessage('API_TESTER_CONFIG_CHANGED', config);
         },
-        getPendingRequests: () => Array.from(pendingRequests.values()),
-        clearPendingRequests: () => pendingRequests.clear(),
-        testRequest: function (url, options = {}) {
+        getPendingRequests: () => Array.from(pendingRequests.values()), // 処理中リクエスト一覧を取得
+        clearPendingRequests: () => pendingRequests.clear(),             // 処理中リクエストをクリア
+        testRequest: function (url, options = {}) {                       // テストリクエストの実行
             return fetch(url, options);
         }
     };
 
-    // Initialize when DOM is ready
+    /**
+     * DOM準備完了時に初期化を実行
+     * ページの状態に応じて適切なタイミングで初期化を実行
+     */
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initialize);
     } else {

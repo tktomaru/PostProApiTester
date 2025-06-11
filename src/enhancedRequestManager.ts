@@ -1,5 +1,7 @@
-// enhancedRequestManagerFixed.ts
-// Enhanced request management with error handling, performance monitoring, and security
+// enhancedRequestManager.ts
+// ───────────────────────────────────────────────────────────────────────────────
+// 高度なリクエスト管理システム
+// エラーハンドリング、パフォーマンス監視、セキュリティ機能を含む拡張リクエストマネージャー
 
 import type { 
   RequestData, 
@@ -15,22 +17,30 @@ import { performanceMonitor } from './performanceMonitor';
 import { securityValidator, scriptSandbox } from './securityValidator';
 import { getVariable, setVariable, replaceVariables } from './variableManager';
 
+/**
+ * 拡張リクエストマネージャークラス
+ * HTTP リクエストの高度な管理、並行処理制御、エラーハンドリングを提供
+ */
 export class EnhancedRequestManager {
-  private activeRequests = new Map<string, AbortController>();
-  private requestQueue: RequestQueueItem[] = [];
-  private readonly maxConcurrentRequests = 5;
-  private httpClient = new HttpClient();
+  private activeRequests = new Map<string, AbortController>();  // アクティブなリクエスト管理
+  private requestQueue: RequestQueueItem[] = [];               // リクエストキュー
+  private readonly maxConcurrentRequests = 5;                 // 最大同時実行数
+  private httpClient = new HttpClient();                      // HTTPクライアント
   
   constructor() {
     this.setupPerformanceMonitoring();
   }
   
+  /**
+   * リクエスト送信のメインメソッド
+   * リクエストの検証、前処理、実行、後処理、結果の確定を順次実行
+   */
   async sendRequest(request: RequestData): Promise<RequestResult> {
     const requestId = this.generateRequestId();
     const abortController = new AbortController();
     
     try {
-      // Phase 1: Validation and preprocessing
+      // フェーズ1: 検証と前処理
       this.validateRequest(request);
       
       await this.waitForSlot();
@@ -38,26 +48,26 @@ export class EnhancedRequestManager {
       
       const perfTimer = performanceMonitor.startTimer('request_execution');
       
-      // Phase 2: Pre-request processing
+      // フェーズ2: リクエスト前処理
       const preProcessedRequest = await this.executePreRequestPhase(
         request, 
         { requestId, abortSignal: abortController.signal }
       );
       
-      // Phase 3: HTTP request execution
+      // フェーズ3: HTTPリクエスト実行
       const response = await this.executeHttpRequest(
         preProcessedRequest,
         { requestId, abortSignal: abortController.signal }
       );
       
-      // Phase 4: Post-request processing
+      // フェーズ4: リクエスト後処理
       const result = await this.executePostRequestPhase(
         preProcessedRequest,
         response,
         { requestId, abortSignal: abortController.signal }
       );
       
-      // Phase 5: Result finalization
+      // フェーズ5: 結果の確定
       return await this.finalizeRequest(
         requestId,
         preProcessedRequest,
@@ -73,10 +83,18 @@ export class EnhancedRequestManager {
     }
   }
   
+  /**
+   * リクエストの妥当性を検証
+   * セキュリティチェックとデータ整合性の確認
+   */
   validateRequest(request: RequestData): ValidationResult {
     return securityValidator.validateRequest(request);
   }
   
+  /**
+   * プリリクエストスクリプトの実行
+   * リクエスト送信前に実行するカスタムスクリプトの処理
+   */
   async executePreRequestScript(
     script: string, 
     context: ScriptContext
@@ -106,6 +124,10 @@ export class EnhancedRequestManager {
     }
   }
   
+  /**
+   * テストスクリプトの実行
+   * レスポンス受信後に実行するテスト・検証スクリプトの処理
+   */
   async executeTestScript(
     script: string, 
     response: ResponseData, 
@@ -118,7 +140,7 @@ export class EnhancedRequestManager {
     const perfTimer = performanceMonitor.startTimer('script_execution', 'test');
     
     try {
-      // Create Postman API compatible context
+      // Postman API互換のコンテキストを作成
       const context = this.createPostmanContext(request, response);
       
       const result = await scriptSandbox.executeScript(script, context);
@@ -139,6 +161,10 @@ export class EnhancedRequestManager {
     }
   }
   
+  /**
+   * リクエスト前処理フェーズ
+   * 変数の処理、スクリプト実行、認証情報の設定を行う
+   */
   private async executePreRequestPhase(
     request: RequestData, 
     context: RequestContext
@@ -147,10 +173,10 @@ export class EnhancedRequestManager {
     const phaseTimer = performanceMonitor.startTimer('pre_request_phase');
     
     try {
-      // Step 1: Build variable context
+      // ステップ1: 変数コンテキストの構築
       const variableContext = await this.buildVariableContext(request);
       
-      // Step 2: Execute pre-request script
+      // ステップ2: プリリクエストスクリプト実行
       if (request.preRequestScript?.trim()) {
         const scriptContext = this.createScriptContext(request, variableContext);
         await this.executePreRequestScript(
@@ -159,13 +185,13 @@ export class EnhancedRequestManager {
         );
       }
       
-      // Step 3: Process variables
+      // ステップ3: 変数の処理
       const processedRequest = await this.processVariables(request, variableContext);
       
-      // Step 4: Normalize request data
+      // ステップ4: リクエストデータの正規化
       const normalizedRequest = this.normalizeRequest(processedRequest);
       
-      // Step 5: Process authentication
+      // ステップ5: 認証処理
       const authenticatedRequest = await this.processAuthentication(normalizedRequest);
       
       return {
@@ -187,6 +213,10 @@ export class EnhancedRequestManager {
     }
   }
   
+  /**
+   * HTTPリクエスト実行フェーズ
+   * 実際のHTTP通信を行い、レスポンスを取得
+   */
   private async executeHttpRequest(
     request: ProcessedRequest,
     context: RequestContext
@@ -251,6 +281,10 @@ export class EnhancedRequestManager {
     }
   }
   
+  /**
+   * 変数の処理
+   * リクエスト内の変数参照を実際の値に置換
+   */
   private async processVariables(
     request: RequestData, 
     context: VariableContext
@@ -258,7 +292,7 @@ export class EnhancedRequestManager {
     
     const processed: RequestData = { ...request };
     
-    // Processing order considering dependencies
+    // 依存関係を考慮した処理順序
     const processingOrder = ['url', 'headers', 'params', 'body'];
     
     for (const field of processingOrder) {
@@ -271,9 +305,9 @@ export class EnhancedRequestManager {
       } catch (error) {
         logger.warn(`Variable processing failed for field: ${field}`, error as Record<string, any>);
         
-        // Continue with non-critical errors
+        // 非重要フィールドのエラーは継続
         if (!this.isCriticalField(field)) {
-          (processed as any)[field] = (request as any)[field]; // Use original value
+          (processed as any)[field] = (request as any)[field]; // 元の値を使用
         } else {
           throw error;
         }
@@ -283,6 +317,10 @@ export class EnhancedRequestManager {
     return processed;
   }
   
+  /**
+   * フィールド値の変数処理
+   * 文字列、オブジェクトに応じて適切な変数処理を実行
+   */
   private async processFieldVariables(
     fieldValue: any, 
     context: VariableContext,
@@ -300,14 +338,22 @@ export class EnhancedRequestManager {
     return fieldValue;
   }
   
+  /**
+   * 文字列内の変数処理
+   * {{variableName}} パターンの変数参照を実際の値に置換
+   */
   private async processStringVariables(
     text: string, 
     _context: VariableContext
   ): Promise<string> {
-    // Variable reference pattern: {{variableName}}
+    // 変数参照パターン: {{variableName}}
     return replaceVariables(text);
   }
   
+  /**
+   * オブジェクト内の変数処理
+   * オブジェクトの各プロパティ値に対して再帰的に変数処理を実行
+   */
   private async processObjectVariables(
     obj: Record<string, any>,
     context: VariableContext
@@ -328,21 +374,29 @@ export class EnhancedRequestManager {
     return processed;
   }
   
+  /**
+   * リクエストデータの正規化
+   * URL形式やHTTPメソッドの標準化を行う
+   */
   private normalizeRequest(request: RequestData): RequestData {
-    // Normalize request data
+    // リクエストデータの正規化
     const normalized = { ...request };
     
-    // URL normalization
+    // URL正規化（プロトコル補完）
     if (normalized.url && !normalized.url.match(/^https?:\/\//)) {
       normalized.url = `http://${normalized.url}`;
     }
     
-    // Method normalization
+    // メソッド正規化（大文字統一）
     normalized.method = normalized.method.toUpperCase();
     
     return normalized;
   }
   
+  /**
+   * 認証情報の処理
+   * Basic、Bearer、API Key認証をヘッダーまたはパラメータに設定
+   */
   private async processAuthentication(request: RequestData): Promise<RequestData> {
     const authenticated = { ...request };
     
@@ -352,6 +406,7 @@ export class EnhancedRequestManager {
     
     switch (request.auth.type) {
       case 'basic':
+        // Basic認証の処理
         if (request.auth.username && request.auth.password) {
           const credentials = btoa(`${request.auth.username}:${request.auth.password}`);
           authenticated.headers = {
@@ -362,6 +417,7 @@ export class EnhancedRequestManager {
         break;
         
       case 'bearer':
+        // Bearer トークン認証の処理
         if (request.auth.token) {
           authenticated.headers = {
             ...authenticated.headers,
@@ -371,13 +427,16 @@ export class EnhancedRequestManager {
         break;
         
       case 'apikey':
+        // API Key認証の処理
         if (request.auth.key && request.auth.value) {
           if (request.auth.addTo === 'header') {
+            // ヘッダーに追加
             authenticated.headers = {
               ...authenticated.headers,
               [request.auth.key]: request.auth.value
             };
           } else if (request.auth.addTo === 'query') {
+            // クエリパラメータに追加
             authenticated.params = {
               ...authenticated.params,
               [request.auth.key]: request.auth.value
@@ -551,12 +610,18 @@ export class EnhancedRequestManager {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   
+  /**
+   * 一意なリクエストIDを生成
+   */
   private generateRequestId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
   
+  /**
+   * パフォーマンス監視の初期設定
+   */
   private setupPerformanceMonitoring(): void {
-    // Setup performance monitoring
+    // パフォーマンス監視の設定
     performanceMonitor.recordCustomMetric(
       'request_manager',
       'initialized',
@@ -565,9 +630,17 @@ export class EnhancedRequestManager {
   }
 }
 
+/**
+ * HTTPクライアントクラス
+ * XMLHttpRequestを使用したHTTP通信の実装
+ */
 class HttpClient {
-  private defaultTimeout = 30000;
+  private defaultTimeout = 30000;  // デフォルトタイムアウト（30秒）
   
+  /**
+   * HTTPリクエストを送信
+   * プロセス済みリクエストを実際のHTTP通信として実行
+   */
   async send(
     request: ProcessedRequest, 
     context: RequestContext
@@ -578,24 +651,26 @@ class HttpClient {
     return new Promise((resolve, reject) => {
       xhr.timeout = (request as any).timeout || this.defaultTimeout;
       
+      // 正常完了時の処理
       xhr.onload = () => {
         if (xhr.readyState === XMLHttpRequest.DONE) {
           resolve(this.createResponseData(xhr));
         }
       };
       
+      // エラーハンドリング
       xhr.onerror = () => reject(new Error('Network request failed'));
       xhr.ontimeout = () => reject(new Error('Request timeout'));
       xhr.onabort = () => reject(new Error('Request aborted'));
       
-      // Monitor abort signal
+      // 中断シグナルの監視
       context.abortSignal?.addEventListener('abort', () => {
         xhr.abort();
       });
       
       xhr.open(request.method, request.url, true);
       
-      // Set headers
+      // ヘッダーの設定
       for (const [name, value] of Object.entries(request.headers || {})) {
         if (value && value.trim()) {
           try {
@@ -610,6 +685,9 @@ class HttpClient {
     });
   }
   
+  /**
+   * XMLHttpRequestからResponseDataを作成
+   */
   private createResponseData(xhr: XMLHttpRequest): ResponseData {
     return {
       status: xhr.status,
@@ -617,11 +695,14 @@ class HttpClient {
       headers: this.parseHeaders(xhr.getAllResponseHeaders()),
       body: xhr.responseText,
       bodyText: xhr.responseText,
-      duration: 0, // Will be set by caller
+      duration: 0, // 呼び出し元で設定
       size: new Blob([xhr.responseText]).size
     };
   }
   
+  /**
+   * ヘッダー文字列をパースしてオブジェクトに変換
+   */
   private parseHeaders(headerString: string): Record<string, string> {
     const headers: Record<string, string> = {};
     headerString.split('\r\n').forEach(line => {
@@ -634,24 +715,35 @@ class HttpClient {
   }
 }
 
+/**
+ * リクエスト実行コンテキスト
+ * リクエストの実行に必要な情報を格納
+ */
 interface RequestContext {
-  requestId: string;
-  abortSignal: AbortSignal;
+  requestId: string;     // リクエストID
+  abortSignal: AbortSignal;  // 中断シグナル
 }
 
+/**
+ * 変数コンテキスト
+ * 各種変数のスコープ別データを格納
+ */
 interface VariableContext {
-  global: Record<string, any>;
-  environment: Record<string, any>;
-  collection: Record<string, any>;
-  runtime: Record<string, any>;
+  global: Record<string, any>;      // グローバル変数
+  environment: Record<string, any>; // 環境変数
+  collection: Record<string, any>;  // コレクション変数
+  runtime: Record<string, any>;     // ランタイム変数
 }
 
+/**
+ * リクエストキューアイテム
+ * 待機中リクエストの管理用
+ */
 interface RequestQueueItem {
-  request: RequestData;
-  resolve: (result: RequestResult) => void;
-  reject: (error: any) => void;
+  request: RequestData;                    // リクエストデータ
+  resolve: (result: RequestResult) => void;  // 成功時のコールバック
+  reject: (error: any) => void;              // 失敗時のコールバック
 }
 
-
-// Global instance
+// グローバルインスタンス
 export const enhancedRequestManager = new EnhancedRequestManager();

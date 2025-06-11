@@ -1,40 +1,58 @@
 // interceptorManager.ts
 // ───────────────────────────────────────────────────────────────────────────────
-// インターセプタ（ネットワークキャプチャ）の開始・停止・受信表示をまとめる
+// ネットワークインターセプターの管理
+// ネットワークキャプチャの開始・停止・受信表示を管理
 
 import type { RequestData } from './types';
 import { showSuccess, escapeHtml } from './utils';
 import { loadRequestIntoEditor } from './requestManager';
 
+/**
+ * インターセプターフィルター設定
+ * キャプチャするリクエストの絞り込み条件
+ */
 interface InterceptorFilters {
-    methods: string[];
-    domain: string;
+    methods: string[];  // キャプチャ対象のHTTPメソッド
+    domain: string;     // キャプチャ対象のドメイン
 }
-
-interface InterceptedRequest {
-    method: string;
-    url: string;
-    headers?: Record<string, string>;
-    body?: string | null;
-    status?: number;
-}
-
-interface RuntimeMessage {
-    action: string;
-    request?: InterceptedRequest;
-    filters?: InterceptorFilters;
-}
-
-interface RuntimeResponse {
-    success?: boolean;
-}
-
-let _isActive = false;
 
 /**
- * startInterceptor
- *  chrome.runtime に対して startInterceptor メッセージを送信し、
- *  onMessage で結果を受け取り、UI 更新
+ * キャプチャされたリクエストの情報
+ * インターセプトされたリクエストの詳細データ
+ */
+interface InterceptedRequest {
+    method: string;                      // HTTPメソッド
+    url: string;                         // リクエストURL
+    headers?: Record<string, string>;    // リクエストヘッダー
+    body?: string | null;                // リクエストボディ
+    status?: number;                     // レスポンスステータスコード
+}
+
+/**
+ * ランタイムメッセージの形式
+ * backgroundスクリプトとの通信に使用
+ */
+interface RuntimeMessage {
+    action: string;                      // アクションタイプ
+    request?: InterceptedRequest;        // キャプチャされたリクエスト（オプション）
+    filters?: InterceptorFilters;        // フィルター設定（オプション）
+}
+
+/**
+ * ランタイムレスポンスの形式
+ * backgroundスクリプトからの応答
+ */
+interface RuntimeResponse {
+    success?: boolean;  // 操作の成功・失敗
+}
+
+// インターセプターの状態管理
+let _isActive = false;  // インターセプターがアクティブかどうか
+
+/**
+ * インターセプターの開始
+ * backgroundスクリプトにstartInterceptorメッセージを送信し、
+ * メッセージリスナーを設定してUIを更新
  */
 export function startInterceptor(): void {
     if (_isActive) return;
@@ -55,9 +73,9 @@ export function startInterceptor(): void {
 }
 
 /**
- * stopInterceptor
- *  chrome.runtime に対して stopInterceptor メッセージを送信し、
- *  onMessage リスナーを解除
+ * インターセプターの停止
+ * backgroundスクリプトにstopInterceptorメッセージを送信し、
+ * メッセージリスナーを解除してUIを更新
  */
 export function stopInterceptor(): void {
     if (!_isActive) return;
@@ -77,8 +95,9 @@ export function stopInterceptor(): void {
 }
 
 /**
- * getInterceptorFilters
- *  DOM のチェックボックス／ドメイン入力欄を読み取ってフィルタ条件を返す
+ * インターセプターフィルターの取得
+ * DOMからメソッドフィルターとドメインフィルターを読み取り、
+ * フィルター条件オブジェクトを作成
  */
 export function getInterceptorFilters(): InterceptorFilters {
     const methodFilters: string[] = [];
@@ -92,9 +111,9 @@ export function getInterceptorFilters(): InterceptorFilters {
 }
 
 /**
- * handleInterceptedRequest
- *  background.js→popup から送られてきた「requestIntercepted」メッセージを受け取り、
- *  displayInterceptedRequest を呼び出す
+ * キャプチャされたリクエストのハンドリング
+ * backgroundスクリプトからの「requestIntercepted」メッセージを受け取り、
+ * キャプチャされたリクエストを表示処理に渡す
  */
 export function handleInterceptedRequest(message: RuntimeMessage): void {
     if (message.action === 'requestIntercepted' && message.request) {
@@ -103,8 +122,9 @@ export function handleInterceptedRequest(message: RuntimeMessage): void {
 }
 
 /**
- * displayInterceptedRequest
- *  受信したリクエストを画面に追加表示し、クリックでロード可能にする
+ * キャプチャされたリクエストの表示
+ * 受信したリクエストをUIに追加表示し、
+ * クリックでエディターにロード可能にする
  */
 export function displayInterceptedRequest(request: InterceptedRequest): void {
     const container = document.getElementById('interceptorContainer') as HTMLElement;
@@ -124,7 +144,7 @@ export function displayInterceptedRequest(request: InterceptedRequest): void {
 
     container.insertBefore(requestDiv, container.firstChild);
 
-    // 50件以上になったら古いものを削除
+    // 50件以上になったら古いものを削除（メモリ節約）
     while (container.children.length > 50) {
         const lastChild = container.lastChild;
         if (lastChild) {
@@ -134,8 +154,9 @@ export function displayInterceptedRequest(request: InterceptedRequest): void {
 }
 
 /**
- * loadInterceptedRequest
- *  キャプチャしたリクエストを右側エディタにロードする
+ * キャプチャしたリクエストのロード
+ * キャプチャしたリクエストをRequestData形式に変換し、
+ * メインエディターにロードして編集可能にする
  */
 export async function loadInterceptedRequest(request: InterceptedRequest): Promise<void> {
     const convertedRequest: RequestData = {

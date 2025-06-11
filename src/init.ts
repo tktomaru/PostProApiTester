@@ -27,7 +27,10 @@ import { newScenario, runScenario, initializeScenarios } from './scenarioManager
 import { initializeVariablesManagement } from './variableManager';
 import { initializeSettingsUI, initializeSettingsModal } from './settings';
 
-// Authentication handlers
+/**
+ * 認証関連のイベントハンドラー設定
+ * 認証タイプの変更時に適切な認証フォームを表示
+ */
 function setupAuthHandlers(): void {
     const authTypeSelect = document.getElementById('authType') as HTMLSelectElement;
     authTypeSelect?.addEventListener('change', function () {
@@ -39,7 +42,10 @@ function setupAuthHandlers(): void {
     });
 }
 
-// Modal handlers
+/**
+ * モーダルダイアログのイベントハンドラー設定
+ * インポート・エクスポートモーダルの開閉とファイル操作を管理
+ */
 function setupModalHandlers(): void {
     const modal = document.getElementById('importExportModal');
     if (!modal) return;
@@ -97,13 +103,20 @@ function setupModalHandlers(): void {
     importSubmitBtn?.addEventListener('click', handleImport);
 }
 
-// Key-Value editors initialization
+/**
+ * キー・バリューエディタの初期化
+ * パラメータ、ヘッダー、フォームデータエディタの初期設定
+ */
 function initializeKeyValueEditors(): void {
     initializeParamsEditor();
     initializeHeadersEditor();
     setupAddButtons();
 }
 
+/**
+ * パラメータエディタの初期化
+ * 初期の空行を追加して編集可能な状態にする
+ */
 function initializeParamsEditor(): void {
     const container = document.getElementById('paramsContainer') as HTMLElement;
     if (container && container.children.length === 0) {
@@ -111,6 +124,10 @@ function initializeParamsEditor(): void {
     }
 }
 
+/**
+ * ヘッダーエディタの初期化
+ * 初期の空行を追加して編集可能な状態にする
+ */
 function initializeHeadersEditor(): void {
     const container = document.getElementById('headersContainer') as HTMLElement;
     if (container && container.children.length === 0) {
@@ -118,6 +135,10 @@ function initializeHeadersEditor(): void {
     }
 }
 
+/**
+ * 追加ボタンのイベント設定
+ * パラメータ、ヘッダー、フォームデータの行追加ボタンを設定
+ */
 function setupAddButtons(): void {
     const addParamBtn = document.querySelector('.add-param');
     addParamBtn?.addEventListener('click', function () {
@@ -202,6 +223,10 @@ function showDevToolsGuidance(): void {
 }
 
 
+/**
+ * プリリクエストスクリプト欄の設定
+ * テキストエリアの自動リサイズ機能を設定
+ */
 function setupPreRequestScript(): void {
     const ta = document.getElementById('preRequestScript') as HTMLTextAreaElement | null;
     if (!ta) return;
@@ -213,6 +238,10 @@ function setupPreRequestScript(): void {
     ta.addEventListener('input', () => autoResizeTextarea(ta));
 }
 
+/**
+ * テストスクリプト欄の設定
+ * テキストエリアの自動リサイズ機能を設定
+ */
 function setupTestScript(): void {
     const ta = document.getElementById('testScript') as HTMLTextAreaElement | null;
     if (!ta) return;
@@ -224,6 +253,10 @@ function setupTestScript(): void {
     ta.addEventListener('input', () => autoResizeTextarea(ta));
 }
 
+/**
+ * アプリケーション全体の初期化処理
+ * UI、イベントリスナー、データの読み込み、各種マネージャーの初期化を順次実行
+ */
 async function initializeApp(): Promise<void> {
     try {
         // ─────────────────────────────
@@ -292,6 +325,10 @@ async function initializeApp(): Promise<void> {
     }
 }
 
+/**
+ * DOMコンテンツ読み込み完了時の初期化処理
+ * アプリケーションのメイン初期化と設定機能の初期化を実行
+ */
 document.addEventListener('DOMContentLoaded', async () => {
     await initializeApp();
 
