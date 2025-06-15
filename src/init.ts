@@ -101,6 +101,18 @@ function setupModalHandlers(): void {
     // Import submit
     const importSubmitBtn = document.getElementById('importSubmitBtn');
     importSubmitBtn?.addEventListener('click', handleImport);
+
+    // Sample import button
+    const importSampleBtn = document.getElementById('importSampleBtn');
+    importSampleBtn?.addEventListener('click', async () => {
+        try {
+            const { importSampleData } = await import('./importExport');
+            await importSampleData();
+            modal.classList.remove('active');
+        } catch (error: any) {
+            console.error('Failed to import sample data:', error);
+        }
+    });
 }
 
 /**

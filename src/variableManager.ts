@@ -3,12 +3,6 @@
 // 環境変数・コレクション変数・グローバル変数を管理する
 
 import type { Environment } from './types';
-import {
-    sampleGlobalVariables,
-    sampleEnvironments,
-    sampleEnvironmentVariables,
-    sampleCollectionVariables
-} from './defaultData';
 
 import {
     saveVariablesToStorage,
@@ -59,105 +53,26 @@ function setupVariableEventListeners(): void {
  */
 export async function initializeVariablesManagement(): Promise<void> {
     try {
-        // --- サンプルデータを自動投入するロジック START ---
+        // ストレージから既存の変数データをロード
+        const stored = await chrome.storage.local.get(['variables']);
+        const storedVars = stored.variables || {};
 
-        // ── 1) グローバル変数の初期化 ──
-        {
-            const stored = await chrome.storage.local.get(['variables']);
-            const storedVars = stored.variables || {};
+        // グローバル変数とコレクション変数を初期化（存在する場合のみ）
+        (state as any).variables.global = storedVars.global || {};
+        (state as any).variables.collection = storedVars.collection || {};
 
-            // ストレージに global がなく、あるいは空オブジェクトならサンプルを投入
-            if (!storedVars.global || Object.keys(storedVars.global).length === 0) {
-                // sampleGlobalVariables はどこかで定義しておくこと
-                (state as any).variables.global = { ...sampleGlobalVariables };
+        // 環境一覧をロード
+        const storedEnvList = await chrome.storage.local.get(['environments']);
+        const envsFromStorage = storedEnvList.environments || [];
+        state.environments.splice(0, state.environments.length, ...envsFromStorage);
 
-                // collection はストレージの existing value があればそれを使い、なければ空オブジェクト
-                (state as any).variables.collection = storedVars.collection || {};
-
-                // Chrome ストレージに保存
-                await chrome.storage.local.set({
-                    variables: {
-                        global: (state as any).variables.global,
-                        collection: (state as any).variables.collection
-                    }
-                });
-            } else {
-                // ストレージに global があれば、既存の変数を保持しながら新しい変数を追加
-                (state as any).variables.global = {
-                    ...sampleGlobalVariables,
-                    ...storedVars.global
-                };
-                (state as any).variables.collection = storedVars.collection || {};
-
-                // 更新された変数を保存
-                await chrome.storage.local.set({
-                    variables: {
-                        global: (state as any).variables.global,
-                        collection: (state as any).variables.collection
-                    }
-                });
-            }
+        // 現在選択中の環境に合わせて変数を読み込む
+        if (state.currentEnvironment) {
+            const envData = await chrome.storage.local.get([`env_${state.currentEnvironment}`]);
+            (state as any).variables.environment = envData[`env_${state.currentEnvironment}`] || {};
+        } else {
+            (state as any).variables.environment = {};
         }
-
-        // ── 2) 環境一覧および環境変数の初期化 ──
-        {
-            const storedEnvList = await chrome.storage.local.get(['environments']);
-            const envsFromStorage = storedEnvList.environments || [];
-
-            // ストレージに環境一覧がなければサンプルを投入
-            if (envsFromStorage.length === 0) {
-                // sampleEnvironments はどこかで定義しておくこと
-                state.environments = [...sampleEnvironments];
-
-                // 各サンプル環境に対応する環境変数を state に設定し、保存
-                for (const env of sampleEnvironments) {
-                    const envVarsForThis = (sampleEnvironmentVariables as any)[env.id] || {};
-                    (state as any).variables.environment = { ...envVarsForThis };
-                    await chrome.storage.local.set({ [`env_${env.id}`]: (state as any).variables.environment });
-                }
-
-                // ストレージにも環境一覧を保存
-                await chrome.storage.local.set({ environments: state.environments });
-            } else {
-                // ストレージに environment list があれば、それを優先して state に読み込む
-                state.environments.splice(0, state.environments.length, ...envsFromStorage);
-
-                // 現在選択中の環境（state.currentEnvironment）に合わせて変数を読み込む
-                if (state.currentEnvironment) {
-                    const envData = await chrome.storage.local.get([`env_${state.currentEnvironment}`]);
-                    (state as any).variables.environment = envData[`env_${state.currentEnvironment}`] || {};
-                } else {
-                    // 選択中環境がないなら空オブジェクト
-                    (state as any).variables.environment = {};
-                }
-            }
-        }
-
-        // ── 3) コレクション変数の初期化 ──
-        {
-            // 再度 'variables' キーを取得して、collection 部分だけ取り出す
-            const storedVars2 = await chrome.storage.local.get(['variables']);
-            const colVarsFromStorage = storedVars2.variables?.collection || {};
-
-            // ストレージに collection 変数がなければサンプルを投入
-            if (!colVarsFromStorage || Object.keys(colVarsFromStorage).length === 0) {
-                // sampleCollectionVariables は { [collectionId]: { key: {value, description}, … }, … } の形で用意しておく
-                (state as any).variables.collection = { ...sampleCollectionVariables };
-
-                // 保存
-                await chrome.storage.local.set({
-                    variables: {
-                        global: (state as any).variables.global,
-                        collection: (state as any).variables.collection
-                    }
-                });
-            } else {
-                // すでにあれば保管されているものを state に読み込む
-                (state as any).variables.collection = colVarsFromStorage;
-            }
-        }
-
-        // --- サンプルデータを自動投入するロジック END ---
 
         renderEnvironmentSelector();
         setupVariableEventListeners();

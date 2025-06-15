@@ -13,7 +13,15 @@ import {
 import { renderCollectionsTree } from './collectionManager';
 import { renderEnvironmentSelector, renderAllVariables, updateCollectionVarSelector } from './variableManager';
 import { showSuccess, showError, renderAuthDetails, updateAuthData } from './utils';
-import { sampleTestScript } from './defaultData';
+import { 
+    sampleTestScript, 
+    sampleCollections, 
+    sampleScenarios, 
+    sampleGlobalVariables, 
+    sampleEnvironments, 
+    sampleEnvironmentVariables, 
+    sampleCollectionVariables 
+} from './defaultData';
 import { addKeyValueRow, handleBodyTypeChange } from './utils';
 import { renderScenarioList } from './scenarioManager';
 
@@ -227,20 +235,22 @@ export async function handleImport(): Promise<void> {
     const importType = importTypeSelect.value;
     const importText = importTextarea.value.trim();
 
-    if (!importText) {
+    if (!importText && importType !== 'sample') {
         showError('Please select a file or paste content to import');
         return;
     }
 
     try {
         let data: any;
-        try {
-            data = JSON.parse(importText);
-        } catch (e) {
-            if (importType === 'curl') {
-                data = parseCurlCommand(importText);
-            } else {
-                throw new Error('Invalid JSON format');
+        if (importType !== 'sample') {
+            try {
+                data = JSON.parse(importText);
+            } catch (e) {
+                if (importType === 'curl') {
+                    data = parseCurlCommand(importText);
+                } else {
+                    throw new Error('Invalid JSON format');
+                }
             }
         }
 
@@ -262,6 +272,9 @@ export async function handleImport(): Promise<void> {
                 break;
             case 'talentedapitester':
                 await importTalendData(data);
+                break;
+            case 'sample':
+                await importSampleData();
                 break;
         }
 
@@ -863,4 +876,78 @@ export async function exportData(): Promise<void> {
     URL.revokeObjectURL(url);
 
     showSuccess('Data exported successfully');
+}
+
+/** importSampleData - サンプルデータのインポート */
+export async function importSampleData(): Promise<void> {
+    try {
+        // 1. サンプルコレクションを追加
+        const existingCollectionIds = state.collections.map(c => c.id);
+        const newCollections = sampleCollections.filter(c => !existingCollectionIds.includes(c.id));
+        if (newCollections.length > 0) {
+            state.collections.push(...newCollections);
+            await saveCollectionsToStorage();
+        }
+
+        // 2. サンプルシナリオを追加
+        if (!Array.isArray(state.scenarios)) {
+            state.scenarios = [];
+        }
+        const existingScenarioIds = state.scenarios.map(s => s.id);
+        const newScenarios = sampleScenarios.filter(s => !existingScenarioIds.includes(s.id));
+        if (newScenarios.length > 0) {
+            state.scenarios.push(...newScenarios);
+            await saveScenariosToStorage();
+        }
+
+        // 3. サンプルグローバル変数を追加
+        if (!(state as any).variables) {
+            (state as any).variables = { global: {}, collection: {}, environment: {} };
+        }
+        if (!(state as any).variables.global) {
+            (state as any).variables.global = {};
+        }
+        Object.assign((state as any).variables.global, sampleGlobalVariables);
+
+        // 4. サンプル環境を追加
+        if (!Array.isArray(state.environments)) {
+            state.environments = [];
+        }
+        const existingEnvIds = state.environments.map(e => e.id);
+        const newEnvironments = sampleEnvironments.filter(e => !existingEnvIds.includes(e.id));
+        if (newEnvironments.length > 0) {
+            state.environments.push(...newEnvironments);
+            await saveEnvironmentsToStorage();
+        }
+
+        // 5. サンプル環境変数を追加
+        if (!(state as any).variables.environment) {
+            (state as any).variables.environment = {};
+        }
+        Object.assign((state as any).variables.environment, sampleEnvironmentVariables);
+
+        // 6. サンプルコレクション変数を追加
+        if (!(state as any).variables.collection) {
+            (state as any).variables.collection = {};
+        }
+        Object.assign((state as any).variables.collection, sampleCollectionVariables);
+
+        // 変数保存
+        await saveVariablesToStorage();
+
+        // UI更新
+        updateCollectionVarSelector();
+        renderEnvironmentSelector();
+        renderAllVariables();
+        renderCollectionsTree();
+        renderScenarioList();
+        
+        // サイドバーのシナリオツリーも更新
+        const { renderScenariosTree } = await import('./collectionManager');
+        renderScenariosTree();
+
+        showSuccess('Sample data imported successfully');
+    } catch (error: any) {
+        showError('Failed to import sample data: ' + error.message);
+    }
 }

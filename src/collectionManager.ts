@@ -11,7 +11,6 @@ import {
     saveSidebarStateToStorage,
     state
 } from './state';
-import { sampleCollections } from './defaultData';
 import { showSuccess, showError, switchMainTab } from './utils';
 import { updateCollectionVarSelector, renderVariables } from './variableManager';
 import { addRequestToScenario } from './scenarioManager';
@@ -30,12 +29,8 @@ interface MenuItem {
 export async function initializeCollections(): Promise<void> {
     try {
         const stored = await chrome.storage.local.get(['collections']);
-        if (!stored.collections || stored.collections.length === 0) {
-            // まだコレクションがなければサンプルを投入
-            state.collections.splice(0, state.collections.length, ...sampleCollections);
-            await chrome.storage.local.set({ collections: state.collections });
-        } else {
-            // すでにあればそちらを優先
+        if (stored.collections) {
+            // ストレージにコレクションがあればロード
             state.collections.splice(0, state.collections.length, ...stored.collections);
         }
 

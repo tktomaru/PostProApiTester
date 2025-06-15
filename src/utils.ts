@@ -741,6 +741,14 @@ export function setupSendButton(): void {
         });
     }
 
+    // ストレージクリア
+    const clearStorageBtn = document.getElementById('clearStorageBtn');
+    if (clearStorageBtn) {
+        clearStorageBtn.addEventListener('click', async () => {
+            await clearAllStorage();
+        });
+    }
+
     // Body タイプ切り替え
     document.querySelectorAll('input[name="bodyType"]').forEach(radio => {
         radio.addEventListener('change', (e: Event) => {
@@ -1114,4 +1122,116 @@ export function autoResizeTextarea(textarea: HTMLTextAreaElement) {
     textarea.style.height = 'auto';
     // scrollHeight 分だけ伸ばす
     textarea.style.height = (textarea.scrollHeight + 100) + 'px';
+}
+
+/**
+ * clearAllStorage - 全てのストレージデータをクリアする
+ */
+export async function clearAllStorage(): Promise<void> {
+    const confirmed = confirm(
+        'Are you sure you want to clear all storage data?\n\n' +
+        'This will delete:\n' +
+        '• All collections and requests\n' +
+        '• All scenarios\n' +
+        '• All variables (global, environment, collection)\n' +
+        '• All environments\n' +
+        '• Request history\n' +
+        '• Settings\n\n' +
+        'This action cannot be undone.'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        // Chrome storage の全データをクリア
+        await chrome.storage.local.clear();
+
+        // アプリケーションの state をリセット
+        const { state } = await import('./state');
+        
+        // コレクションをクリア
+        state.collections.splice(0);
+        state.currentCollection = null;
+        
+        // シナリオをクリア
+        state.scenarios.splice(0);
+        state.currentScenario = null;
+        
+        // 環境をクリア
+        state.environments.splice(0);
+        state.currentEnvironment = null;
+        
+        // 履歴をクリア
+        state.history.splice(0);
+        
+        // 変数をクリア
+        (state as any).variables = {
+            global: {},
+            collection: {},
+            environment: {}
+        };
+        
+        // 現在のリクエストをクリア
+        state.currentRequest = null;
+
+        // UI を更新
+        const { renderCollectionsTree } = await import('./collectionManager');
+        const { renderScenarioList } = await import('./scenarioManager');
+        const { renderEnvironmentSelector, renderAllVariables, updateCollectionVarSelector } = await import('./variableManager');
+        const { renderHistory } = await import('./historyManager');
+
+        renderCollectionsTree();
+        renderScenarioList();
+        renderEnvironmentSelector();
+        renderAllVariables();
+        updateCollectionVarSelector();
+        renderHistory();
+
+        // エディタをクリア
+        const methodSelect = document.getElementById('methodSelect') as HTMLSelectElement;
+        const urlInput = document.getElementById('urlInput') as HTMLInputElement;
+        const nameInput = document.getElementById('nameInput') as HTMLInputElement;
+        
+        if (methodSelect) methodSelect.value = 'GET';
+        if (urlInput) urlInput.value = '';
+        if (nameInput) nameInput.value = '';
+
+        // ヘッダーとパラメータのコンテナをクリア
+        const headersContainer = document.getElementById('headersContainer');
+        const paramsContainer = document.getElementById('paramsContainer');
+        
+        if (headersContainer) {
+            headersContainer.innerHTML = '';
+            addKeyValueRow(headersContainer, 'header');
+        }
+        if (paramsContainer) {
+            paramsContainer.innerHTML = '';
+            addKeyValueRow(paramsContainer, 'param');
+        }
+
+        // ボディ関連をリセット
+        const rawBody = document.getElementById('rawBody') as HTMLTextAreaElement;
+        const jsonBody = document.getElementById('jsonBody') as HTMLTextAreaElement;
+        const preRequestScript = document.getElementById('preRequestScript') as HTMLTextAreaElement;
+        const testScript = document.getElementById('testScript') as HTMLTextAreaElement;
+        
+        if (rawBody) rawBody.value = '';
+        if (jsonBody) jsonBody.value = '';
+        if (preRequestScript) preRequestScript.value = '';
+        if (testScript) testScript.value = '';
+
+        // Body Type を none にリセット
+        const noneRadio = document.querySelector('input[name="bodyType"][value="none"]') as HTMLInputElement;
+        if (noneRadio) {
+            noneRadio.checked = true;
+            handleBodyTypeChange({ target: { value: 'none' } } as any);
+        }
+
+        showSuccess('All storage data has been cleared successfully');
+        
+    } catch (error: any) {
+        showStorageError('clear all storage', error);
+    }
 }

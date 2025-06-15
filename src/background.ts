@@ -669,9 +669,9 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
 
     // Context menu setup (optional feature)
     chrome.runtime.onInstalled.addListener(() => {
-        chrome.storage.local.clear(() => {
-            console.log('debug用の暫定処理：ストレージをクリアしました（onInstalled）');
-        });
+        // chrome.storage.local.clear(() => {
+        //     console.log('debug用の暫定処理：ストレージをクリアしました（onInstalled）');
+        // });
         chrome.contextMenus.create({
             id: 'interceptRequest',
             title: 'Test this API with API Tester',

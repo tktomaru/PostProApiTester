@@ -4,7 +4,6 @@ import type { Scenario, RequestData, TestResult } from './types';
 import { state, saveScenariosToStorage } from './state';
 import { loadRequestIntoEditor, sendRequest } from './requestManager';
 import { showSuccess, showError } from './utils';
-import { sampleScenarios } from './defaultData';
 
 /**
  * initializeScenarios：起動時に localStorage からシナリオをロードし、もし存在しなければサンプルを挿入
@@ -12,12 +11,8 @@ import { sampleScenarios } from './defaultData';
 export async function initializeScenarios(): Promise<void> {
     try {
         const stored = await chrome.storage.local.get(['scenarios']);
-        if (!stored.scenarios || stored.scenarios.length === 0) {
-            // まだシナリオがなければ sampleScenarios を投入
-            state.scenarios.splice(0, state.scenarios.length, ...sampleScenarios);
-            await chrome.storage.local.set({ scenarios: state.scenarios });
-        } else {
-            // すでにあればそちらを優先
+        if (stored.scenarios) {
+            // ストレージにシナリオがあればロード
             state.scenarios.splice(0, state.scenarios.length, ...stored.scenarios);
         }
 

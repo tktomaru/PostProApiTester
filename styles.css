@@ -439,6 +439,17 @@ body {
     font-size: 11px;
 }
 
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    border: 1px solid #dc3545;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    border-color: #bd2130;
+}
+
 /* Navigation Tabs */
 .nav-tabs {
     display: flex;
