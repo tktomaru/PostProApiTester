@@ -14,6 +14,7 @@
         <div class="header-actions">
             <button class="btn btn-outline btn-sm" id="importBtn">Import</button>
             <button class="btn btn-outline btn-sm" id="exportBtn">Export</button>
+            <button class="btn btn-outline btn-sm btn-danger" id="clearStorageBtn">Clear Storage</button>
             <button class="btn btn-outline btn-sm" id="settingsBtn">Settings</button>
         </div>
     </div>
@@ -379,7 +380,14 @@
                         <option value="curl">cURL Command</option>
                         <option value="apitester">PostPro API Tester Format</option>
                         <option value="talentedapitester">Talented API Tester Format</option>
+                        <option value="sample">Sample Data</option>
                     </select>
+                </div>
+                <div class="sample-import-section">
+                    <button class="btn btn-outline" id="importSampleBtn">Import Sample Data</button>
+                    <small style="color: #666; display: block; margin-top: 4px;">
+                        Load sample collections, scenarios, and variables for testing
+                    </small>
                 </div>
                 <div class="file-input-area">
                     <div id="fileDropZone" class="file-drop-zone">
