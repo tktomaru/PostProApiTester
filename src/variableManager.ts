@@ -53,20 +53,8 @@ function setupVariableEventListeners(): void {
  */
 export async function initializeVariablesManagement(): Promise<void> {
     try {
-        // ストレージから既存の変数データをロード
-        const stored = await chrome.storage.local.get(['variables']);
-        const storedVars = stored.variables || {};
-
-        // グローバル変数とコレクション変数を初期化（存在する場合のみ）
-        (state as any).variables.global = storedVars.global || {};
-        (state as any).variables.collection = storedVars.collection || {};
-
-        // 環境一覧をロード
-        const storedEnvList = await chrome.storage.local.get(['environments']);
-        const envsFromStorage = storedEnvList.environments || [];
-        state.environments.splice(0, state.environments.length, ...envsFromStorage);
-
-        // 現在選択中の環境に合わせて変数を読み込む
+        // 既にloadAllStoredData()で基本データは読み込み済み
+        // 現在選択中の環境に合わせて環境変数を読み込む（これは個別に必要）
         if (state.currentEnvironment) {
             const envData = await chrome.storage.local.get([`env_${state.currentEnvironment}`]);
             (state as any).variables.environment = envData[`env_${state.currentEnvironment}`] || {};

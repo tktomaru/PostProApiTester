@@ -296,6 +296,10 @@ async function initializeApp(): Promise<void> {
 
         // ─────────────────────────────
         // 2. ストレージからデータをロードし、必要ならサンプル投入
+        
+        // 2-1. 全ストレージデータを読み込み
+        const { loadAllStoredData } = await import('./state');
+        await loadAllStoredData();
 
         // 2-2. コレクションの初期化（サンプルコレクション投入）
         await initializeCollections();
@@ -330,7 +334,15 @@ async function initializeApp(): Promise<void> {
         initializeTestScript();
 
         // ─────────────────────────────
+        // 初期化後の状態を確認
         console.log('API Tester initialized successfully');
+        console.log('Final state after initialization:', {
+            collectionsCount: state.collections.length,
+            scenariosCount: state.scenarios.length,
+            environmentsCount: state.environments.length,
+            globalVariablesCount: Object.keys((state as any).variables.global).length,
+            collectionVariablesCount: Object.keys((state as any).variables.collection).length
+        });
     } catch (error: any) {
         console.error('Initialization error:', error);
         showError('Failed to initialize: ' + error.message);

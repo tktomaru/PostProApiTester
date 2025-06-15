@@ -619,26 +619,51 @@ const interceptedRequests = new Map<string, InterceptedRequest>();
     }
 
     // Extension lifecycle events
-    chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
+    chrome.runtime.onInstalled.addListener(async (details: chrome.runtime.InstalledDetails) => {
         console.log('API Tester extension installed:', details.reason);
 
-        // Initialize default settings
-        chrome.storage.local.set({
-            settings: {
+        // 既存のデータを確認してから初期化（上書きを防ぐ）
+        const existing = await chrome.storage.local.get(['settings', 'collections', 'history', 'variables']);
+        
+        const defaultData: any = {};
+        
+        // 設定が存在しない場合のみデフォルト設定をセット
+        if (!existing.settings) {
+            defaultData.settings = {
                 timeout: 30000,
                 followRedirects: true,
                 validateSSL: true,
                 maxHistoryItems: 100,
                 openDevTools: true
-            },
-            collections: [],
-            history: [],
-            variables: {
+            };
+        }
+        
+        // コレクションが存在しない場合のみ空配列をセット
+        if (!existing.collections) {
+            defaultData.collections = [];
+        }
+        
+        // 履歴が存在しない場合のみ空配列をセット
+        if (!existing.history) {
+            defaultData.history = [];
+        }
+        
+        // 変数が存在しない場合のみ空オブジェクトをセット
+        if (!existing.variables) {
+            defaultData.variables = {
                 global: {},
                 environment: {},
                 collection: {}
-            }
-        });
+            };
+        }
+        
+        // 必要なデータのみを設定
+        if (Object.keys(defaultData).length > 0) {
+            await chrome.storage.local.set(defaultData);
+            console.log('Default data set:', defaultData);
+        } else {
+            console.log('All data already exists, skipping initialization');
+        }
     });
 
     chrome.runtime.onStartup.addListener(() => {

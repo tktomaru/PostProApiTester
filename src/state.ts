@@ -95,6 +95,9 @@ export async function loadAllStoredData(): Promise<void> {
 
         if (result.collections) {
             state.collections = result.collections;
+            console.log('Collections loaded from storage:', state.collections.length, state.collections);
+        } else {
+            console.log('No collections found in storage');
         }
 
         if (result.history) {
@@ -103,10 +106,16 @@ export async function loadAllStoredData(): Promise<void> {
 
         if (result.variables?.global) {
             state.variables.global = result.variables.global;
+            console.log('Global variables loaded from storage:', Object.keys(state.variables.global).length, state.variables.global);
+        } else {
+            console.log('No global variables found in storage');
         }
 
         if (result.variables?.collection) {
             state.variables.collection = result.variables.collection;
+            console.log('Collection variables loaded from storage:', Object.keys(state.variables.collection).length, state.variables.collection);
+        } else {
+            console.log('No collection variables found in storage');
         }
 
         if (result.environments) {
@@ -157,12 +166,9 @@ export async function loadAllStoredData(): Promise<void> {
  */
 export async function saveCollectionsToStorage(): Promise<void> {
     try {
+        console.log('Saving collections to storage:', state.collections.length, 'collections');
         await chrome.storage.local.set({ collections: state.collections });
-
-        const stored = await chrome.storage.local.get(['collections']);
-        state.collections.splice(0, state.collections.length, ...stored.collections);
-        // リクエスト実行結果の保存時はUI更新不要
-        // renderCollectionsTree();
+        // 保存後にストレージから再読み込みする必要はない
         // コレクション変数セレクタも更新
         updateCollectionVarSelector();
     } catch (error: any) {
@@ -193,6 +199,11 @@ export async function saveHistoryToStorage(): Promise<void> {
  *  state.variables.global と state.variables.collection を chrome.storage.local に保存
  */
 export async function saveVariablesToStorage(): Promise<void> {
+    console.log('Saving variables to storage:', {
+        globalCount: Object.keys(state.variables.global).length,
+        collectionCount: Object.keys(state.variables.collection).length,
+        environmentCount: Object.keys(state.variables.environment).length
+    });
     await chrome.storage.local.set({
         variables: {
             global: state.variables.global,

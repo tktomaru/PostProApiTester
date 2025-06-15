@@ -10,13 +10,8 @@ import { showSuccess, showError } from './utils';
  */
 export async function initializeScenarios(): Promise<void> {
     try {
-        const stored = await chrome.storage.local.get(['scenarios']);
-        if (stored.scenarios) {
-            // ストレージにシナリオがあればロード
-            state.scenarios.splice(0, state.scenarios.length, ...stored.scenarios);
-        }
-
-        // 画面上のシナリオ一覧を描画
+        // 既にloadAllStoredData()で読み込み済みのため、ストレージからの再読み込みは不要
+        // 画面にレンダリングのみ実行
         renderScenarioList();
         
         // サイドバーのシナリオツリーも描画

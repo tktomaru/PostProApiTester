@@ -28,13 +28,8 @@ interface MenuItem {
  */
 export async function initializeCollections(): Promise<void> {
     try {
-        const stored = await chrome.storage.local.get(['collections']);
-        if (stored.collections) {
-            // ストレージにコレクションがあればロード
-            state.collections.splice(0, state.collections.length, ...stored.collections);
-        }
-
-        // 画面にレンダリング
+        // 既にloadAllStoredData()で読み込み済みのため、ストレージからの再読み込みは不要
+        // 画面にレンダリングのみ実行
         renderCollectionsTree();
         renderScenariosTree();
 
