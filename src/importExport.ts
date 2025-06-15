@@ -924,7 +924,24 @@ export async function importSampleData(): Promise<void> {
         if (!(state as any).variables.environment) {
             (state as any).variables.environment = {};
         }
-        Object.assign((state as any).variables.environment, sampleEnvironmentVariables);
+        
+        // 各環境に対応する環境変数を個別に保存
+        for (const [envId, envVars] of Object.entries(sampleEnvironmentVariables)) {
+            // Chrome storageに各環境の変数を保存
+            await chrome.storage.local.set({ [`env_${envId}`]: envVars });
+        }
+        
+        // 環境が選択されていない場合、最初のサンプル環境を選択
+        if (!state.currentEnvironment && newEnvironments.length > 0) {
+            state.currentEnvironment = newEnvironments[0].id;
+            await chrome.storage.local.set({ currentEnvironment: state.currentEnvironment });
+            
+            // 選択した環境の変数をメモリに読み込み
+            const firstEnvVars = sampleEnvironmentVariables[state.currentEnvironment];
+            if (firstEnvVars) {
+                (state as any).variables.environment = { ...firstEnvVars };
+            }
+        }
 
         // 6. サンプルコレクション変数を追加
         if (!(state as any).variables.collection) {
@@ -936,9 +953,9 @@ export async function importSampleData(): Promise<void> {
         await saveVariablesToStorage();
 
         // UI更新
+        renderEnvironmentSelector(); // 環境セレクタを先に更新
         updateCollectionVarSelector();
-        renderEnvironmentSelector();
-        renderAllVariables();
+        renderAllVariables(); // 変数表示を更新
         renderCollectionsTree();
         renderScenarioList();
         
